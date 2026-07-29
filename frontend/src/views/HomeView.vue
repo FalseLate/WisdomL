@@ -22,9 +22,10 @@
         <van-tab title="📁 上传文件">
           <FileUploadCard :loading="fLoading" @upload="handleFileUpload" />
           <LoadingSkeleton v-if="fLoading" />
-          <div v-if="upDone && pureQuestions.length === 0" class="card section-list">
-            <div class="card section-info">📁 {{ upName }} · {{ upWords }}字 · {{ secs.length }}章节</div>
-            <div class="section-ai-hint">章节由AI根据文档内容自动生成</div>
+          <div v-if="upDone" class="card section-list">
+            <div class="summary-bar">
+              📊 共 {{ fileResults.length }} 个文档，{{ totalSecCount }} 个章节，{{ totalWords }} 字
+            </div>
             <div class="card type-selector-card">
               <van-radio-group v-model="fileQT" direction="horizontal">
                 <van-radio name="all" shape="square">📝 全部</van-radio>
@@ -32,20 +33,51 @@
                 <van-radio name="subjective" shape="square">✍️ 主观</van-radio>
               </van-radio-group>
             </div>
-            <div class="section-header"><span>选择章节：</span><van-button size="mini" plain type="primary" @click="selAll">全选</van-button><van-button size="mini" plain type="default" @click="deselAll">取消</van-button></div>
-            <div class="section-items">
-              <div v-for="s in secs" :key="s.id" class="section-item" :class="{checked:selSecs.includes(s.id)}" @click="toggleSec(s.id)">
-                <span class="sec-chk" :class="{checked:selSecs.includes(s.id)}"><van-icon v-if="selSecs.includes(s.id)" name="success" size="12" color="#fff" /></span>
-                <span class="sec-title">{{ s.title }}</span><span class="sec-words">({{ s.wordCount }}字)</span>
+
+            <!-- 可滚动文件卡片区域 -->
+            <div class="file-cards-scroll">
+            <div v-for="(fr, fi) in fileResults" :key="fi" class="file-card" :class="{ 'pure-card': fr.isPure }">
+              <div class="file-card-header">
+                <span class="file-icon">{{ fr.isPure ? '🟢' : '📘' }}</span>
+                <span class="file-name">{{ fr.name }}</span>
+                <span class="file-tag">{{ fr.isPure ? '纯题目 · ' + fr.questions.length + '题' : '理论文档 · ' + fr.words + '字' }}</span>
               </div>
+
+              <template v-if="fr.isPure">
+                <div class="section-items" style="border-bottom:1px solid #f0f0f0">
+                  <div class="section-item" :class="{checked:selPures.includes(fi)}" @click="togglePure(fi)">
+                    <span class="sec-chk" :class="{checked:selPures.includes(fi)}"><van-icon v-if="selPures.includes(fi)" name="success" size="12" color="#fff" /></span>
+                    <span class="sec-title">🟢 直接提取原题（{{ fr.questions.length }}题）</span>
+                    <span class="sec-words">不AI改写</span>
+                  </div>
+                </div>
+                <div class="section-items">
+                  <div v-for="s in fr.sections" :key="s.id" class="section-item" :class="{checked:selSecs.includes(s.id)}" @click="toggleSec(s.id)">
+                    <span class="sec-chk" :class="{checked:selSecs.includes(s.id)}"><van-icon v-if="selSecs.includes(s.id)" name="success" size="12" color="#fff" /></span>
+                    <span class="sec-title">{{ s.title }}</span>
+                    <span class="sec-words">({{ s.wordCount }}字)</span>
+                  </div>
+                </div>
+              </template>
+
+              <template v-if="!fr.isPure || fr.showSections">
+                <div class="section-items">
+                  <div v-for="s in fr.sections" :key="s.id" class="section-item" :class="{checked:selSecs.includes(s.id)}" @click="toggleSec(s.id)">
+                    <span class="sec-chk" :class="{checked:selSecs.includes(s.id)}"><van-icon v-if="selSecs.includes(s.id)" name="success" size="12" color="#fff" /></span>
+                    <span class="sec-title">{{ s.title }}</span>
+                    <span class="sec-words">({{ s.wordCount }}字)</span>
+                  </div>
+                </div>
+              </template>
             </div>
-            <van-button block round class="gradient-btn" :loading="genLoading" :disabled="selSecs.length===0" @click="genFromSecs">✅ 生成（{{selSecs.length}}章节）</van-button>
-          </div>
-                    <div v-if="pureQuestions.length > 0" class="card section-list" style="border-left: 4px solid #07c160;">
-            <div class="card section-info">📝 检测到纯题目文档，共 {{ pureQuestionCount }} 道题目</div>
-            <div class="section-ai-hint">系统将直接提取原题，不做AI二次改写</div>
-            <van-button block round class="gradient-btn" @click="usePureQuestions">✅ 直接使用提取的题目</van-button>
-            <van-button block round plain style="margin-top:8px" @click="pureQuestions=[];pureQuestionCount=0">❌ 改为AI重新出题</van-button>
+            </div>
+
+            <div class="section-header" style="margin-top:8px">
+              <span>已选 {{ selSecs.length }} 章节 + {{ selPures.length }} 纯题目</span>
+              <van-button size="mini" plain type="primary" @click="selAll">全选</van-button>
+              <van-button size="mini" plain type="default" @click="deselAll">取消</van-button>
+            </div>
+            <van-button block round class="gradient-btn" :loading="genLoading" :disabled="selSecs.length===0 && selPures.length===0" @click="genFromSecs">✅ 开始生成（{{ selSecs.length }}章节 + {{ selPures.length }}纯题目）</van-button>
           </div>
           <div v-if="upDone" class="reupload" @click="resetUp"><van-icon name="replay" /> 重新选择</div>
         </van-tab>
@@ -73,11 +105,12 @@
         <van-button round plain block @click="showGenDialog=false">留在首页</van-button>
       </div>
     </van-dialog>
+    <LoadingDialog :visible="showLoadingDialog" />
   </div>
 </template>
 <script setup>
-import { ref } from 'vue'
- import { showLoadingToast, closeToast, showFailToast, showSuccessToast } from 'vant'
+import { ref, computed } from 'vue'
+ import { showFailToast, showSuccessToast } from 'vant'
 import { useRouter } from 'vue-router'
 import { isLoggedIn } from '../utils/auth.js'
 import { useQuestionsStore } from '../stores/questions'
@@ -87,6 +120,7 @@ import TextInputCard from '../components/TextInputCard.vue'
 import PhotoInputCard from '../components/PhotoInputCard.vue'
 import FileUploadCard from '../components/FileUploadCard.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
+import LoadingDialog from '../components/LoadingDialog.vue'
 
 const router = useRouter()
 const qStore = useQuestionsStore()
@@ -107,33 +141,39 @@ const visImg = ref('')
 const showViz = ref(false)
 const regCount = ref(0)
 const upDone = ref(false)
-const upName = ref('')
-const upWords = ref(0)
-const secs = ref([])
+// 按文件分组: [{ name, isPure, sections, questions, words, showSections }]
+const fileResults = ref([])
 const selSecs = ref([])
+const selPures = ref([])
 const secTexts = ref({})
 const fileQT = ref('all')
-const pureQuestions = ref([])
-const pureQuestionCount = ref(0)
+const showLoadingDialog = ref(false)
+
+const totalSecCount = computed(() => {
+  let c = 0; fileResults.value.forEach(fr => c += fr.sections.length); return c
+})
+const totalWords = computed(() => {
+  let w = 0; fileResults.value.forEach(fr => w += fr.words); return w
+})
 
 async function handleGenerate({ text, questionType }) {
   if (!text?.trim()) { showFailToast('请输入复习资料'); return }
   if (!isLoggedIn()) { showLoginDialog.value = true; return }
   loading.value = true
-  showLoadingToast({ message: 'AI正在努力出题中...', forbidClick: true, duration: 0 })
+  showLoadingDialog.value = true
   try {
     const r = await request.post('/generate', { text, questionType })
     if (r.errorMessage) { showFailToast(r.errorMessage); return }
     popDialog(r)
   } catch (e) { showFailToast(e.message || "error") }
-  finally { loading.value = false; closeToast() }
+  finally { loading.value = false; showLoadingDialog.value = false }
 }
 
 async function handlePhotoGenerate({ files, questionType }) {
   if (!files || files.length===0) { showFailToast('请先拍照或选择图片'); return }
   if (!isLoggedIn()) { showLoginDialog.value = true; return }
   pLoading.value = true
-  showLoadingToast({ message: 'AI正在分析' + files.length + '张图片...', forbidClick: true, duration: 0 })
+  showLoadingDialog.value = true
   try {
     // ================================================================
     // Promise.all 并发上传多张图片
@@ -166,7 +206,7 @@ async function handlePhotoGenerate({ files, questionType }) {
     regCount.value = firstRegCount
     popDialog({ totalCount, objectiveCount: objCount, subjectiveCount: subCount, objectiveQuestions: allObj, subjectiveQuestions: allSub })
   } catch (e) { showFailToast(e.message || '识别失败') }
-  finally { pLoading.value = false; closeToast() }
+  finally { pLoading.value = false; showLoadingDialog.value = false }
 }
 
 // ================================================================
@@ -180,92 +220,92 @@ async function handleFileUpload({ files, questionType }) {
     const tasks = files.map(file => {
       const fd = new FormData()
       fd.append('file', file)
-      return request.post('/upload', fd, { timeout: 120000 }).catch(() => null)
+      return request.post('/upload', fd, { timeout: 180000 }).catch(() => null)
     })
     const results = await Promise.all(tasks)
 
-    let allSecs = []; let allNames = []; let totalWords = 0; let secIdx = 0
-    let allExtracted = []; let isPure = false
+    const frList = []
+    let secIdx = 0
+    const txt = {}
 
-    results.forEach(r => {
+    results.forEach((r, idx) => {
       if (!r || r.error) return
-      allNames.push(r.fileName)
-      totalWords += r.totalWords
-      if (r.sections) {
-        r.sections.forEach(s => {
-          secIdx++
-          const prefix = files.length > 1 ? '[' + r.fileName + '] ' : ''
-          allSecs.push({ id: 'sec-' + secIdx, title: prefix + s.title, text: s.text, wordCount: s.wordCount })
-        })
-      }
-      if (r.isPureQuestions) { isPure = true; allExtracted.push(...(r.extractedQuestions || [])) }
+      const sections = (r.sections || []).map(s => {
+        secIdx++
+        const prefix = '[' + r.fileName + '] '
+        const id = 'sec-' + secIdx
+        const sec = { id, title: prefix + s.title, text: s.text, wordCount: s.wordCount }
+        txt[id] = s.text
+        return sec
+      })
+      frList.push({
+        name: r.fileName || ('文件' + (idx + 1)),
+        isPure: !!r.isPureQuestions,
+        sections: sections,
+        questions: r.extractedQuestions || [],
+        words: r.totalWords || 0,
+        showSections: false
+      })
     })
 
-    if (allSecs.length === 0) { showFailToast('未能提取到文字内容'); return }
-    upName.value = allNames.join(', '); upWords.value = totalWords; secs.value = allSecs
-    const txt = {}; allSecs.forEach(s => txt[s.id] = s.text); secTexts.value = txt
+    if (frList.length === 0) { showFailToast('未能提取到文字内容'); return }
+    fileResults.value = frList
+    secTexts.value = txt
     upDone.value = true
-    if (isPure && allExtracted.length > 0) {
-      pureQuestions.value = allExtracted
-      pureQuestionCount.value = allExtracted.length
-    }
   } catch (e) { showFailToast(e.message || '上传失败') }
   finally { fLoading.value = false }
 }
 
 function toggleSec(id) { const i = selSecs.value.indexOf(id); i >= 0 ? selSecs.value.splice(i, 1) : selSecs.value.push(id) }
-function selAll() { selSecs.value = secs.value.map(s => s.id) }
-function deselAll() { selSecs.value = [] }
-function resetUp() { upDone.value = false; upName.value = ''; secs.value = []; selSecs.value = []; secTexts.value = {}; pureQuestions.value = []; pureQuestionCount.value = 0 }
+function selAll() { selSecs.value = []; fileResults.value.forEach(fr => fr.sections.forEach(s => selSecs.value.push(s.id))) }
+function deselAll() { selSecs.value = []; selPures.value = [] }
+function resetUp() { upDone.value = false; fileResults.value = []; selSecs.value = []; selPures.value = []; secTexts.value = {} }
 
- async function usePureQuestions() {
-   if (pureQuestions.value.length === 0) { showFailToast('未检测到题目'); return }
-   showLoadingToast({ message: 'AI正在校验答案...', forbidClick: true, duration: 0 })
-   try {
-     const res = await request.post('/verify-answers', { questions: pureQuestions.value })
-     if (res.error) { showFailToast(res.error); closeToast(); return }
-     const qs = res.questions || pureQuestions.value
-     qStore.setQuestions(qs)
-     pStore.currentSectionId = 'sec-' + Date.now()
-     genTotal.value = qs.length
-     genObj.value = qs.filter(q => q.type !== 'subjective').length
-     genSub.value = qs.filter(q => q.type === 'subjective').length
-     genMissingCount.value = countMissingAnswers(qs)
-     showGenDialog.value = true
-     closeToast()
-     // 保存到后端
-     request.post('/generate-from-extracted', { questions: qs }).catch(() => {})
-   } catch (e) {
-     closeToast()
-     showFailToast('答案校验失败: ' + (e.message || '请稍后重试'))
-   }
- }
+function togglePure(fi) { const i = selPures.value.indexOf(fi); i >= 0 ? selPures.value.splice(i, 1) : selPures.value.push(fi) }
 
 async function genFromSecs() {
-  if (selSecs.value.length === 0) { showFailToast('请选择章节'); return }
+  if (selSecs.value.length === 0 && selPures.value.length === 0) { showFailToast('请选择章节或纯题目'); return }
   if (!isLoggedIn()) { showLoginDialog.value = true; return }
   genLoading.value = true
-  showLoadingToast({ message: 'AI正在努力出题中...', forbidClick: true, duration: 0 })
+  showLoadingDialog.value = true
   try {
-    const r = await request.post('/generate-from-sections', { sectionIds: selSecs.value, sectionTexts: secTexts.value, questionType: fileQT.value })
-    if (r.error) { showFailToast(r.error); return }
-    const qs = r.questions || []; const ss = r.subjectiveQuestions || []
-    qStore.setQuestions([...qs, ...ss])
-    popDialog({ totalCount: r.totalCount || 0, objectiveQuestions: qs, subjectiveQuestions: ss })
+    let allQs = []
+    for (const fi of selPures.value) {
+      const fr = fileResults.value[fi]
+      if (!fr || fr.questions.length === 0) continue
+      try { const res = await request.post('/verify-answers', { questions: fr.questions }); allQs.push(...(res.questions || fr.questions)) }
+      catch(e) { allQs.push(...fr.questions) }
+    }
+    if (selSecs.value.length > 0) {
+      const r = await request.post('/generate-from-sections', { sectionIds: selSecs.value, sectionTexts: secTexts.value, questionType: fileQT.value })
+      if (!r.error) { allQs.push(...(r.questions || [])); allQs.push(...(r.subjectiveQuestions || [])) }
+    }
+    if (allQs.length === 0) { showFailToast('生成失败'); return }
+    // 统一中文type→英文
+    const TYPE_MAP = { '单选':'single', '多选':'multiple', '判断':'single', '简答':'subjective', '主观':'subjective' }
+    allQs.forEach(q => { const m = TYPE_MAP[q.type]; if (m) q.type = m })
+    // 有type=subjective的直接归主观题，其余按选项数判断
+    const subQs = allQs.filter(q => q.type === 'subjective')
+    const objQs = allQs.filter(q => q.type !== 'subjective' && (Object.values(q.options||{}).filter(v=>v&&String(v).trim()).length >= 2))
+    subQs.push(...allQs.filter(q => q.type !== 'subjective' && Object.values(q.options||{}).filter(v=>v&&String(v).trim()).length < 2))
+    popDialog({ totalCount: allQs.length, objectiveQuestions: objQs, subjectiveQuestions: subQs })
   } catch (e) { showFailToast(e.message || '出题失败') }
-  finally { genLoading.value = false; closeToast() }
+  finally { genLoading.value = false; showLoadingDialog.value = false }
 }
 
 function popDialog(r) {
   const qs = r.objectiveQuestions || []; const ss = r.subjectiveQuestions || []
+  const TYPE_MAP = { '单选':'single', '多选':'multiple', '判断':'single', '简答':'subjective', '主观':'subjective' }
+  qs.forEach(q => { const m = TYPE_MAP[q.type]; if (m) q.type = m; else q.type = 'single' })
+  ss.forEach(q => { const m = TYPE_MAP[q.type]; if (m) q.type = m; else q.type = 'subjective' })
   const all = [...qs, ...ss]
   qStore.setQuestions(all)
-  // 每次出题都生成新的 sectionId，确保刷题进度从零开始
   pStore.currentSectionId = 'sec-' + Date.now()
   genTotal.value = r.totalCount || qs.length + ss.length
-  genObj.value = r.objectiveCount || qs.length
-  genSub.value = r.subjectiveCount || ss.length
+  genObj.value = qs.length
+  genSub.value = ss.length
   genMissingCount.value = countMissingAnswers(all)
+  showLoadingDialog.value = false
   showGenDialog.value = true
 }
 
@@ -273,13 +313,13 @@ function countMissingAnswers(questions) {
   return questions.filter(q => {
     const ans = q.answer
     const exp = q.explanation
-    const missingAns = !ans || ans === '参考答案未提供' || ans === '未提供' || ans.trim() === ''
-    const missingExp = !exp || exp === '解析未提供' || exp === '解析生成失败' || exp === '未提供' || exp.trim() === ''
+    const missingAns = ans == null || typeof ans !== 'string' || ans === '参考答案未提供' || ans === '未提供' || ans.trim() === ''
+    const missingExp = exp == null || typeof exp !== 'string' || exp === '解析未提供' || exp === '解析生成失败' || exp === '未提供' || exp.trim() === ''
     return missingAns || missingExp
   }).length
 }
 
-function goPractice() { showGenDialog.value = false; router.push('/practice') }
+function goPractice() { showGenDialog.value = false; router.push('/question-bank') }
 function goProfile() {
   if (!isLoggedIn()) { showLoginDialog.value = true; return }
   router.push("/user-center")
@@ -306,6 +346,16 @@ function goProfile() {
 .sec-words { font-size: 12px; color: #999; margin-left: 6px; }
 .reupload { text-align: center; padding: 12px; font-size: 13px; color: #667eea; cursor: pointer; }
 .type-selector-card { padding: 12px 16px; }
+.summary-bar { font-size: 13px; color: #667eea; padding: 10px 16px; background: #f0f0ff; border-bottom: 1px solid #e0e0f0; }
+.file-card { background: #fafbfc; border: 1px solid #e8e8f0; border-radius: 12px; margin: 8px 12px; }
+.file-card + .file-card { margin-top: 14px; border-top: 2px dashed #e0e0f0; padding-top: 4px; }
+.file-card.pure-card { border-left: 4px solid #07c160; }
+.file-card-header { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: #fafafa; }
+.file-icon { font-size: 14px; }
+.file-name { font-size: 14px; font-weight: 600; color: #333; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-tag { font-size: 11px; color: #999; flex-shrink: 0; }
+.file-actions { display: flex; gap: 8px; padding: 10px 14px; }
+.file-cards-scroll { max-height: 48vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .bottom-entries { display: flex; justify-content: center; gap: 20px; padding: 30px 0 50px; }
 .entry-item { text-align: center; color: rgba(255,255,255,0.85); font-size: 14px; cursor: pointer; padding: 10px 16px; border-radius: 20px; background: rgba(255,255,255,0.15); }
 </style>

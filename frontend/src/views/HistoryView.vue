@@ -141,6 +141,8 @@ function practiceItem(item) {
     const subArr = parsed.subjectiveQuestions || []
     const arr = [...objArr, ...subArr]
     if (arr.length === 0) { showFailToast('题目数据异常'); return }
+    const TYPE_MAP = { '单选':'single', '多选':'multiple', '判断':'single', '简答':'subjective', '主观':'subjective' }
+    arr.forEach(q => { const m = TYPE_MAP[q.type]; if (m) q.type = m })
     qStore.setQuestions(arr)
     // 记录当前刷题的 recordId
     pStore.currentSectionId = item.id?.toString() || Date.now().toString()

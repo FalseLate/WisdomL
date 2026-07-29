@@ -16,9 +16,9 @@ public class SectionSplitter {
             Pattern.CASE_INSENSITIVE
     );
 
-    private static final int TARGET_SECTION_SIZE = 2000;
+    private static final int TARGET_SECTION_SIZE = 5000;
     private static final int MIN_SECTION_SIZE = 500;
-    private static final int MAX_SECTION_SIZE = 4000;
+    private static final int MAX_SECTION_SIZE = 6000;
 
     public static class Section {
         private String id;
@@ -59,7 +59,7 @@ public class SectionSplitter {
                 int end = (i + 1 < chapterTitles.size()) ? chapterPositions.get(i + 1) : text.length();
                 String sectionText = text.substring(start, end).trim();
                 if (sectionText.length() < MIN_SECTION_SIZE) continue;
-                String title = chapterTitles.get(i);
+                String title = chapterTitles.get(i) + "（" + countChars(sectionText) + "字）";
                 sections.add(new Section("sec-" + (i + 1), title, sectionText, countChars(sectionText)));
             }
         } else {
@@ -74,7 +74,7 @@ public class SectionSplitter {
         int total = text.length();
 
         if (total <= MAX_SECTION_SIZE) {
-            sections.add(new Section("sec-1", "全文内容", text, countChars(text)));
+            sections.add(new Section("sec-1", "全文内容（" + countChars(text) + "字）", text, countChars(text)));
             return sections;
         }
 
@@ -99,7 +99,7 @@ public class SectionSplitter {
                 break;
             }
 
-            String title = "第" + toChinese(part) + "部分";
+            String title = "第" + toChinese(part) + "部分（" + countChars(chunk) + "字）";
             sections.add(new Section("sec-" + part, title, chunk, countChars(chunk)));
             part++;
             pos = end;

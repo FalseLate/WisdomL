@@ -33,7 +33,7 @@ public class GenerateController {
     public QuestionDTO generate(@RequestBody Map<String, String> request) {
         String text = request.get("text");
         String questionType = request.getOrDefault("questionType", "all");
-        QuestionDTO dto = questionService.generate(text, questionType);
+        QuestionDTO dto = questionService.generateParallel(text, questionType);
         saveRecord(text, dto);
         return dto;
     }

@@ -95,6 +95,7 @@ public class FileController {
                 return ResponseEntity.badRequest().body(result);
             }
 
+            // 正则快速检测：纯题目文档
             boolean isPureQuestions = detectPureQuestions(text);
             result.put("isPureQuestions", isPureQuestions);
 
@@ -104,6 +105,7 @@ public class FileController {
                 result.put("questionCount", extractedQuestions.size());
             }
 
+            // 正则快速拆分章节（秒返）
             List<Section> sections = sectionSplitter.split(text, fileName);
             int totalWords = sections.stream().mapToInt(Section::getWordCount).sum();
             result.put("fileName", fileName);
@@ -142,7 +144,17 @@ public class FileController {
             if (t == null || t.trim().isEmpty()) continue;
 
             try {
-                QuestionDTO dto = questionService.generate(t, questionType);
+                QuestionDTO dto = questionService.generateParallel(t, questionType);
+                // 给每道题打上章节标签
+                String chapterName = extractChapterName(t);
+                for (Map<String, Object> q : dto.getObjectiveQuestions()) {
+                    q.put("chapterId", id);
+                    q.put("chapterName", chapterName);
+                }
+                for (Map<String, Object> q : dto.getSubjectiveQuestions()) {
+                    q.put("chapterId", id);
+                    q.put("chapterName", chapterName);
+                }
                 allObjective.addAll(dto.getObjectiveQuestions());
                 allSubjective.addAll(dto.getSubjectiveQuestions());
                 totalObj += dto.getObjectiveCount();
@@ -229,16 +241,14 @@ public class FileController {
                 }
             }
             
-            // 对验证失败的题目，逐个调用 AI 补全
-            questionService.ensureAnswersAndExplanations(questions);
+            // 缺失答案的题目前端有 regenerate 按钮兜底，不在此阻塞
             
             result.put("questions", questions);
             result.put("success", true);
             return ResponseEntity.ok(result);
         } catch (Exception e) {
-            // 批量验证失败，回退到逐个补全
-            log.warn("批量验证失败，回退到逐个生成: {}", e.getMessage());
-            questionService.ensureAnswersAndExplanations(questions);
+            // 批量验证失败，不阻塞，前端 regenerate 兜底
+            log.warn("批量验证失败: {}", e.getMessage());
             result.put("questions", questions);
             result.put("success", true);
             result.put("fallback", true);
@@ -291,10 +301,7 @@ public class FileController {
         dto.setSubjectiveCount(subjective.size());
         dto.setTotalCount(objective.size() + subjective.size());
 
-        // 确保所有题目都有答案和解析
-        questionService.ensureAnswersAndExplanations(objective);
-        questionService.ensureAnswersAndExplanations(subjective);
-
+        // 不再同步生成答案和解析，前端可逐个触发重新生成
         String combinedText = "纯题目文档提取";
         saveSectionRecord(combinedText, dto);
 
@@ -304,6 +311,73 @@ public class FileController {
         result.put("success", true);
         return ResponseEntity.ok(result);
     }
+    /**
+     * AI 文档分析：判断文档类型，提取章节和知识点。
+     * 返回 Map: { doc_type, chapters, questions }
+     */
+    private Map<String, Object> callAiDocumentAnalysis(String text) {
+        Map<String, Object> fallback = new HashMap<>();
+        fallback.put("doc_type", "theory");
+        fallback.put("chapters", Collections.emptyList());
+        fallback.put("questions", Collections.emptyList());
+
+        try {
+            // 长文档截断，最大 15000 字符
+            String truncated = text.length() > 15000 ? text.substring(0, 15000) : text;
+
+            String systemPrompt = "你是一位专业的文档分析助手，请严格按照要求分析文档并输出JSON。";
+            String userPrompt = "请判断文档类型：\n" +
+                "如果文档绝大部分都是试题、选择题、简答题、答案，判定为【纯题目文档】，输出doc_type:\"question_only\"，chapters和questions为空数组。\n\n" +
+                "如果文档包含理论、概念、原理讲解，判定为【理论文档】，执行下面流程：\n" +
+                "1. 提取文档所有核心独立知识点；\n" +
+                "2. 将相似知识点聚类分组，每组必须是单一主题，禁止将不同主题的知识点混在同一组；\n" +
+                "3. 根据分组生成章节，章节名称格式严格为：第一章 xxx、第二章 xxx；\n" +
+                "4. 每个章节必须内容独立，章节名称必须准确反映该章节的知识点主题；\n" +
+                "5. 禁止将多个不相关的章节合并为一个，禁止章节名称与实际内容不符；\n\n" +
+                "输出标准JSON，不要额外解释，不要markdown。\n\n" +
+                "输出JSON结构：\n" +
+                "{\"doc_type\":\"\",\"chapters\":[{\"chapter_index\":数字,\"chapter_name\":\"第一章 xxx\",\"knowledge_list\":[\"知识点\"]}],\"questions\":[]}\n\n" +
+                "文档内容：\n" + truncated;
+
+            String rawResponse = questionService.callAIContent(systemPrompt, userPrompt);
+            String json = cleanJson(rawResponse);
+            Map<String, Object> parsed = mapper.readValue(json,
+                new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+
+            if (!parsed.containsKey("doc_type")) {
+                parsed.put("doc_type", "theory");
+            }
+            if (!parsed.containsKey("chapters")) {
+                parsed.put("chapters", Collections.emptyList());
+            }
+            if (!parsed.containsKey("questions")) {
+                parsed.put("questions", Collections.emptyList());
+            }
+            return parsed;
+        } catch (Exception e) {
+            log.warn("AI 文档分析失败，回退到正则: {}", e.getMessage());
+            return fallback;
+        }
+    }
+
+    private String cleanJson(String raw) {
+        if (raw == null || raw.isBlank()) return "{}";
+        String cleaned = raw.replace("```json", "").replace("```", "").trim();
+        int start = cleaned.indexOf('{');
+        int end = cleaned.lastIndexOf('}');
+        if (start >= 0 && end > start) {
+            return cleaned.substring(start, end + 1);
+        }
+        return cleaned;
+    }
+
+    /** 从章节文本中提取章节名称（第一行） */
+    private String extractChapterName(String text) {
+        if (text == null || text.isBlank()) return "未命名章节";
+        String firstLine = text.split("\\n")[0].trim();
+        return firstLine.length() > 30 ? firstLine.substring(0, 30) + "..." : firstLine;
+    }
+
     private boolean detectPureQuestions(String text) {
         var matcher = QUESTION_PATTERN.matcher(text);
         int questionCount = 0;
@@ -357,9 +431,10 @@ public class FileController {
                 }
                 q.put("question", cleanQuestion);
                 q.put("options", options);
-                String answer = i < answers.size() ? answers.get(i) : "";
+                String rawAns = i < answers.size() ? answers.get(i) : "";
+                String answer = rawAns.replaceAll("[^A-Ea-e]", "").toUpperCase();
                 q.put("type", options.size() > 4 || answer.length() > 1 ? "multiple" : "single");
-                q.put("answer", answer.isEmpty() ? "" : answer);
+                q.put("answer", answer.isEmpty() ? rawAns : answer);
                 q.put("explanation", "");
             } else {
                 // 主观题

@@ -18,9 +18,9 @@
       </div>
 
       <!-- 整卷提交按钮 -->
-      <div class="batch-bar" v-if="!allSubmitted && pendingAnswers.size > 0">
+      <div class="batch-bar" v-if="!allSubmitted && pendingCount > 0">
         <van-button round block type="warning" @click="batchSubmit" :loading="batchSubmitting">
-          📤 整卷提交（{{ pendingAnswers.size }}题待提交）
+          📤 整卷提交（{{ pendingCount }}题待提交）
         </van-button>
       </div>
 
@@ -28,24 +28,56 @@
       <van-tabs v-if="hasBoth" v-model="qTab" color="#667eea" title-active-color="#667eea">
         <van-tab :title="'客观题(' + objQ.length + ')'">
           <div class="q-scroll">
-            <ObjectiveQuestionCard v-for="(q,i) in objQ" :key="q.id||i" :question="q" :result="results[q.id||i]||null" :index="i" ref="objCardRefs" @submit="(e)=>handleSubmitObjective(e,q.id||i,q.type)" @change="(e)=>handleSelectionChange(e)" />
+            <template v-if="chapterGroups.length > 0">
+              <template v-for="g in chapterGroups" :key="g.name">
+                <div v-if="g.questions.some(q=>q.type!=='subjective')" class="chapter-header">{{ g.name }}</div>
+                <ObjectiveQuestionCard v-for="(q,i) in g.questions.filter(q=>q.type!=='subjective')" :key="q.id||i" :question="q" :result="results[q.id||i]||null" :index="i" ref="objCardRefs" @submit="(e)=>handleSubmitObjective(e,q.id||i,q.type)" @change="(e)=>handleSelectionChange(e)" @update-answer="(e)=>handleUpdateAnswer(e,q)" />
+              </template>
+            </template>
+            <template v-else>
+              <ObjectiveQuestionCard v-for="(q,i) in objQ" :key="q.id||i" :question="q" :result="results[q.id||i]||null" :index="i" ref="objCardRefs" @submit="(e)=>handleSubmitObjective(e,q.id||i,q.type)" @change="(e)=>handleSelectionChange(e)" @update-answer="(e)=>handleUpdateAnswer(e,q)" />
+            </template>
           </div>
         </van-tab>
         <van-tab :title="'主观题(' + subQ.length + ')'">
           <div class="q-scroll">
-            <SubjectiveQuestionCard v-for="(q,i) in subQ" :key="q.id||i" :question="q" :result="results[q.id||i]||null" :index="i" ref="subCardRefs" @submit="(e)=>handleSubmitSubjective(e,q.id||i)" @update-answer="(e)=>handleUpdateAnswer(e,q)" />
+            <template v-if="chapterGroups.length > 0">
+              <template v-for="g in chapterGroups" :key="g.name">
+                <div v-if="g.questions.some(q=>q.type==='subjective')" class="chapter-header">{{ g.name }}</div>
+                <SubjectiveQuestionCard v-for="(q,i) in g.questions.filter(q=>q.type==='subjective')" :key="q.id||i" :question="q" :result="results[q.id||i]||null" :index="i" ref="subCardRefs" @submit="(e)=>handleSubmitSubjective(e,q.id||i)" @update-answer="(e)=>handleUpdateAnswer(e,q)" />
+              </template>
+            </template>
+            <template v-else>
+              <SubjectiveQuestionCard v-for="(q,i) in subQ" :key="q.id||i" :question="q" :result="results[q.id||i]||null" :index="i" ref="subCardRefs" @submit="(e)=>handleSubmitSubjective(e,q.id||i)" @update-answer="(e)=>handleUpdateAnswer(e,q)" />
+            </template>
           </div>
         </van-tab>
       </van-tabs>
 
       <!-- 仅客观题 -->
       <div v-if="!hasBoth && objQ.length>0" class="q-scroll">
-        <ObjectiveQuestionCard v-for="(q,i) in objQ" :key="q.id||i" :question="q" :result="results[q.id||i]||null" :index="i" ref="objCardRefs" @submit="(e)=>handleSubmitObjective(e,q.id||i,q.type)" @change="(e)=>handleSelectionChange(e)" />
+        <template v-if="chapterGroups.length > 0">
+          <template v-for="g in chapterGroups" :key="g.name">
+            <div v-if="g.questions.some(q=>q.type!=='subjective')" class="chapter-header">{{ g.name }}</div>
+            <ObjectiveQuestionCard v-for="(q,i) in g.questions.filter(q=>q.type!=='subjective')" :key="q.id||i" :question="q" :result="results[q.id||i]||null" :index="i" ref="objCardRefs" @submit="(e)=>handleSubmitObjective(e,q.id||i,q.type)" @change="(e)=>handleSelectionChange(e)" @update-answer="(e)=>handleUpdateAnswer(e,q)" />
+          </template>
+        </template>
+        <template v-else>
+          <ObjectiveQuestionCard v-for="(q,i) in objQ" :key="q.id||i" :question="q" :result="results[q.id||i]||null" :index="i" ref="objCardRefs" @submit="(e)=>handleSubmitObjective(e,q.id||i,q.type)" @change="(e)=>handleSelectionChange(e)" @update-answer="(e)=>handleUpdateAnswer(e,q)" />
+        </template>
       </div>
 
       <!-- 仅主观题 -->
       <div v-if="!hasBoth && subQ.length>0" class="q-scroll">
-        <SubjectiveQuestionCard v-for="(q,i) in subQ" :key="q.id||i" :question="q" :result="results[q.id||i]||null" :index="i" ref="subCardRefs" @submit="(e)=>handleSubmitSubjective(e,q.id||i)" @update-answer="(e)=>handleUpdateAnswer(e,q)" />
+        <template v-if="chapterGroups.length > 0">
+          <template v-for="g in chapterGroups" :key="g.name">
+            <div v-if="g.questions.some(q=>q.type==='subjective')" class="chapter-header">{{ g.name }}</div>
+            <SubjectiveQuestionCard v-for="(q,i) in g.questions.filter(q=>q.type==='subjective')" :key="q.id||i" :question="q" :result="results[q.id||i]||null" :index="i" ref="subCardRefs" @submit="(e)=>handleSubmitSubjective(e,q.id||i)" @update-answer="(e)=>handleUpdateAnswer(e,q)" />
+          </template>
+        </template>
+        <template v-else>
+          <SubjectiveQuestionCard v-for="(q,i) in subQ" :key="q.id||i" :question="q" :result="results[q.id||i]||null" :index="i" ref="subCardRefs" @submit="(e)=>handleSubmitSubjective(e,q.id||i)" @update-answer="(e)=>handleUpdateAnswer(e,q)" />
+        </template>
       </div>
 
       <!-- 完成按钮 -->
@@ -106,6 +138,20 @@ const objQ = computed(() => allQuestions.value.filter(q => q.type !== 'subjectiv
 const subQ = computed(() => allQuestions.value.filter(q => q.type === 'subjective'))
 const hasBoth = computed(() => objQ.value.length > 0 && subQ.value.length > 0)
 
+// 章节分组：按 chapterName 分组题目
+const chapterGroups = computed(() => {
+  const groups = []
+  const seen = new Set()
+  for (const q of allQuestions.value) {
+    const name = q.chapterName || '默认分组'
+    if (!seen.has(name)) {
+      seen.add(name)
+      groups.push({ name, questions: allQuestions.value.filter(x => (x.chapterName || '默认分组') === name) })
+    }
+  }
+  return groups.length > 1 ? groups : []
+})
+
 const answeredCount = computed(() => Object.keys(results).length)
 const correctCount = computed(() => Object.values(results).filter(r => r?.correct).length)
 const wrongCount = computed(() => answeredCount.value - correctCount.value)
@@ -114,6 +160,21 @@ const progressPct = computed(() => {
 })
 const accuracyPct = computed(() => answeredCount.value > 0 ? Math.round(correctCount.value / answeredCount.value * 100) : 0)
 const allSubmitted = computed(() => answeredCount.value >= allQuestions.value.length)
+
+// 待提交计数：客观题pendingAnswers + 主观题已输入未提交
+const pendingCount = computed(() => {
+  let count = pendingAnswers.size
+  const subCards = subCardRefs.value || []
+  subQ.value.forEach((q, idx) => {
+    const qId = q.id || q._id
+    if (!results[qId]) {
+      const card = subCards[idx]
+      const ans = card?.getCurrentAnswer?.() || localStorage.getItem('subj_ans_' + qId) || ''
+      if (ans.trim()) count++
+    }
+  })
+  return count
+})
 
 const encouragements = [
   '坚持就是胜利，你离学霸又近了一步！📚',
@@ -129,8 +190,9 @@ onMounted(() => {
 })
 
 function initFromStore() {
+  const sectionId = pStore.currentSectionId
+  if (!sectionId) return
   Object.keys(results).forEach(k => delete results[k])
-  const sectionId = pStore.currentSectionId || 'default'
   pStore.initSection(sectionId, allQuestions.value.length, '刷题练习', 'practice')
   const saved = pStore.getSectionAnswers(sectionId)
   Object.keys(saved).forEach(k => { results[k] = saved[k] })
@@ -157,7 +219,8 @@ async function handleSubmitObjective(e, questionId, questionType) {
     })
     results[questionId] = r
     pendingAnswers.delete(questionId)
-    const secId = pStore.currentSectionId || 'default'
+    const secId = pStore.currentSectionId
+    if (!secId) return
     pStore.recordAnswer(secId, r?.correct)
     pStore.recordAnswerResult(secId, questionId, r)
   } catch(err) {
@@ -167,7 +230,9 @@ async function handleSubmitObjective(e, questionId, questionType) {
 
 function handleSubmitSubjective(e, questionId) {
   results[questionId] = { correct: e.isCorrect !== false, evaluation: e.evaluation || '', score: e.score || 0 }
-  const secId = pStore.currentSectionId || 'default'
+  pendingAnswers.delete(questionId)
+  const secId = pStore.currentSectionId
+  if (!secId) return
   pStore.recordAnswer(secId, e.isCorrect !== false)
   pStore.recordAnswerResult(secId, questionId, { correct: e.isCorrect !== false, score: e.score || 0 })
 }
@@ -175,7 +240,11 @@ function handleSubmitSubjective(e, questionId) {
 // 处理主观题答案/解析更新（来自子组件的手动重试生成）
 function handleUpdateAnswer(e, question) {
   if (e.answer) question.answer = e.answer
-  if (e.explanation) question.explanation = e.explanation
+  if (e.explanation) {
+    question.explanation = e.explanation
+    const qId = question.id || question._id
+    if (results[qId]) results[qId].explanation = e.explanation
+  }
 }
 
 async function batchSubmit() {
@@ -231,12 +300,40 @@ async function batchSubmit() {
       const qId = answers[idx].question.id || answers[idx].question._id
       results[qId] = r
       pendingAnswers.delete(qId)
-      const secId = pStore.currentSectionId || 'default'
+      const secId = pStore.currentSectionId
+      if (!secId) return
       pStore.recordAnswer(secId, r?.correct)
       pStore.recordAnswerResult(secId, qId, r)
     })
     
     showSuccessToast(`已提交 ${answers.length} 题`)
+    
+    // 批量并行生成缺失的解析
+    const missingExps = allQuestions.value.filter(q => {
+      const qId = q.id || q._id
+      const r = results[qId]
+      const exp = r?.explanation || q.explanation
+      return !exp || typeof exp !== 'string' || exp === '未提供' || exp === '解析未提供' || exp === '解析生成失败' || exp.trim() === ''
+    })
+    if (missingExps.length > 0) {
+      showSuccessToast(`正在生成 ${missingExps.length} 道题解析...`)
+      const genTasks = missingExps.map(q => 
+        request.post('/generate-answer', {
+          question: q.question,
+          type: q.type || 'subjective',
+          category: q.category || ''
+        }).then(res => {
+          const qId = q.id || q._id
+          if (res.answer) q.answer = res.answer
+          if (res.explanation) {
+            q.explanation = res.explanation
+            if (results[qId]) results[qId].explanation = res.explanation
+          }
+        }).catch(() => {})
+      )
+      await Promise.all(genTasks)
+      showSuccessToast('解析已全部生成')
+    }
   } catch (err) {
     showFailToast(err.message || '整卷提交失败')
   } finally {
@@ -268,6 +365,7 @@ function goHistory() {
 .progress-stats { display: flex; justify-content: space-around; margin-top: 8px; font-size: 12px; color: #999; }
 .batch-bar { position: sticky; top: 0; z-index: 10; background: #fff; border-radius: 16px; padding: 12px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
 .q-scroll { padding-bottom: 16px; }
+.chapter-header { font-size: 14px; font-weight: 700; color: #667eea; background: #f0f0ff; border-left: 4px solid #667eea; padding: 10px 14px; margin: 12px 0 8px; border-radius: 0 8px 8px 0; }
 .finish-bar { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; padding: 12px 16px 20px; background: #fff; box-shadow: 0 -2px 10px rgba(0,0,0,0.06); }
 .dialog-body { padding: 0 16px 20px; text-align: center; }
 .dialog-stats { display: flex; justify-content: space-around; margin-bottom: 16px; }

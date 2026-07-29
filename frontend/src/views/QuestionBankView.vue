@@ -118,6 +118,9 @@ function goPractice(item) {
       const objArr = Array.isArray(parsed) ? parsed : (parsed.objectiveQuestions || [])
       const subArr = parsed.subjectiveQuestions || []
       const qs = [...objArr, ...subArr]
+      // 前端用英文type，数据库存的是中文，统一映射
+      const TYPE_MAP = { '单选':'single', '多选':'multiple', '判断':'single', '简答':'subjective', '主观':'subjective' }
+      qs.forEach(q => { const m = TYPE_MAP[q.type]; if (m) q.type = m })
       qStore.setQuestions(qs)
       const secId = item.id?.toString() || Date.now().toString()
       pStore.currentSectionId = secId

@@ -45,7 +45,10 @@ out/
 
 # 前端忽略
 node_modules/
-dist/
+frontend/dist/
+
+# Reasonix 工作目录
+.reasonix/
 
 # 【重点】忽略带有密钥、数据库密码的配置文件
 **/application.yml

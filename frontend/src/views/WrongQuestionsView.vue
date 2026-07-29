@@ -12,6 +12,9 @@
         </div>
         <div v-if="item.question">
           <div class="wrong-question">{{ item.question.question }}</div>
+          <div class="wrong-opts" v-if="item.question.options">
+            <span v-for="(v,k) in item.question.options" :key="k" class="wrong-opt" :class="{ correct: k === item.correctAnswer }">{{ k }}. {{ v }}</span>
+          </div>
           <div class="wrong-answer">你的答案：<span class="red">{{ item.userAnswer }}</span></div>
           <div class="wrong-answer">正确答案：<span class="green">{{ item.correctAnswer }}</span></div>
           <div class="wrong-explain" v-if="item.explanation">{{ item.explanation }}</div>
@@ -56,4 +59,7 @@ async function removeWrong(id) {
 .red { color:#ee0a24; font-weight:500; }
 .green { color:#07c160; font-weight:500; }
 .wrong-explain { font-size:13px; color:#555; background:#fff8f8; padding:10px; border-radius:8px; margin-top:8px; line-height:1.5; }
+.wrong-opts { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
+.wrong-opt { font-size:12px; padding:4px 10px; border-radius:12px; background:#f5f5f5; color:#666; }
+.wrong-opt.correct { background:#e8f5e9; color:#2e7d32; font-weight:600; }
 </style>

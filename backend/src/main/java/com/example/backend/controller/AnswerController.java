@@ -44,13 +44,15 @@ public class AnswerController {
 
     private final RestTemplate restTemplate = new RestTemplate();
 
+    private static String asStr(Object o) { return o == null ? "" : String.valueOf(o); }
+
     @PostMapping("/check")
     public ResponseEntity<Map<String, Object>> checkAnswer(@RequestBody Map<String, Object> request) {
         Map<String, Object> result = new HashMap<>();
         Long userId = getCurrentUserId();
 
-        String userAnswer = (String) request.get("userAnswer");
-        if (userAnswer == null || userAnswer.trim().isEmpty()) {
+        String userAnswer = asStr(request.get("userAnswer"));
+        if (userAnswer.isEmpty()) {
             result.put("error", "请先选择答案");
             return ResponseEntity.badRequest().body(result);
         }
@@ -60,13 +62,13 @@ public class AnswerController {
             return ResponseEntity.status(404).body(Map.of("error", "题目不存在"));
         }
 
-        String correctAnswer = (String) question.get("answer");
-        String explanation = (String) question.get("explanation");
+        String correctAnswer = asStr(question.get("answer"));
+        String explanation = asStr(question.get("explanation"));
         boolean correct = normalizeAnswer(userAnswer).equals(normalizeAnswer(correctAnswer));
 
         result.put("correct", correct);
         result.put("correctAnswer", correctAnswer);
-        result.put("explanation", explanation != null ? explanation : "");
+        result.put("explanation", explanation.isEmpty() ? "" : explanation);
 
         try {
             if (answerRecordMapper != null) {
@@ -76,12 +78,12 @@ public class AnswerController {
                         ((Number) request.get("questionIndex")).intValue() : null;
 
                 AnswerRecord ar = new AnswerRecord();
-                ar.setRecordId(recordId != null ? recordId.longValue() : 0L);
+                ar.setRecordId(recordId != null ? recordId.longValue() : null);
                 ar.setQuestionIndex(questionIndex != null ? questionIndex : 0);
                 ar.setUserAnswer(userAnswer);
                 ar.setIsCorrect(correct ? 1 : 0);
                 ar.setQuestionContent(mapper.writeValueAsString(question));
-                ar.setQuestionType((String) question.getOrDefault("type", "single"));
+                ar.setQuestionType(asStr(question.getOrDefault("type", "single")));
                 answerRecordMapper.insert(ar);
                 log.info("答题记录已保存：{}", ar.getId());
             }
@@ -101,8 +103,8 @@ public class AnswerController {
         Map<String, Object> result = new HashMap<>();
         Long userId = getCurrentUserId();
 
-        String userAnswer = (String) request.get("userAnswer");
-        if (userAnswer == null || userAnswer.trim().isEmpty()) {
+        String userAnswer = asStr(request.get("userAnswer"));
+        if (userAnswer.isEmpty()) {
             result.put("error", "请输入你的答案");
             return ResponseEntity.badRequest().body(result);
         }
@@ -112,17 +114,17 @@ public class AnswerController {
             return ResponseEntity.status(404).body(Map.of("error", "题目不存在"));
         }
 
-        String referenceAnswer = (String) question.get("answer");
-        String explanation = (String) question.get("explanation");
+        String referenceAnswer = asStr(question.get("answer"));
+        String explanation = asStr(question.get("explanation"));
 
         Map<String, Object> evalResult = callAiForEvaluation(userAnswer, referenceAnswer, explanation);
-        String aiEvaluation = (String) evalResult.getOrDefault("evaluation", "");
+        String aiEvaluation = asStr(evalResult.getOrDefault("evaluation", ""));
         int score = evalResult.get("score") instanceof Number ? ((Number) evalResult.get("score")).intValue() : 0;
 
         result.put("evaluation", aiEvaluation);
         result.put("score", score);
         result.put("referenceAnswer", referenceAnswer);
-        result.put("explanation", explanation != null ? explanation : "");
+        result.put("explanation", explanation.isEmpty() ? "" : explanation);
 
         // 分数低于3分（满分5分，60%以下）自动入错题
         if (score > 0 && score < 3) {
@@ -137,7 +139,7 @@ public class AnswerController {
                         ((Number) request.get("questionIndex")).intValue() : null;
 
                 AnswerRecord ar = new AnswerRecord();
-                ar.setRecordId(recordId != null ? recordId.longValue() : 0L);
+                ar.setRecordId(recordId != null ? recordId.longValue() : null);
                 ar.setQuestionIndex(questionIndex != null ? questionIndex : 0);
                 ar.setUserAnswer(userAnswer);
                 ar.setIsCorrect(1);
@@ -169,8 +171,8 @@ public class AnswerController {
 
         for (Map<String, Object> item : answers) {
             Map<String, Object> question = (Map<String, Object>) item.get("question");
-            String userAnswer = (String) item.get("userAnswer");
-            String questionType = (String) item.getOrDefault("questionType", "single");
+            String userAnswer = asStr(item.get("userAnswer"));
+            String questionType = asStr(item.getOrDefault("questionType", "single"));
             Integer questionIndex = item.get("questionIndex") instanceof Number ?
                     ((Number) item.get("questionIndex")).intValue() : null;
             Integer recordId = item.get("recordId") instanceof Number ?
@@ -179,25 +181,25 @@ public class AnswerController {
             Map<String, Object> singleResult = new HashMap<>();
 
             if ("subjective".equals(questionType)) {
-                String referenceAnswer = (String) question.get("answer");
-                String explanation = (String) question.get("explanation");
+                String referenceAnswer = asStr(question.get("answer"));
+                String explanation = asStr(question.get("explanation"));
                 Map<String, Object> evalResult = callAiForEvaluation(userAnswer, referenceAnswer, explanation);
-                String evaluation = (String) evalResult.getOrDefault("evaluation", "");
+                String evaluation = asStr(evalResult.getOrDefault("evaluation", ""));
                 int score = evalResult.get("score") instanceof Number ? ((Number) evalResult.get("score")).intValue() : 0;
                 singleResult.put("evaluation", evaluation);
                 singleResult.put("score", score);
                 singleResult.put("referenceAnswer", referenceAnswer);
-                singleResult.put("explanation", explanation != null ? explanation : "");
+                singleResult.put("explanation", explanation.isEmpty() ? "" : explanation);
                 singleResult.put("correct", score >= 3);
                 if (score >= 3) correctCount++;
                 else saveWrongQuestion(userId, question, userAnswer, referenceAnswer, explanation, score);
             } else {
-                String correctAnswer = (String) question.get("answer");
-                String explanation = (String) question.get("explanation");
+                String correctAnswer = asStr(question.get("answer"));
+                String explanation = asStr(question.get("explanation"));
                 boolean correct = normalizeAnswer(userAnswer).equals(normalizeAnswer(correctAnswer));
                 singleResult.put("correct", correct);
                 singleResult.put("correctAnswer", correctAnswer);
-                singleResult.put("explanation", explanation != null ? explanation : "");
+                singleResult.put("explanation", explanation.isEmpty() ? "" : explanation);
                 if (correct) correctCount++;
 
                 if (!correct) {
@@ -208,7 +210,7 @@ public class AnswerController {
             try {
                 if (answerRecordMapper != null) {
                     AnswerRecord ar = new AnswerRecord();
-                    ar.setRecordId(recordId != null ? recordId.longValue() : 0L);
+                    ar.setRecordId(recordId != null ? recordId.longValue() : null);
                     ar.setQuestionIndex(questionIndex != null ? questionIndex : 0);
                     ar.setUserAnswer(userAnswer);
                     ar.setIsCorrect("subjective".equals(questionType) ? 1 : (Boolean) singleResult.get("correct") ? 1 : 0);
@@ -234,8 +236,8 @@ public class AnswerController {
     private void saveWrongQuestion(Long userId, Map<String, Object> question, String userAnswer, String correctAnswer, String explanation, Integer score) {
         try {
             if (wrongQuestionMapper != null) {
-                String questionId = (String) question.getOrDefault("id", UUID.randomUUID().toString());
-                String questionType = (String) question.getOrDefault("type", "single");
+                String questionId = asStr(question.getOrDefault("id", UUID.randomUUID().toString()));
+                String questionType = asStr(question.getOrDefault("type", "single"));
 
                 UserWrongQuestion existing = wrongQuestionMapper.selectOne(
                         new LambdaQueryWrapper<UserWrongQuestion>()
@@ -255,7 +257,7 @@ public class AnswerController {
                     wq.setQuestionContent(mapper.writeValueAsString(question));
                     wq.setQuestionType(questionType);
                     wq.setUserAnswer(userAnswer);
-                    wq.setCorrectAnswer(correctAnswer);
+                    wq.setCorrectAnswer(correctAnswer != null && correctAnswer.length() > 500 ? correctAnswer.substring(0, 500) : correctAnswer);
                     wq.setExplanation(explanation);
                     wq.setScore(score);
                     wq.setWrongCount(1);
@@ -359,11 +361,11 @@ public class AnswerController {
     @PostMapping("/generate-answer")
     public ResponseEntity<Map<String, Object>> generateAnswer(@RequestBody Map<String, Object> request) {
         Map<String, Object> result = new HashMap<>();
-        String question = (String) request.get("question");
-        String type = (String) request.getOrDefault("type", "subjective");
-        String category = (String) request.getOrDefault("category", "");
+        String question = asStr(request.get("question"));
+        String type = asStr(request.getOrDefault("type", "subjective"));
+        String category = asStr(request.getOrDefault("category", ""));
 
-        if (question == null || question.trim().isEmpty()) {
+        if (question.isEmpty()) {
             result.put("error", "题目内容为空");
             return ResponseEntity.badRequest().body(result);
         }

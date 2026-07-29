@@ -71,7 +71,7 @@ public class PhotoController {
             }
 
             // 3. 生成题目
-            QuestionDTO dto = questionService.generate(recognizedText, questionType);
+            QuestionDTO dto = questionService.generateParallel(recognizedText, questionType);
 
             // 4. 组装返回
             result.put("totalCount", dto.getTotalCount());

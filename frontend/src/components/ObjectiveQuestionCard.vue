@@ -25,6 +25,10 @@
     <div v-if="!result" class="act">
       <van-button plain type="primary" size="small" round @click="submit">提交答案</van-button>
     </div>
+    <!-- 答案/解析缺失：重试生成 -->
+    <div v-if="isAnswerMissing" class="act" style="margin-top:4px">
+      <van-button size="small" round plain type="danger" @click="retryGenerateAnswer" :loading="retrying">🔁 重新生成解析</van-button>
+    </div>
 
     <!-- 结果 -->
     <div v-if="result" class="res">
@@ -43,13 +47,15 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
+import request from '../utils/request.js'
+import { showFailToast, showSuccessToast } from 'vant'
 
 const props = defineProps({
   question: { type: Object, required: true },
   result: { type: Object, default: null },
   index: { type: Number, default: 0 }
 })
-const emit = defineEmits(['submit', 'change'])
+const emit = defineEmits(['submit', 'change', 'update-answer'])
 
 const q = computed(() => props.question)
 const isSingle = computed(() => q.value.type === 'single')
@@ -59,6 +65,15 @@ const label = computed(() => isSingle.value ? '单选题' : '多选题')
 const selected = ref(null)
 const multiSelected = ref([])
 const expandKeys = ref([]); const isFav = ref(false)
+const retrying = ref(false)
+
+const isAnswerMissing = computed(() => {
+  const ans = q.value.answer
+  const exp = q.value.explanation
+  const missing = !ans || typeof ans !== 'string' || ans === '参考答案未提供' || ans === '未提供' || ans.trim() === ''
+  const missingExp = !exp || typeof exp !== 'string' || exp === '解析未提供' || exp === '解析生成失败' || exp === '未提供' || exp.trim() === ''
+  return missing || missingExp
+})
 
 watch(() => props.result, v => { if (v) expandKeys.value = ['x'] })
 
@@ -70,7 +85,7 @@ function toggle(key) {
   if (props.result) return
   if (isSingle.value) {
     selected.value = key
-    emit('change', { questionId: q.value.id, userAnswer: key })
+    emit('change', { questionId: q.value.id, userAnswer: String(key) })
   } else {
     const i = multiSelected.value.indexOf(key)
     i >= 0 ? multiSelected.value.splice(i, 1) : multiSelected.value.push(key)
@@ -86,6 +101,25 @@ function submit() {
 }
 
 async function toggleFav() { isFav.value = !isFav.value }
+
+async function retryGenerateAnswer() {
+  retrying.value = true
+  try {
+    const res = await request.post('/generate-answer', {
+      question: q.value.question,
+      type: q.value.type || 'single',
+      category: q.value.category || ''
+    })
+    if (res.answer) q.value.answer = res.answer
+    if (res.explanation) q.value.explanation = res.explanation
+    showSuccessToast('解析已生成')
+    emit('update-answer', { questionId: q.value.id, answer: res.answer, explanation: res.explanation })
+  } catch (e) {
+    showFailToast(e.message || '解析生成失败')
+  } finally {
+    retrying.value = false
+  }
+}
 
 defineExpose({
   getCurrentAnswer: () => {

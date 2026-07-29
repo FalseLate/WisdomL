@@ -2,7 +2,7 @@
 
 const request = axios.create({
   baseURL: '/api',
-  timeout: 120000
+  timeout: 180000
 })
 
 // 请求拦截器 - 自动带 token + 打印日志

@@ -20,7 +20,7 @@ public class QuestionService {
 
     private static final Logger log = LoggerFactory.getLogger(QuestionService.class);
     private static final ObjectMapper mapper = new ObjectMapper();
-    private static final int MAX_RETRIES = 2;
+    private static final int MAX_RETRIES = 1;
 
     @Value("${ai.api.url}")
     private String apiUrl;
@@ -35,11 +35,11 @@ public class QuestionService {
 
     public QuestionService() {
         this.restTemplate = new RestTemplate();
-        // 60秒超时
+        // 180秒超时（长文档分析需要更长时间）
         var rf = restTemplate.getRequestFactory();
         if (rf instanceof org.springframework.http.client.SimpleClientHttpRequestFactory sf) {
             sf.setConnectTimeout((int) Duration.ofSeconds(15).toMillis());
-            sf.setReadTimeout((int) Duration.ofSeconds(60).toMillis());
+            sf.setReadTimeout((int) Duration.ofSeconds(90).toMillis());
         }
     }
 
@@ -63,10 +63,153 @@ public class QuestionService {
         Map<String, String> prompts = PromptBuilder.buildPrompts(cleanText, questionType);
         String rawResponse = callAiWithRetry(prompts.get("system"), prompts.get("user"));
 
-        String json = cleanJson(rawResponse);
+        parseQuestions(rawResponse, dto);
+
+        // 不再同步补全答案和解析，前端可逐个触发重新生成
+        return dto;
+    }
+
+    /**
+     * 并行出题：将长文本拆分为 2500 字左右的片段，并行调用 AI 出题，最后合并。
+     * 大幅降低单次调用耗时，总耗时约等于单次调用时间。
+     */
+    public QuestionDTO generateParallel(String text, String questionType) {
+        QuestionDTO dto = new QuestionDTO();
+        if (text == null || text.trim().isEmpty()) {
+            dto.setErrorMessage("文本内容为空");
+            return dto;
+        }
+        String cleanText = text.trim();
+        dto.setTextPreview(cleanText.length() > 150 ? cleanText.substring(0, 150) + "..." : cleanText);
+
+        int len = cleanText.length();
+        Map<String, Integer> counts = QuestionConfig.getCounts(len, questionType);
+        int objNum = counts.get("objNum");
+        int subNum = counts.get("subNum");
+        dto.setObjectiveCount(objNum);
+        dto.setSubjectiveCount(subNum);
+        dto.setTotalCount(objNum + subNum);
+
+        // 1500 字以下：出题+答案+解析，单次调用
+        boolean noAnswers = len > 1500;
+        if (len <= 1500) {
+            Map<String, String> prompts = PromptBuilder.buildPrompts(cleanText, questionType);
+            String raw = callAi(prompts.get("system"), prompts.get("user"), 4096);
+            parseQuestions(raw, dto);
+            return dto;
+        }
+
+        // 拆分文本为 ~1500 字片段，只出题不生成答案
+        List<String> chunks = new ArrayList<>();
+        int pos = 0;
+        while (pos < len) {
+            int end = Math.min(pos + 1500, len);
+            if (end < len) {
+                int nl = cleanText.lastIndexOf('\n', end);
+                if (nl > pos + 800) end = nl;
+            }
+            chunks.add(cleanText.substring(pos, end).trim());
+            pos = end;
+        }
+
+        // 真正并行调用
+        int perObj = Math.max(1, objNum / chunks.size());
+        int perSub = Math.max(1, subNum / chunks.size());
+        
+        List<java.util.concurrent.CompletableFuture<QuestionDTO>> futures = new ArrayList<>();
+        for (int i = 0; i < chunks.size(); i++) {
+            final int idx = i;
+            final String chunk = chunks.get(i);
+            int cObj = (idx == chunks.size() - 1) ? objNum - perObj * idx : perObj;
+            int cSub = (idx == chunks.size() - 1) ? subNum - perSub * idx : perSub;
+            String adjustedQT = buildAdjustedPrompt(chunk, questionType, cObj, cSub, true);
+            futures.add(java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+                try {
+                    String raw = callAi("你是一名专业的出题老师。", adjustedQT, 2048);
+                    QuestionDTO part = new QuestionDTO();
+                    parseQuestions(raw, part);
+                    return part;
+                } catch (Exception e) {
+                    log.warn("并行出题片段 {} 失败: {}", idx, e.getMessage());
+                    return null;
+                }
+            }));
+        }
+        
+        // 真正并行等待全部完成，合并结果
+        List<QuestionDTO> partialResults = new ArrayList<>();
+        try {
+            java.util.concurrent.CompletableFuture.allOf(futures.toArray(new java.util.concurrent.CompletableFuture[0]))
+                .get(90, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (Exception e) {
+            log.warn("并行出题整体超时: {}", e.getMessage());
+        }
+        for (var f : futures) {
+            try {
+                QuestionDTO part = f.getNow(null);
+                if (part != null) partialResults.add(part);
+            } catch (Exception e) {
+                log.warn("并行出题片段获取失败: {}", e.getMessage());
+            }
+        }
+
+        // 合并结果，裁剪到目标数量
+        List<Map<String, Object>> allObj = new ArrayList<>();
+        List<Map<String, Object>> allSub = new ArrayList<>();
+        for (QuestionDTO part : partialResults) {
+            if (part.getObjectiveQuestions() != null) allObj.addAll(part.getObjectiveQuestions());
+            if (part.getSubjectiveQuestions() != null) allSub.addAll(part.getSubjectiveQuestions());
+        }
+        if (allObj.size() > objNum) allObj = new ArrayList<>(allObj.subList(0, objNum));
+        if (allSub.size() > subNum) allSub = new ArrayList<>(allSub.subList(0, subNum));
+        dto.setObjectiveQuestions(allObj);
+        dto.setSubjectiveQuestions(allSub);
+        return dto;
+    }
+
+    private String buildAdjustedPrompt(String text, String questionType, int objNum, int subNum, boolean noAnswers) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("请严格根据以下资料出题。\n\n");
+        if (objNum > 0) {
+            sb.append("【客观题要求】共").append(objNum).append("道，包含单选题、多选题。每题options格式必须为{\"A\":\"\",\"B\":\"\",\"C\":\"\",\"D\":\"\"}。\n");
+            if (noAnswers) {
+                sb.append("每题必须包含type/question/options/answer字段，但不要生成explanation。\n");
+            }
+        } else {
+            sb.append("【客观题】无需出客观题，返回空数组。\n");
+        }
+        if (subNum > 0) {
+            sb.append("【主观题要求】共").append(subNum).append("道。\n");
+            if (noAnswers) {
+                sb.append("每题必须包含type/question/answer字段，但不要生成explanation。\n");
+            }
+        } else {
+            sb.append("【主观题】无需出主观题，返回空数组。\n");
+        }
+        sb.append("返回纯JSON：{\"objectiveQuestions\":[],\"subjectiveQuestions\":[]}\n\n");
+        sb.append("资料原文：\n").append(text);
+        return sb.toString();
+    }
+
+    private static final String[] OPTION_LETTERS = {"A","B","C","D","E","F","G","H"};
+
+    private void normalizeOptions(Map<String, Object> q) {
+        Object opts = q.get("options");
+        if (opts == null) return;
+        if (opts instanceof List) {
+            List<?> list = (List<?>) opts;
+            Map<String, String> map = new LinkedHashMap<>();
+            for (int i = 0; i < list.size() && i < OPTION_LETTERS.length; i++) {
+                map.put(OPTION_LETTERS[i], String.valueOf(list.get(i)));
+            }
+            q.put("options", map);
+        }
+    }
+
+    private void parseQuestions(String raw, QuestionDTO dto) {
+        String json = cleanJson(raw);
         List<Map<String, Object>> objList = new ArrayList<>();
         List<Map<String, Object>> subList = new ArrayList<>();
-
         try {
             Map<String, Object> parsed = mapper.readValue(json, new TypeReference<Map<String, Object>>() {});
             Object rawObj = parsed.getOrDefault("objectiveQuestions", Collections.emptyList());
@@ -75,6 +218,7 @@ public class QuestionService {
                     if (item instanceof Map) {
                         Map<String, Object> q = (Map<String, Object>) item;
                         q.putIfAbsent("id", UUID.randomUUID().toString());
+                        normalizeOptions(q);
                         objList.add(q);
                     }
                 }
@@ -91,16 +235,34 @@ public class QuestionService {
             }
         } catch (Exception e) {
             log.error("JSON解析失败: {}", e.getMessage());
-            dto.setErrorMessage("AI返回格式异常: " + e.getMessage());
         }
         dto.setObjectiveQuestions(objList);
-        dto.setSubjectiveQuestions(subList);
-
-        // 后处理：确保所有题目都有答案和解析
-        ensureAnswersAndExplanations(objList);
-        ensureAnswersAndExplanations(subList);
-
-        return dto;
+        // 简单后处理：按type字段归类，避免主观题混在客观题里
+        List<Map<String, Object>> finalObj = new ArrayList<>();
+        List<Map<String, Object>> finalSub = new ArrayList<>(subList);
+        for (Map<String, Object> q : objList) {
+            String t = (String) q.get("type");
+            if ("subjective".equals(t)) {
+                finalSub.add(q);
+            } else if ("multiple".equals(t) || "single".equals(t)) {
+                finalObj.add(q);
+            } else {
+                Object opts = q.get("options");
+                int optCount = 0;
+                if (opts instanceof Map) {
+                    for (Object v : ((Map<?,?>)opts).values()) {
+                        if (v != null && !String.valueOf(v).trim().isEmpty()) optCount++;
+                    }
+                }
+                q.put("type", optCount >= 2 ? "single" : "subjective");
+                if (optCount >= 2) finalObj.add(q); else finalSub.add(q);
+            }
+        }
+        for (Map<String, Object> q : finalSub) {
+            q.putIfAbsent("type", "subjective");
+        }
+        dto.setObjectiveQuestions(finalObj);
+        dto.setSubjectiveQuestions(finalSub);
     }
 
     /**
@@ -109,6 +271,7 @@ public class QuestionService {
      */
     public void ensureAnswersAndExplanations(List<Map<String, Object>> questions) {
         if (questions == null || questions.isEmpty()) return;
+        List<java.util.concurrent.CompletableFuture<Void>> futures = new ArrayList<>();
         for (Map<String, Object> q : questions) {
             String answer = (String) q.get("answer");
             String explanation = (String) q.get("explanation");
@@ -120,16 +283,74 @@ public class QuestionService {
             if (missingAnswer || missingExplanation) {
                 String questionText = (String) q.get("question");
                 String type = (String) q.getOrDefault("type", "subjective");
-                log.info("题目 {} 缺少答案/解析，自动补全中...", q.get("id"));
-                Map<String, String> generated = generateAnswerForQuestion(questionText, type);
-                if (missingAnswer && generated.containsKey("answer") && !generated.get("answer").isBlank()) {
-                    q.put("answer", generated.get("answer"));
-                }
-                if (missingExplanation && generated.containsKey("explanation") && !generated.get("explanation").isBlank()) {
-                    q.put("explanation", generated.get("explanation"));
-                }
+                futures.add(java.util.concurrent.CompletableFuture.runAsync(() -> {
+                    log.info("题目 {} 缺少答案/解析，并行生成中(15s超时)...", q.get("id"));
+                    try {
+                        Map<String, String> generated = generateAnswerForQuestionWithTimeout(questionText, type, 15);
+                        if (missingAnswer && generated.containsKey("answer") && !generated.get("answer").isBlank()) {
+                            q.put("answer", generated.get("answer"));
+                        }
+                        if (missingExplanation && generated.containsKey("explanation") && !generated.get("explanation").isBlank()) {
+                            q.put("explanation", generated.get("explanation"));
+                        }
+                    } catch (Exception e) {
+                        log.warn("题目 {} 答案并行生成失败: {}", q.get("id"), e.getMessage());
+                    }
+                }));
             }
         }
+        if (!futures.isEmpty()) {
+            try {
+                java.util.concurrent.CompletableFuture.allOf(futures.toArray(new java.util.concurrent.CompletableFuture[0]))
+                    .get(20, java.util.concurrent.TimeUnit.SECONDS);
+            } catch (Exception e) {
+                log.warn("批量答案生成部分超时: {}", e.getMessage());
+            }
+        }
+    }
+
+    private Map<String, String> generateAnswerForQuestionWithTimeout(String questionText, String type, int timeoutSec) {
+        Map<String, String> result = new HashMap<>();
+        if (questionText == null || questionText.isBlank()) return result;
+        try {
+            RestTemplate shortRt = new RestTemplate();
+            var rf = shortRt.getRequestFactory();
+            if (rf instanceof org.springframework.http.client.SimpleClientHttpRequestFactory sf) {
+                sf.setConnectTimeout(5000);
+                sf.setReadTimeout(timeoutSec * 1000);
+            }
+            Map<String, Object> body = new HashMap<>();
+            body.put("model", modelName);
+            body.put("temperature", 0.6);
+            body.put("max_tokens", 2048);
+            String userPrompt = String.format(
+                "题目类型：%s\n题目内容：%s\n\n请为这道题生成：\n1. 参考答案（要点清晰、准确）\n2. 答题思路（分析考点、解题步骤、得分要点）\n\n请以JSON格式返回：{\"answer\":\"参考答案\",\"explanation\":\"答题思路\"}",
+                "subjective".equals(type) ? "主观题" : "客观题", questionText
+            );
+            body.put("messages", List.of(
+                Map.of("role", "system", "content", "你是一位专业教师，请为题目生成参考答案和答题思路。"),
+                Map.of("role", "user", "content", userPrompt)
+            ));
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setBearerAuth(apiKey);
+            ResponseEntity<Map> response = shortRt.exchange(apiUrl, HttpMethod.POST, new HttpEntity<>(body, headers), Map.class);
+            if (response.getBody() != null && response.getBody().containsKey("choices")) {
+                List<Map<String, Object>> choices = (List<Map<String, Object>>) response.getBody().get("choices");
+                if (choices != null && !choices.isEmpty()) {
+                    Map<String, Object> msg = (Map<String, Object>) ((Map<String, Object>) choices.get(0)).get("message");
+                    if (msg != null && msg.get("content") instanceof String s) {
+                        String json = cleanJson(s);
+                        Map<String, Object> parsed = mapper.readValue(json, new TypeReference<Map<String, Object>>() {});
+                        result.put("answer", (String) parsed.getOrDefault("answer", ""));
+                        result.put("explanation", (String) parsed.getOrDefault("explanation", ""));
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("单题答案生成失败: {}", e.getMessage());
+        }
+        return result;
     }
 
     /**
@@ -162,9 +383,12 @@ public class QuestionService {
         return callAiWithRetry(systemPrompt, userPrompt);
     }
     private String callAiWithRetry(String system, String user) {
+        return callAi(system, user, 4096);
+    }
+    private String callAiWithRetry(String system, String user, int maxTokens) {
         for (int i = 0; i < MAX_RETRIES; i++) {
             try {
-                String result = callAi(system, user);
+                String result = callAi(system, user, maxTokens);
                 if (!result.equals("{}")) return result;
                 log.warn("AI返回空结果, 第{}次重试", i + 1);
             } catch (Exception e) {
@@ -175,11 +399,11 @@ public class QuestionService {
         return "{}";
     }
 
-    private String callAi(String system, String user) {
+    private String callAi(String system, String user, int maxTokens) {
         Map<String, Object> body = new HashMap<>();
         body.put("model", modelName);
         body.put("temperature", 0.6);
-        body.put("max_tokens", 4096);
+        body.put("max_tokens", maxTokens);
 
         List<Map<String, String>> messages = List.of(
             Map.of("role", "system", "content", system),
