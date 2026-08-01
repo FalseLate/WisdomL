@@ -49,6 +49,7 @@
 import { ref, computed, watch } from 'vue'
 import request from '../utils/request.js'
 import { showFailToast, showSuccessToast } from 'vant'
+import { classify } from '../utils/questionType.js'
 
 const props = defineProps({
   question: { type: Object, required: true },
@@ -58,9 +59,11 @@ const props = defineProps({
 const emit = defineEmits(['submit', 'change', 'update-answer'])
 
 const q = computed(() => props.question)
-const isSingle = computed(() => q.value.type === 'single')
-const barColor = computed(() => isSingle.value ? '#667eea' : '#9944ff')
-const label = computed(() => isSingle.value ? '单选题' : '多选题')
+const qType = computed(() => classify(q.value))
+const isSingle = computed(() => qType.value.type === 'single')
+const qId = computed(() => q.value.id || q.value._id || props.index)
+const barColor = computed(() => qType.value.color)
+const label = computed(() => qType.value.label)
 
 const selected = ref(null)
 const multiSelected = ref([])
@@ -85,11 +88,11 @@ function toggle(key) {
   if (props.result) return
   if (isSingle.value) {
     selected.value = key
-    emit('change', { questionId: q.value.id, userAnswer: String(key) })
+    emit('change', { questionId: qId.value, userAnswer: String(key) })
   } else {
     const i = multiSelected.value.indexOf(key)
     i >= 0 ? multiSelected.value.splice(i, 1) : multiSelected.value.push(key)
-    emit('change', { questionId: q.value.id, userAnswer: [...multiSelected.value].sort().join('') })
+    emit('change', { questionId: qId.value, userAnswer: [...multiSelected.value].sort().join('') })
   }
 }
 
@@ -97,7 +100,7 @@ function submit() {
   const ans = isSingle.value ? selected.value : [...multiSelected.value].sort().join('')
   if (!ans) return
   try { navigator.vibrate?.(20) } catch (e) {}
-  emit('submit', { questionId: q.value.id, userAnswer: ans })
+  emit('submit', { questionId: qId.value, userAnswer: ans })
 }
 
 async function toggleFav() { isFav.value = !isFav.value }
@@ -113,7 +116,7 @@ async function retryGenerateAnswer() {
     if (res.answer) q.value.answer = res.answer
     if (res.explanation) q.value.explanation = res.explanation
     showSuccessToast('解析已生成')
-    emit('update-answer', { questionId: q.value.id, answer: res.answer, explanation: res.explanation })
+    emit('update-answer', { questionId: qId.value, answer: res.answer, explanation: res.explanation })
   } catch (e) {
     showFailToast(e.message || '解析生成失败')
   } finally {

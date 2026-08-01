@@ -67,13 +67,27 @@ onMounted(async () => {
     const res = await request.get('/user/history')
     list.value = (res || []).map((item, i) => {
       const progress = pStore.getProgress(item.id?.toString())
+      // 解析 questionsJson 计算客观/主观题数
+      let subCount = 0, objCount = 0
+      try {
+        const parsed = JSON.parse(item.questionsJson || '[]')
+        if (Array.isArray(parsed)) {
+          subCount = parsed.filter(q => q.type === 'subjective').length
+          objCount = parsed.length - subCount
+        } else {
+          const obj = parsed.objectiveQuestions || []
+          const sub = parsed.subjectiveQuestions || []
+          objCount = obj.length
+          subCount = sub.length
+        }
+      } catch(e) {}
       return {
         id: item.id || i,
         title: item.sourceText ? item.sourceText.substring(0, 50) : '出题记录',
         date: formatDate(item.createTime),
         total: item.questionCount || 0,
-        objCount: item.questionCount,
-        subCount: 0,
+        objCount: objCount || item.questionCount,
+        subCount,
         progress: Math.min(progress, 100),
         sourceLabel: item.sourceText?.length > 100 ? '📄 文件' : '✍️ 文本',
         sourceColor: item.sourceText?.length > 100 ? '#ff8c00' : '#667eea',
@@ -118,15 +132,12 @@ function goPractice(item) {
       const objArr = Array.isArray(parsed) ? parsed : (parsed.objectiveQuestions || [])
       const subArr = parsed.subjectiveQuestions || []
       const qs = [...objArr, ...subArr]
-      // 前端用英文type，数据库存的是中文，统一映射
-      const TYPE_MAP = { '单选':'single', '多选':'multiple', '判断':'single', '简答':'subjective', '主观':'subjective' }
-      qs.forEach(q => { const m = TYPE_MAP[q.type]; if (m) q.type = m })
       qStore.setQuestions(qs)
       const secId = item.id?.toString() || Date.now().toString()
       pStore.currentSectionId = secId
       pStore.initSection(secId, qs.length, item.sourceText || '题目', 'text')
       router.push('/practice')
-    } catch (e) {}
+    } catch (e) { showFailToast('题目数据解析失败:' + e.message) }
   }
 }
 </script>

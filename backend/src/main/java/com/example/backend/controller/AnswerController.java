@@ -7,6 +7,7 @@ import com.example.backend.entity.UserWrongQuestion;
 import com.example.backend.mapper.AnswerRecordMapper;
 import com.example.backend.mapper.UserWrongQuestionMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 
 @RestController
 @RequestMapping("/api")
@@ -43,6 +45,14 @@ public class AnswerController {
     private String aiModel;
 
     private final RestTemplate restTemplate = new RestTemplate();
+
+    @PostConstruct
+    public void init() {
+        var factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout((int) java.time.Duration.ofSeconds(15).toMillis());
+        factory.setReadTimeout((int) java.time.Duration.ofSeconds(90).toMillis());
+        restTemplate.setRequestFactory(factory);
+    }
 
     private static String asStr(Object o) { return o == null ? "" : String.valueOf(o); }
 
@@ -127,7 +137,7 @@ public class AnswerController {
         result.put("explanation", explanation.isEmpty() ? "" : explanation);
 
         // 分数低于3分（满分5分，60%以下）自动入错题
-        if (score > 0 && score < 3) {
+        if (score < 3) {
             saveWrongQuestion(userId, question, userAnswer, referenceAnswer, explanation, score);
         }
 
@@ -142,7 +152,7 @@ public class AnswerController {
                 ar.setRecordId(recordId != null ? recordId.longValue() : null);
                 ar.setQuestionIndex(questionIndex != null ? questionIndex : 0);
                 ar.setUserAnswer(userAnswer);
-                ar.setIsCorrect(1);
+                ar.setIsCorrect(score >= 3 ? 1 : 0);
                 ar.setQuestionContent(mapper.writeValueAsString(question));
                 ar.setQuestionType("subjective");
                 answerRecordMapper.insert(ar);
@@ -166,10 +176,15 @@ public class AnswerController {
             return ResponseEntity.badRequest().body(result);
         }
 
-        List<Map<String, Object>> results = new ArrayList<>();
-        int correctCount = 0;
+        int n = answers.size();
+        Map<String, Object>[] results = new Map[n];
+        int[] correctCount = {0};
 
-        for (Map<String, Object> item : answers) {
+        // 收集主观题 AI 调用的异步任务
+        List<CompletableFuture<Void>> futures = new ArrayList<>();
+
+        for (int i = 0; i < n; i++) {
+            Map<String, Object> item = answers.get(i);
             Map<String, Object> question = (Map<String, Object>) item.get("question");
             String userAnswer = asStr(item.get("userAnswer"));
             String questionType = asStr(item.getOrDefault("questionType", "single"));
@@ -178,42 +193,86 @@ public class AnswerController {
             Integer recordId = item.get("recordId") instanceof Number ?
                     ((Number) item.get("recordId")).intValue() : null;
 
-            Map<String, Object> singleResult = new HashMap<>();
-
-            if ("subjective".equals(questionType)) {
+            int idx = i;
+            if ("subjective".equals(questionType) && question != null) {
                 String referenceAnswer = asStr(question.get("answer"));
                 String explanation = asStr(question.get("explanation"));
-                Map<String, Object> evalResult = callAiForEvaluation(userAnswer, referenceAnswer, explanation);
-                String evaluation = asStr(evalResult.getOrDefault("evaluation", ""));
-                int score = evalResult.get("score") instanceof Number ? ((Number) evalResult.get("score")).intValue() : 0;
-                singleResult.put("evaluation", evaluation);
-                singleResult.put("score", score);
-                singleResult.put("referenceAnswer", referenceAnswer);
-                singleResult.put("explanation", explanation.isEmpty() ? "" : explanation);
-                singleResult.put("correct", score >= 3);
-                if (score >= 3) correctCount++;
-                else saveWrongQuestion(userId, question, userAnswer, referenceAnswer, explanation, score);
-            } else {
+                CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+                    try {
+                        Map<String, Object> evalResult = callAiForEvaluation(userAnswer, referenceAnswer, explanation);
+                        String evaluation = asStr(evalResult.getOrDefault("evaluation", ""));
+                        int score = evalResult.get("score") instanceof Number ? ((Number) evalResult.get("score")).intValue() : 0;
+                        Map<String, Object> sr = new HashMap<>();
+                        sr.put("evaluation", evaluation);
+                        sr.put("score", score);
+                        sr.put("referenceAnswer", referenceAnswer);
+                        sr.put("explanation", explanation.isEmpty() ? "" : explanation);
+                        sr.put("correct", score >= 3);
+                        synchronized (correctCount) {
+                            if (score >= 3) correctCount[0]++;
+                        }
+                        if (score < 3) {
+                            saveWrongQuestion(userId, question, userAnswer, referenceAnswer, explanation, score);
+                        }
+                        results[idx] = sr;
+                    } catch (Exception e) {
+                        log.error("主观题AI评价异步任务异常: {}", e.getMessage());
+                        Map<String, Object> sr = new HashMap<>();
+                        sr.put("evaluation", "AI 评价服务暂时不可用");
+                        sr.put("score", 0);
+                        sr.put("referenceAnswer", referenceAnswer);
+                        sr.put("explanation", explanation.isEmpty() ? "" : explanation);
+                        sr.put("correct", false);
+                        results[idx] = sr;
+                    }
+                });
+                futures.add(future);
+            } else if (question != null) {
                 String correctAnswer = asStr(question.get("answer"));
                 String explanation = asStr(question.get("explanation"));
                 boolean correct = normalizeAnswer(userAnswer).equals(normalizeAnswer(correctAnswer));
-                singleResult.put("correct", correct);
-                singleResult.put("correctAnswer", correctAnswer);
-                singleResult.put("explanation", explanation.isEmpty() ? "" : explanation);
-                if (correct) correctCount++;
-
+                Map<String, Object> sr = new HashMap<>();
+                sr.put("correct", correct);
+                sr.put("correctAnswer", correctAnswer);
+                sr.put("explanation", explanation.isEmpty() ? "" : explanation);
+                if (correct) correctCount[0]++;
                 if (!correct) {
                     saveWrongQuestion(userId, question, userAnswer, correctAnswer, explanation);
                 }
+                results[idx] = sr;
+            } else {
+                // question 为 null — 写入 fallback 避免 results[idx] 为空
+                Map<String, Object> sr = new HashMap<>();
+                sr.put("correct", false);
+                sr.put("error", "题目数据缺失");
+                results[idx] = sr;
             }
+        }
 
+        // 等待所有主观题 AI 调用完成，单个失败不影响整体
+        try {
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+        } catch (Exception e) {
+            log.warn("部分主观题AI评价异常: {}", e.getMessage());
+        }
+
+        // 保存答题记录
+        for (int i = 0; i < n; i++) {
+            Map<String, Object> item = answers.get(i);
+            Map<String, Object> question = (Map<String, Object>) item.get("question");
+            String questionType = asStr(item.getOrDefault("questionType", "single"));
+            Integer questionIndex = item.get("questionIndex") instanceof Number ?
+                    ((Number) item.get("questionIndex")).intValue() : null;
+            Integer recordId = item.get("recordId") instanceof Number ?
+                    ((Number) item.get("recordId")).intValue() : null;
+            String userAnswer = asStr(item.get("userAnswer"));
             try {
                 if (answerRecordMapper != null) {
                     AnswerRecord ar = new AnswerRecord();
                     ar.setRecordId(recordId != null ? recordId.longValue() : null);
                     ar.setQuestionIndex(questionIndex != null ? questionIndex : 0);
                     ar.setUserAnswer(userAnswer);
-                    ar.setIsCorrect("subjective".equals(questionType) ? 1 : (Boolean) singleResult.get("correct") ? 1 : 0);
+                    ar.setIsCorrect(Boolean.TRUE.equals(results[i].get("correct")) ? 1 : 0);
                     ar.setQuestionContent(mapper.writeValueAsString(question));
                     ar.setQuestionType(questionType);
                     answerRecordMapper.insert(ar);
@@ -221,14 +280,24 @@ public class AnswerController {
             } catch (Exception e) {
                 log.warn("保存答题记录失败：{}", e.getMessage());
             }
-
-            results.add(singleResult);
         }
 
-        result.put("results", results);
-        result.put("totalCount", answers.size());
-        result.put("correctCount", correctCount);
-        result.put("wrongCount", answers.size() - correctCount);
+        // 确保 results 中没有 null（兜底防护）
+        List<Map<String, Object>> resultList = new ArrayList<>();
+        for (Map<String, Object> r : results) {
+            if (r != null) resultList.add(r);
+            else {
+                Map<String, Object> fallback = new HashMap<>();
+                fallback.put("correct", false);
+                fallback.put("error", "处理异常");
+                resultList.add(fallback);
+            }
+        }
+
+        result.put("results", resultList);
+        result.put("totalCount", n);
+        result.put("correctCount", correctCount[0]);
+        result.put("wrongCount", n - correctCount[0]);
 
         return ResponseEntity.ok(result);
     }
@@ -351,7 +420,7 @@ public class AnswerController {
 
     private String normalizeAnswer(String answer) {
         if (answer == null) return "";
-        String normalized = answer.replaceAll("\\s+", "").toUpperCase();
+        String normalized = answer.replaceAll("[\\s,，、]+", "").toUpperCase();
         char[] chars = normalized.toCharArray();
         Arrays.sort(chars);
         return new String(chars);

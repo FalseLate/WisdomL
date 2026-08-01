@@ -281,13 +281,8 @@ async function genFromSecs() {
       if (!r.error) { allQs.push(...(r.questions || [])); allQs.push(...(r.subjectiveQuestions || [])) }
     }
     if (allQs.length === 0) { showFailToast('生成失败'); return }
-    // 统一中文type→英文
-    const TYPE_MAP = { '单选':'single', '多选':'multiple', '判断':'single', '简答':'subjective', '主观':'subjective' }
-    allQs.forEach(q => { const m = TYPE_MAP[q.type]; if (m) q.type = m })
-    // 有type=subjective的直接归主观题，其余按选项数判断
     const subQs = allQs.filter(q => q.type === 'subjective')
-    const objQs = allQs.filter(q => q.type !== 'subjective' && (Object.values(q.options||{}).filter(v=>v&&String(v).trim()).length >= 2))
-    subQs.push(...allQs.filter(q => q.type !== 'subjective' && Object.values(q.options||{}).filter(v=>v&&String(v).trim()).length < 2))
+    const objQs = allQs.filter(q => q.type !== 'subjective')
     popDialog({ totalCount: allQs.length, objectiveQuestions: objQs, subjectiveQuestions: subQs })
   } catch (e) { showFailToast(e.message || '出题失败') }
   finally { genLoading.value = false; showLoadingDialog.value = false }
@@ -295,12 +290,10 @@ async function genFromSecs() {
 
 function popDialog(r) {
   const qs = r.objectiveQuestions || []; const ss = r.subjectiveQuestions || []
-  const TYPE_MAP = { '单选':'single', '多选':'multiple', '判断':'single', '简答':'subjective', '主观':'subjective' }
-  qs.forEach(q => { const m = TYPE_MAP[q.type]; if (m) q.type = m; else q.type = 'single' })
-  ss.forEach(q => { const m = TYPE_MAP[q.type]; if (m) q.type = m; else q.type = 'subjective' })
   const all = [...qs, ...ss]
   qStore.setQuestions(all)
   pStore.currentSectionId = 'sec-' + Date.now()
+  pStore.initSection(pStore.currentSectionId, all.length, '新题目', 'text')
   genTotal.value = r.totalCount || qs.length + ss.length
   genObj.value = qs.length
   genSub.value = ss.length

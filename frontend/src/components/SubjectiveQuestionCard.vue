@@ -48,6 +48,7 @@
 import { ref, computed, watch } from 'vue'
 import request from '../utils/request.js'
 import { showFailToast, showSuccessToast } from 'vant'
+import { classify } from '../utils/questionType.js'
 
 const props = defineProps({
   question: { type: Object, required: true },
@@ -58,7 +59,7 @@ const props = defineProps({
 const emit = defineEmits(['submit', 'update-answer'])
 
 const q = computed(() => props.question)
-const storageKey = computed(() => 'subj_ans_' + (q.value.id || props.index))
+const storageKey = computed(() => 'subj_ans_' + (q.value.id || q.value._id || props.index))
 
 const userAnswer = ref(localStorage.getItem(storageKey.value) || '')
 const showReference = ref(false)
@@ -93,12 +94,17 @@ watch(() => props.result, (val) => {
   }
 })
 
-watch(() => props.index, () => {
-  showReference.value = false
-  showResult.value = false
-  evaluation.value = ''
-  score.value = 0
-  isLocked.value = false
+// 当题目对象引用变化时重置状态（而非监听 index）
+watch(() => props.question, (newQ, oldQ) => {
+  if (newQ !== oldQ) {
+    showReference.value = false
+    showResult.value = false
+    evaluation.value = ''
+    score.value = 0
+    isLocked.value = false
+    const sk = 'subj_ans_' + (newQ.id || newQ._id || props.index)
+    userAnswer.value = localStorage.getItem(sk) || ''
+  }
 })
 
 // 实时保存草稿到 localStorage
@@ -140,7 +146,7 @@ async function retryGenerateAnswer() {
     }
     showSuccessToast('解析已生成')
     // 通知父组件答案已更新
-    emit('update-answer', { questionId: q.value.id, answer: res.answer, explanation: res.explanation })
+    emit('update-answer', { questionId: q.value.id || q.value._id || props.index, answer: res.answer, explanation: res.explanation })
   } catch (e) {
     showFailToast(e.message || '解析生成失败')
   } finally {
@@ -156,9 +162,10 @@ async function submitAnswer() {
   if (isLocked.value) return
 
   submitting.value = true
+  const qId = q.value.id || q.value._id || props.index
   try {
     const res = await request.post('/check-subjective', {
-      questionId: q.value.id,
+      questionId: qId,
       userAnswer: userAnswer.value,
       question: q.value
     })
@@ -171,7 +178,7 @@ async function submitAnswer() {
     localStorage.setItem(storageKey.value, userAnswer.value)
     
     emit('submit', {
-      questionId: q.value.id,
+      questionId: qId,
       userAnswer: userAnswer.value,
       isCorrect: score.value >= 3,
       evaluation: res.evaluation || '',

@@ -21,6 +21,7 @@ const router = createRouter({ history: createWebHistory(), routes })
 
 router.beforeEach((to, from, next) => {
   if (to.meta.requiresAuth && !isLoggedIn()) {
+    sessionStorage.setItem('redirect', to.fullPath)
     next('/login')
   } else if ((to.path === '/login' || to.path === '/register') && isLoggedIn()) {
     next('/')

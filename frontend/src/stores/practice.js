@@ -30,6 +30,7 @@ export const usePracticeStore = defineStore('practice', () => {
   function recordAnswer(sectionId, isCorrect) {
     const s = sections.value[sectionId]
     if (s) {
+      if (s.done >= s.total && s.total > 0) return
       s.done = (s.done || 0) + 1
       if (isCorrect) s.correct = (s.correct || 0) + 1
       s.timestamp = Date.now()
@@ -64,7 +65,7 @@ export const usePracticeStore = defineStore('practice', () => {
 
   return { sections, currentSectionId, completedCount, accuracy, initSection, recordAnswer, recordAnswerResult, getSectionAnswers, isSectionComplete, getProgress }
 }, {
-  persist: { key: 'zhifuxi-practice', pick: ['sections'] }
+  persist: { key: 'zhifuxi-practice', pick: ['sections', 'currentSectionId'] }
 })
 
 if (import.meta.hot) {

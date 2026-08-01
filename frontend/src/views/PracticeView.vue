@@ -31,11 +31,11 @@
             <template v-if="chapterGroups.length > 0">
               <template v-for="g in chapterGroups" :key="g.name">
                 <div v-if="g.questions.some(q=>q.type!=='subjective')" class="chapter-header">{{ g.name }}</div>
-                <ObjectiveQuestionCard v-for="(q,i) in g.questions.filter(q=>q.type!=='subjective')" :key="q.id||i" :question="q" :result="results[q.id||i]||null" :index="i" ref="objCardRefs" @submit="(e)=>handleSubmitObjective(e,q.id||i,q.type)" @change="(e)=>handleSelectionChange(e)" @update-answer="(e)=>handleUpdateAnswer(e,q)" />
+                <ObjectiveQuestionCard v-for="(q,i) in g.questions.filter(q=>q.type!=='subjective')" :key="getQid(q,i)" :question="q" :result="results[getQid(q,i)]||null" :index="i" ref="objCardRefs" @submit="(e)=>handleSubmitObjective(e,getQid(q,i),q)" @change="(e)=>handleSelectionChange(e)" @update-answer="(e)=>handleUpdateAnswer(e,q)" />
               </template>
             </template>
             <template v-else>
-              <ObjectiveQuestionCard v-for="(q,i) in objQ" :key="q.id||i" :question="q" :result="results[q.id||i]||null" :index="i" ref="objCardRefs" @submit="(e)=>handleSubmitObjective(e,q.id||i,q.type)" @change="(e)=>handleSelectionChange(e)" @update-answer="(e)=>handleUpdateAnswer(e,q)" />
+              <ObjectiveQuestionCard v-for="(q,i) in objQ" :key="getQid(q,i)" :question="q" :result="results[getQid(q,i)]||null" :index="i" ref="objCardRefs" @submit="(e)=>handleSubmitObjective(e,getQid(q,i),q)" @change="(e)=>handleSelectionChange(e)" @update-answer="(e)=>handleUpdateAnswer(e,q)" />
             </template>
           </div>
         </van-tab>
@@ -44,11 +44,11 @@
             <template v-if="chapterGroups.length > 0">
               <template v-for="g in chapterGroups" :key="g.name">
                 <div v-if="g.questions.some(q=>q.type==='subjective')" class="chapter-header">{{ g.name }}</div>
-                <SubjectiveQuestionCard v-for="(q,i) in g.questions.filter(q=>q.type==='subjective')" :key="q.id||i" :question="q" :result="results[q.id||i]||null" :index="i" ref="subCardRefs" @submit="(e)=>handleSubmitSubjective(e,q.id||i)" @update-answer="(e)=>handleUpdateAnswer(e,q)" />
+                <SubjectiveQuestionCard v-for="(q,i) in g.questions.filter(q=>q.type==='subjective')" :key="getQid(q,i)" :question="q" :result="results[getQid(q,i)]||null" :index="i" ref="subCardRefs" @submit="(e)=>handleSubmitSubjective(e,getQid(q,i))" @update-answer="(e)=>handleUpdateAnswer(e,q)" />
               </template>
             </template>
             <template v-else>
-              <SubjectiveQuestionCard v-for="(q,i) in subQ" :key="q.id||i" :question="q" :result="results[q.id||i]||null" :index="i" ref="subCardRefs" @submit="(e)=>handleSubmitSubjective(e,q.id||i)" @update-answer="(e)=>handleUpdateAnswer(e,q)" />
+              <SubjectiveQuestionCard v-for="(q,i) in subQ" :key="getQid(q,i)" :question="q" :result="results[getQid(q,i)]||null" :index="i" ref="subCardRefs" @submit="(e)=>handleSubmitSubjective(e,getQid(q,i))" @update-answer="(e)=>handleUpdateAnswer(e,q)" />
             </template>
           </div>
         </van-tab>
@@ -59,11 +59,11 @@
         <template v-if="chapterGroups.length > 0">
           <template v-for="g in chapterGroups" :key="g.name">
             <div v-if="g.questions.some(q=>q.type!=='subjective')" class="chapter-header">{{ g.name }}</div>
-            <ObjectiveQuestionCard v-for="(q,i) in g.questions.filter(q=>q.type!=='subjective')" :key="q.id||i" :question="q" :result="results[q.id||i]||null" :index="i" ref="objCardRefs" @submit="(e)=>handleSubmitObjective(e,q.id||i,q.type)" @change="(e)=>handleSelectionChange(e)" @update-answer="(e)=>handleUpdateAnswer(e,q)" />
+            <ObjectiveQuestionCard v-for="(q,i) in g.questions.filter(q=>q.type!=='subjective')" :key="getQid(q,i)" :question="q" :result="results[getQid(q,i)]||null" :index="i" ref="objCardRefs" @submit="(e)=>handleSubmitObjective(e,getQid(q,i),q)" @change="(e)=>handleSelectionChange(e)" @update-answer="(e)=>handleUpdateAnswer(e,q)" />
           </template>
         </template>
         <template v-else>
-          <ObjectiveQuestionCard v-for="(q,i) in objQ" :key="q.id||i" :question="q" :result="results[q.id||i]||null" :index="i" ref="objCardRefs" @submit="(e)=>handleSubmitObjective(e,q.id||i,q.type)" @change="(e)=>handleSelectionChange(e)" @update-answer="(e)=>handleUpdateAnswer(e,q)" />
+          <ObjectiveQuestionCard v-for="(q,i) in objQ" :key="getQid(q,i)" :question="q" :result="results[getQid(q,i)]||null" :index="i" ref="objCardRefs" @submit="(e)=>handleSubmitObjective(e,getQid(q,i),q)" @change="(e)=>handleSelectionChange(e)" @update-answer="(e)=>handleUpdateAnswer(e,q)" />
         </template>
       </div>
 
@@ -72,11 +72,11 @@
         <template v-if="chapterGroups.length > 0">
           <template v-for="g in chapterGroups" :key="g.name">
             <div v-if="g.questions.some(q=>q.type==='subjective')" class="chapter-header">{{ g.name }}</div>
-            <SubjectiveQuestionCard v-for="(q,i) in g.questions.filter(q=>q.type==='subjective')" :key="q.id||i" :question="q" :result="results[q.id||i]||null" :index="i" ref="subCardRefs" @submit="(e)=>handleSubmitSubjective(e,q.id||i)" @update-answer="(e)=>handleUpdateAnswer(e,q)" />
+            <SubjectiveQuestionCard v-for="(q,i) in g.questions.filter(q=>q.type==='subjective')" :key="getQid(q,i)" :question="q" :result="results[getQid(q,i)]||null" :index="i" ref="subCardRefs" @submit="(e)=>handleSubmitSubjective(e,getQid(q,i))" @update-answer="(e)=>handleUpdateAnswer(e,q)" />
           </template>
         </template>
         <template v-else>
-          <SubjectiveQuestionCard v-for="(q,i) in subQ" :key="q.id||i" :question="q" :result="results[q.id||i]||null" :index="i" ref="subCardRefs" @submit="(e)=>handleSubmitSubjective(e,q.id||i)" @update-answer="(e)=>handleUpdateAnswer(e,q)" />
+          <SubjectiveQuestionCard v-for="(q,i) in subQ" :key="getQid(q,i)" :question="q" :result="results[getQid(q,i)]||null" :index="i" ref="subCardRefs" @submit="(e)=>handleSubmitSubjective(e,getQid(q,i))" @update-answer="(e)=>handleUpdateAnswer(e,q)" />
         </template>
       </div>
 
@@ -130,6 +130,9 @@ const batchSubmitting = ref(false)
 const objCardRefs = ref([])
 const subCardRefs = ref([])
 
+/** 统一题目 ID 提取：id → _id → 数组索引 */
+function getQid(q, idx) { return q?.id || q?._id || idx }
+
 // 暂存用户选择但未提交的答案
 const pendingAnswers = reactive(new Map())
 
@@ -166,7 +169,7 @@ const pendingCount = computed(() => {
   let count = pendingAnswers.size
   const subCards = subCardRefs.value || []
   subQ.value.forEach((q, idx) => {
-    const qId = q.id || q._id
+    const qId = getQid(q, idx)
     if (!results[qId]) {
       const card = subCards[idx]
       const ans = card?.getCurrentAnswer?.() || localStorage.getItem('subj_ans_' + qId) || ''
@@ -193,12 +196,14 @@ function initFromStore() {
   const sectionId = pStore.currentSectionId
   if (!sectionId) return
   Object.keys(results).forEach(k => delete results[k])
+  pendingAnswers.clear()
   pStore.initSection(sectionId, allQuestions.value.length, '刷题练习', 'practice')
   const saved = pStore.getSectionAnswers(sectionId)
   Object.keys(saved).forEach(k => { results[k] = saved[k] })
 }
 
 function handleSelectionChange(e) {
+  if (results[e.questionId]) return
   if (e.userAnswer) {
     pendingAnswers.set(e.questionId, e.userAnswer)
   } else {
@@ -206,22 +211,22 @@ function handleSelectionChange(e) {
   }
 }
 
-async function handleSubmitObjective(e, questionId, questionType) {
-  const q = allQuestions.value.find(x => (x.id || x._id) === questionId)
-  if (!q) { results[questionId] = e; return }
+async function handleSubmitObjective(e, questionId, question) {
+  if (results[questionId]) return
+  if (!question) { results[questionId] = e; return }
   
   try {
     const r = await request.post("/check", { 
       questionId, 
       userAnswer: e.userAnswer, 
-      question: q,
-      questionType: questionType || q.type
+      question,
+      questionType: question.type
     })
     results[questionId] = r
     pendingAnswers.delete(questionId)
     const secId = pStore.currentSectionId
     if (!secId) return
-    pStore.recordAnswer(secId, r?.correct)
+    pStore.recordAnswer(secId, r?.correct === true)
     pStore.recordAnswerResult(secId, questionId, r)
   } catch(err) {
     console.error('客观题提交失败:', err)
@@ -229,12 +234,13 @@ async function handleSubmitObjective(e, questionId, questionType) {
 }
 
 function handleSubmitSubjective(e, questionId) {
-  results[questionId] = { correct: e.isCorrect !== false, evaluation: e.evaluation || '', score: e.score || 0 }
+  if (results[questionId]) return
+  results[questionId] = { correct: e.isCorrect === true, evaluation: e.evaluation || '', score: e.score || 0 }
   pendingAnswers.delete(questionId)
   const secId = pStore.currentSectionId
   if (!secId) return
-  pStore.recordAnswer(secId, e.isCorrect !== false)
-  pStore.recordAnswerResult(secId, questionId, { correct: e.isCorrect !== false, score: e.score || 0 })
+  pStore.recordAnswer(secId, e.isCorrect === true)
+  pStore.recordAnswerResult(secId, questionId, { correct: e.isCorrect === true, score: e.score || 0 })
 }
 
 // 处理主观题答案/解析更新（来自子组件的手动重试生成）
@@ -242,7 +248,7 @@ function handleUpdateAnswer(e, question) {
   if (e.answer) question.answer = e.answer
   if (e.explanation) {
     question.explanation = e.explanation
-    const qId = question.id || question._id
+    const qId = e.questionId || getQid(question, allQuestions.value.indexOf(question))
     if (results[qId]) results[qId].explanation = e.explanation
   }
 }
@@ -272,7 +278,7 @@ async function batchSubmit() {
     // 收集主观题答案（从组件 ref 读取，回退 localStorage）
     const subCards = subCardRefs.value || []
     subQ.value.forEach((q, idx) => {
-      const qId = q.id || q._id
+      const qId = getQid(q, idx)
       if (!results[qId]) {
         const card = subCards[idx]
         const userAnswer = card?.getCurrentAnswer?.() || localStorage.getItem('subj_ans_' + qId) || ''
@@ -297,42 +303,46 @@ async function batchSubmit() {
     const res = await request.post('/check-batch', { answers })
     
     res.results.forEach((r, idx) => {
-      const qId = answers[idx].question.id || answers[idx].question._id
+      const qId = getQid(answers[idx].question, answers[idx].questionIndex)
+      if (results[qId]) return
       results[qId] = r
       pendingAnswers.delete(qId)
       const secId = pStore.currentSectionId
       if (!secId) return
-      pStore.recordAnswer(secId, r?.correct)
+      pStore.recordAnswer(secId, r?.correct === true)
       pStore.recordAnswerResult(secId, qId, r)
     })
     
     showSuccessToast(`已提交 ${answers.length} 题`)
     
     // 批量并行生成缺失的解析
-    const missingExps = allQuestions.value.filter(q => {
-      const qId = q.id || q._id
+    const missingExps = allQuestions.value.filter((q, qi) => {
+      const qId = getQid(q, qi)
       const r = results[qId]
       const exp = r?.explanation || q.explanation
       return !exp || typeof exp !== 'string' || exp === '未提供' || exp === '解析未提供' || exp === '解析生成失败' || exp.trim() === ''
     })
     if (missingExps.length > 0) {
-      showSuccessToast(`正在生成 ${missingExps.length} 道题解析...`)
-      const genTasks = missingExps.map(q => 
-        request.post('/generate-answer', {
+      let genOk = 0, genFail = 0
+      const genTasks = missingExps.map(q => {
+        const qIdx = allQuestions.value.indexOf(q)
+        return request.post('/generate-answer', {
           question: q.question,
           type: q.type || 'subjective',
           category: q.category || ''
         }).then(res => {
-          const qId = q.id || q._id
+          genOk++
+          const qId = getQid(q, qIdx)
           if (res.answer) q.answer = res.answer
           if (res.explanation) {
             q.explanation = res.explanation
             if (results[qId]) results[qId].explanation = res.explanation
           }
-        }).catch(() => {})
-      )
+        }).catch(() => { genFail++ })
+      })
       await Promise.all(genTasks)
-      showSuccessToast('解析已全部生成')
+      if (genOk > 0) showSuccessToast(`解析生成完成 (${genOk}/${missingExps.length})`)
+      if (genFail > 0) showFailToast(`${genFail} 道题解析生成失败`)
     }
   } catch (err) {
     showFailToast(err.message || '整卷提交失败')

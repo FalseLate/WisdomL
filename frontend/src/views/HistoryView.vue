@@ -89,11 +89,25 @@ onMounted(async () => {
     const res = await request.get('/user/history')
     list.value = (res || []).map(item => {
       const progress = pStore.getProgress(item.id?.toString())
+      // 解析 questionsJson 计算客观/主观题数
+      let subCount = 0, objCount = 0
+      try {
+        const parsed = JSON.parse(item.questionsJson || '[]')
+        if (Array.isArray(parsed)) {
+          subCount = parsed.filter(q => q.type === 'subjective').length
+          objCount = parsed.length - subCount
+        } else {
+          const obj = parsed.objectiveQuestions || []
+          const sub = parsed.subjectiveQuestions || []
+          objCount = obj.length
+          subCount = sub.length
+        }
+      } catch(e) {}
       return {
         ...item,
         progress,
-        objCount: item.questionCount,
-        subCount: 0,
+        objCount: objCount || item.questionCount,
+        subCount,
         wordCount: item.sourceText?.length || 0,
         sourceLabel: item.sourceText?.length > 40 ? (item.sourceText?.length > 200 ? '📄 文件资料' : '✍️ 文本生成') : '✍️ 文本生成', sourceColor: item.sourceText?.length > 200 ? '#ff8c00' : '#667eea'
       }
@@ -141,8 +155,6 @@ function practiceItem(item) {
     const subArr = parsed.subjectiveQuestions || []
     const arr = [...objArr, ...subArr]
     if (arr.length === 0) { showFailToast('题目数据异常'); return }
-    const TYPE_MAP = { '单选':'single', '多选':'multiple', '判断':'single', '简答':'subjective', '主观':'subjective' }
-    arr.forEach(q => { const m = TYPE_MAP[q.type]; if (m) q.type = m })
     qStore.setQuestions(arr)
     // 记录当前刷题的 recordId
     pStore.currentSectionId = item.id?.toString() || Date.now().toString()

@@ -72,7 +72,9 @@ async function handleLogin() {
   try {
     await login(username.value.trim(), password.value)
     showSuccessToast('登录成功')
-    router.push('/')
+    const redirect = sessionStorage.getItem('redirect')
+    sessionStorage.removeItem('redirect')
+    router.push(redirect || '/')
   } catch (err) {
     showFailToast(err.message || '登录失败')
   } finally {
