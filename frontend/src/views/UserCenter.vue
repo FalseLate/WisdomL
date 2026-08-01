@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="uc-view">
     <van-nav-bar title="个人中心" left-text="返回" left-arrow @click-left="$router.back()" fixed placeholder />
     <div class="page-container">

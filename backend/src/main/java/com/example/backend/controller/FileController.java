@@ -423,7 +423,10 @@ public class FileController {
                 options.put(optMatcher.group(1).toUpperCase(), optMatcher.group(2).trim());
             }
 
-            if (options.size() >= 2) {
+            // 检测是否为主观题关键词
+            boolean hasSubjectiveKeyword = qText.matches(".*(?:简述|简答|解释|论述|名词解释|案例分析|材料分析|问答|试述|试论|说明|分析|阐述|论述题|简答题).*");
+
+            if (options.size() >= 2 && !hasSubjectiveKeyword) {
                 // 客观题：提取选项
                 var reMatcher = OPTION_PATTERN.matcher(qText);
                 if (reMatcher.find()) {
@@ -437,7 +440,7 @@ public class FileController {
                 q.put("answer", answer.isEmpty() ? rawAns : answer);
                 q.put("explanation", "");
             } else {
-                // 主观题
+                // 主观题（无选项或含主观题关键词）
                 q.put("question", qText);
                 q.put("type", "subjective");
                 q.put("answer", i < answers.size() ? answers.get(i) : "");

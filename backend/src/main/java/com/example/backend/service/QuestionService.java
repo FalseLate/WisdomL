@@ -125,7 +125,7 @@ public class QuestionService {
             String adjustedQT = buildAdjustedPrompt(chunk, questionType, cObj, cSub, true);
             futures.add(java.util.concurrent.CompletableFuture.supplyAsync(() -> {
                 try {
-                    String raw = callAi("你是一名专业的出题老师。", adjustedQT, 2048);
+                    String raw = callAi("你是一名专业的出题老师。", adjustedQT, 3072);
                     QuestionDTO part = new QuestionDTO();
                     parseQuestions(raw, part);
                     return part;
@@ -150,6 +150,28 @@ public class QuestionService {
                 if (part != null) partialResults.add(part);
             } catch (Exception e) {
                 log.warn("并行出题片段获取失败: {}", e.getMessage());
+            }
+        }
+
+        // 统计缺失数量，自动重试一次
+        int actualObj = 0, actualSub = 0;
+        for (QuestionDTO part : partialResults) {
+            if (part.getObjectiveQuestions() != null) actualObj += part.getObjectiveQuestions().size();
+            if (part.getSubjectiveQuestions() != null) actualSub += part.getSubjectiveQuestions().size();
+        }
+        int missingObj = Math.max(0, objNum - actualObj);
+        int missingSub = Math.max(0, subNum - actualSub);
+        if (missingObj + missingSub > 0) {
+            log.info("并行出题缺失: 客观{}题, 主观{}题, 自动重试...", missingObj, missingSub);
+            try {
+                String retryPrompt = buildAdjustedPrompt(cleanText.length() > 1500 ? cleanText.substring(0, 1500) : cleanText, questionType, missingObj, missingSub, true);
+                String retryRaw = callAi("你是一名专业的出题老师。", retryPrompt, 3072);
+                QuestionDTO retryPart = new QuestionDTO();
+                parseQuestions(retryRaw, retryPart);
+                partialResults.add(retryPart);
+                log.info("重试成功: 客观{}题, 主观{}题", retryPart.getObjectiveQuestions().size(), retryPart.getSubjectiveQuestions().size());
+            } catch (Exception e) {
+                log.warn("重试失败: {}", e.getMessage());
             }
         }
 
@@ -211,7 +233,14 @@ public class QuestionService {
         List<Map<String, Object>> objList = new ArrayList<>();
         List<Map<String, Object>> subList = new ArrayList<>();
         try {
-            Map<String, Object> parsed = mapper.readValue(json, new TypeReference<Map<String, Object>>() {});
+            Map<String, Object> parsed = null;
+            try {
+                parsed = mapper.readValue(json, new TypeReference<Map<String, Object>>() {});
+            } catch (Exception parseEx) {
+                log.warn("JSON首次解析失败，尝试截断恢复...");
+                parsed = recoverTruncatedJson(json);
+                if (parsed == null) throw parseEx;
+            }
             Object rawObj = parsed.getOrDefault("objectiveQuestions", Collections.emptyList());
             if (rawObj instanceof List) {
                 for (Object item : (List<?>) rawObj) {
@@ -440,5 +469,52 @@ public class QuestionService {
             return cleaned.substring(start, end + 1);
         }
         return cleaned;
+    }
+
+    /** 截断JSON恢复 */
+    private Map<String, Object> recoverTruncatedJson(String json) {
+        try {
+            int lastBrace = json.lastIndexOf('}');
+            if (lastBrace < 0) return null;
+            String truncated = json.substring(0, lastBrace + 1);
+            String[] closers = { "}]}", "}}", "}]" };
+            for (String closer : closers) {
+                try {
+                    Map<String, Object> result = mapper.readValue(truncated + closer, new TypeReference<Map<String, Object>>() {});
+                    int total = 0;
+                    Object rawObj = result.get("objectiveQuestions");
+                    Object rawSub = result.get("subjectiveQuestions");
+                    if (rawObj instanceof List) total += ((List<?>) rawObj).size();
+                    if (rawSub instanceof List) total += ((List<?>) rawSub).size();
+                    if (total > 0) { log.info("截断恢复成功: {}题", total); return result; }
+                } catch (Exception ignored) {}
+            }
+            return extractPartialQuestions(truncated);
+        } catch (Exception e) { log.warn("截断恢复失败: {}", e.getMessage()); return null; }
+    }
+
+    private Map<String, Object> extractPartialQuestions(String json) {
+        List<Map<String, Object>> objList = new ArrayList<>();
+        List<Map<String, Object>> subList = new ArrayList<>();
+        int depth = 0; int start = -1;
+        for (int i = 0; i < json.length(); i++) {
+            char c = json.charAt(i);
+            if (c == '{') { if (depth == 0) start = i; depth++; }
+            else if (c == '}') { depth--; if (depth == 0 && start >= 0) {
+                try {
+                    Map<String, Object> q = mapper.readValue(json.substring(start, i + 1), new TypeReference<Map<String, Object>>() {});
+                    if (q.containsKey("question")) {
+                        if ("subjective".equals(q.getOrDefault("type", ""))) subList.add(q); else objList.add(q);
+                    }
+                } catch (Exception ignored) {}
+                start = -1;
+            }}
+        }
+        if (objList.isEmpty() && subList.isEmpty()) return null;
+        Map<String, Object> result = new HashMap<>();
+        result.put("objectiveQuestions", objList);
+        result.put("subjectiveQuestions", subList);
+        log.info("逐段恢复: {}题", objList.size() + subList.size());
+        return result;
     }
 }

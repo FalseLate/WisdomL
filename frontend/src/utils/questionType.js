@@ -1,5 +1,9 @@
 const TYPE_MAP = {
   '主观':'subjective', '简答':'subjective', '简述':'subjective',
+  '名词解释':'subjective', '论述':'subjective', '填空':'subjective',
+  '问答':'subjective', '案例分析':'subjective', '材料分析':'subjective',
+  'essay':'subjective', 'short_answer':'subjective', 'fill':'subjective',
+  'blank':'subjective', 'subject':'subjective', 'open':'subjective',
   '单选':'single', '单选题':'single', 'single':'single', '选择':'single', 'choice':'single',
   '多选':'multiple', '多选题':'multiple', '多项选择':'multiple',
   'multiple':'multiple', 'multi':'multiple', 'multi_choice':'multiple',
@@ -15,10 +19,19 @@ export function classify(q) {
   let raw = q.type || ''
   let t = TYPE_MAP[raw] || (raw.includes('简答')||raw.includes('主观')||raw.includes('简述') ? 'subjective' : null)
   // 英语原文判断
-  if (!t) t = raw
-  if (t !== 'subjective' && t !== 'single' && t !== 'multiple') t = 'single'
-  // 答案多字母修正：single但答案有多个字母→multiple（仅当答案是无分隔符的纯字母）
-  if (t === 'single' && q.answer) {
+  // 未知类型：通过内容特征判断
+  if (!t) {
+    if (q.options && typeof q.options === 'object' && Object.keys(q.options).length >= 2) {
+      t = 'single'  // 有选项 → 客观题
+    } else if (q.category && /简答|主观|简述|名词|论述|填空|问答|案例|材料/.test(q.category)) {
+      t = 'subjective'
+    } else {
+      t = 'subjective'  // 默认主观题（安全降级，不会导致选项丢失）
+    }
+  }
+  if (t !== 'subjective' && t !== 'single' && t !== 'multiple') t = 'subjective'
+  // 答案多字母修正：仅当有 options 对象且确实是 single 时才可能升级
+  if (t === 'single' && q.answer && q.options && typeof q.options === 'object' && Object.keys(q.options).length >= 2) {
     const letters = q.answer.replace(/[^A-Za-z]/g, '')
     if (letters.length > 1) t = 'multiple'
   }

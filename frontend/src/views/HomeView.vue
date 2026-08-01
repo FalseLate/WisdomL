@@ -270,11 +270,15 @@ async function genFromSecs() {
   showLoadingDialog.value = true
   try {
     let allQs = []
+    let pureQuestions = []
     for (const fi of selPures.value) {
       const fr = fileResults.value[fi]
       if (!fr || fr.questions.length === 0) continue
-      try { const res = await request.post('/verify-answers', { questions: fr.questions }); allQs.push(...(res.questions || fr.questions)) }
-      catch(e) { allQs.push(...fr.questions) }
+      try { const res = await request.post('/verify-answers', { questions: fr.questions }); const verified = res.questions || fr.questions; allQs.push(...verified); pureQuestions.push(...verified) }
+      catch(e) { allQs.push(...fr.questions); pureQuestions.push(...fr.questions) }
+    }
+    if (pureQuestions.length > 0) {
+      try { await request.post('/generate-from-extracted', { questions: pureQuestions }) } catch(e) { console.warn('纯题目保存失败', e.message) }
     }
     if (selSecs.value.length > 0) {
       const r = await request.post('/generate-from-sections', { sectionIds: selSecs.value, sectionTexts: secTexts.value, questionType: fileQT.value })
