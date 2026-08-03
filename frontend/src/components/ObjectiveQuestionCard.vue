@@ -78,7 +78,19 @@ const isAnswerMissing = computed(() => {
   return missing || missingExp
 })
 
-watch(() => props.result, v => { if (v) expandKeys.value = ['x'] })
+watch(() => props.result, (v) => {
+  if (v) {
+    expandKeys.value = ['x']
+    // 恢复用户之前选择的选项
+    if (v.userAnswer) {
+      if (isSingle.value) {
+        selected.value = v.userAnswer
+      } else {
+        multiSelected.value = v.userAnswer.split('')
+      }
+    }
+  }
+}, { immediate: true })
 
 function isSelected(key) {
   return isSingle.value ? selected.value === key : multiSelected.value.includes(key)
@@ -111,7 +123,9 @@ async function retryGenerateAnswer() {
     const res = await request.post('/generate-answer', {
       question: q.value.question,
       type: q.value.type || 'single',
-      category: q.value.category || ''
+      category: q.value.category || '',
+      options: q.value.options || null,
+      answer: q.value.answer || ''
     })
     if (res.answer) q.value.answer = res.answer
     if (res.explanation) q.value.explanation = res.explanation

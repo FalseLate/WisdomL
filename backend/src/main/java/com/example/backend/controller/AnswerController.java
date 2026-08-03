@@ -79,6 +79,7 @@ public class AnswerController {
         result.put("correct", correct);
         result.put("correctAnswer", correctAnswer);
         result.put("explanation", explanation.isEmpty() ? "" : explanation);
+        result.put("userAnswer", userAnswer);
 
         try {
             if (answerRecordMapper != null) {
@@ -208,6 +209,7 @@ public class AnswerController {
                         sr.put("referenceAnswer", referenceAnswer);
                         sr.put("explanation", explanation.isEmpty() ? "" : explanation);
                         sr.put("correct", score >= 3);
+                        sr.put("userAnswer", userAnswer);
                         synchronized (correctCount) {
                             if (score >= 3) correctCount[0]++;
                         }
@@ -223,6 +225,7 @@ public class AnswerController {
                         sr.put("referenceAnswer", referenceAnswer);
                         sr.put("explanation", explanation.isEmpty() ? "" : explanation);
                         sr.put("correct", false);
+                        sr.put("userAnswer", userAnswer);
                         results[idx] = sr;
                     }
                 });
@@ -235,6 +238,7 @@ public class AnswerController {
                 sr.put("correct", correct);
                 sr.put("correctAnswer", correctAnswer);
                 sr.put("explanation", explanation.isEmpty() ? "" : explanation);
+                sr.put("userAnswer", userAnswer);
                 if (correct) correctCount[0]++;
                 if (!correct) {
                     saveWrongQuestion(userId, question, userAnswer, correctAnswer, explanation);
@@ -433,6 +437,8 @@ public class AnswerController {
         String question = asStr(request.get("question"));
         String type = asStr(request.getOrDefault("type", "subjective"));
         String category = asStr(request.getOrDefault("category", ""));
+        String correctAnswer = asStr(request.get("answer"));
+        Map<String, Object> options = request.get("options") instanceof Map ? (Map<String, Object>) request.get("options") : null;
 
         if (question.isEmpty()) {
             result.put("error", "题目内容为空");
@@ -445,12 +451,45 @@ public class AnswerController {
             body.put("temperature", 0.6);
             body.put("max_tokens", 2048);
 
-            String systemPrompt = "你是一位专业教师，请为题目生成参考答案和答题思路。";
-            String userPrompt = String.format(
-                "题目类型：%s\n题目内容：%s\n\n请为这道题生成：\n1. 参考答案（要点清晰、准确）\n2. 答题思路（分析考点、解题步骤、得分要点）\n\n请以JSON格式返回：{\"answer\":\"参考答案\",\"explanation\":\"答题思路\"}",
-                "subjective".equals(type) ? "主观题" + (category.isEmpty() ? "" : "（" + category + "）") : "客观题",
-                question
-            );
+            String systemPrompt;
+            String userPrompt;
+
+            if ("subjective".equals(type)) {
+                // 主观题：传入题干+参考答案，要求分析考点和答题要点
+                systemPrompt = "你是一位专业的考试辅导教师。请为主观题生成参考答案和答题思路。要求紧扣题目，分析核心考点，给出得分要点。解析控制在150字以内，突出核心要点。";
+                userPrompt = String.format(
+                    "题目：%s\n%s\n\n" +
+                    "请生成：\n" +
+                    "1. 参考答案：要点清晰、准确完整\n" +
+                    "2. 解析：分析本题考查的核心知识点，给出得分策略（控制在150字以内）\n\n" +
+                    "请严格以JSON格式返回：{\"answer\":\"参考答案\",\"explanation\":\"解析内容\"}",
+                    question,
+                    correctAnswer.isEmpty() ? "" : "参考答案：" + correctAnswer
+                );
+            } else {
+                // 客观题：传入题干+所有选项+标准答案，要求逐一分析每个选项
+                systemPrompt = "你是一位专业的考试辅导教师。请为客观题生成简洁解析。要求紧扣题目，明确指出正确答案，简要分析每个选项为什么对或错。解析控制在100字以内，简洁明了。";
+                StringBuilder optsStr = new StringBuilder();
+                if (options != null && !options.isEmpty()) {
+                    for (Map.Entry<String, Object> entry : options.entrySet()) {
+                        optsStr.append(entry.getKey()).append(". ").append(entry.getValue()).append("  ");
+                    }
+                }
+                userPrompt = String.format(
+                    "题目：%s\n" +
+                    "选项：%s\n" +
+                    "正确答案：%s\n\n" +
+                    "请生成简洁解析（控制在100字以内），要求：\n" +
+                    "1. 明确指出正确答案\n" +
+                    "2. 简要分析每个选项的对错原因\n" +
+                    "3. 说明考查的核心知识点\n\n" +
+                    "请严格以JSON格式返回：{\"answer\":\"%s\",\"explanation\":\"解析内容\"}",
+                    question,
+                    optsStr.toString().isEmpty() ? "无" : optsStr.toString(),
+                    correctAnswer.isEmpty() ? "待生成" : correctAnswer,
+                    correctAnswer.isEmpty() ? "待生成" : correctAnswer
+                );
+            }
 
             List<Map<String, String>> messages = List.of(
                 Map.of("role", "system", "content", systemPrompt),

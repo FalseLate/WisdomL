@@ -136,7 +136,9 @@ async function retryGenerateAnswer() {
     const res = await request.post('/generate-answer', {
       question: q.value.question,
       type: q.value.type || 'subjective',
-      category: q.value.category || ''
+      category: q.value.category || '',
+      answer: q.value.answer || '',
+      explanation: q.value.explanation || ''
     })
     if (res.answer) {
       q.value.answer = res.answer

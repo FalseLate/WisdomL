@@ -222,6 +222,7 @@ async function handleSubmitObjective(e, questionId, question) {
       question,
       questionType: question.type
     })
+    r.userAnswer = e.userAnswer  // 确保存储用户选择
     results[questionId] = r
     pendingAnswers.delete(questionId)
     const secId = pStore.currentSectionId

@@ -409,10 +409,22 @@ public class FileController {
             answers.add(aMatcher.group(1).trim());
         }
 
+        // 行内答案剥离：匹配 （ A ） 或 ( AB ) 格式
+        var inlineAnswerPattern = java.util.regex.Pattern.compile("[（(]\\s*([A-Ea-e]{1,5})\\s*[）)]");
+
         for (int i = 0; i < questionTexts.size(); i++) {
             Map<String, Object> q = new HashMap<>();
             String qText = questionTexts.get(i);
             q.put("id", UUID.randomUUID().toString());
+
+            // 行内答案剥离
+            var inlineMatcher = inlineAnswerPattern.matcher(qText);
+            if (inlineMatcher.find()) {
+                String inlineAnswer = inlineMatcher.group(1).toUpperCase();
+                qText = inlineMatcher.replaceAll("").trim();
+                // 存储行内答案，后续根据是否已有答案决定是否使用
+                q.put("_inlineAnswer", inlineAnswer);
+            }
 
             // 检测题目中是否包含选项（A. B. C. D.）
             var optMatcher = OPTION_PATTERN.matcher(qText);
@@ -436,6 +448,10 @@ public class FileController {
                 q.put("options", options);
                 String rawAns = i < answers.size() ? answers.get(i) : "";
                 String answer = rawAns.replaceAll("[^A-Ea-e]", "").toUpperCase();
+                // 如果ANSWER_PATTERN没提取到答案，使用行内答案
+                if (answer.isEmpty() && q.containsKey("_inlineAnswer")) {
+                    answer = (String) q.get("_inlineAnswer");
+                }
                 q.put("type", options.size() > 4 || answer.length() > 1 ? "multiple" : "single");
                 q.put("answer", answer.isEmpty() ? rawAns : answer);
                 q.put("explanation", "");
@@ -444,8 +460,15 @@ public class FileController {
                 q.put("question", qText);
                 q.put("type", "subjective");
                 q.put("answer", i < answers.size() ? answers.get(i) : "");
+                // 如果ANSWER_PATTERN没提取到答案，使用行内答案
+                if ((q.get("answer") == null || q.get("answer").toString().isEmpty()) && q.containsKey("_inlineAnswer")) {
+                    q.put("answer", q.get("_inlineAnswer"));
+                }
                 q.put("explanation", "");
             }
+
+            // 移除临时字段
+            q.remove("_inlineAnswer");
 
             questions.add(q);
         }
