@@ -410,12 +410,28 @@ public class FileController {
         }
 
         // 行内答案剥离：匹配 （ A ） 或 ( AB ) 格式
-        var inlineAnswerPattern = java.util.regex.Pattern.compile("[（(]\\s*([A-Ea-e]{1,5})\\s*[）)]");
+        var inlineAnswerPattern = java.util.regex.Pattern.compile("[（(][\\s\\u2003]*([A-Ea-e]{1,5})[\\s\\u2003]*[）)]");
 
         for (int i = 0; i < questionTexts.size(); i++) {
             Map<String, Object> q = new HashMap<>();
             String qText = questionTexts.get(i);
             q.put("id", UUID.randomUUID().toString());
+
+            // 第一步：剥离 【答案解析】 及之后内容
+            int ansParseIdx = qText.indexOf("【答案解析】");
+            if (ansParseIdx >= 0) {
+                qText = qText.substring(0, ansParseIdx).trim();
+            }
+
+            // 第二步：剥离 【答案】 标记，尝试提取答案字母
+            int ansTagIdx = qText.indexOf("【答案】");
+            if (ansTagIdx >= 0) {
+                String afterAns = qText.substring(ansTagIdx + 4).trim();
+                qText = qText.substring(0, ansTagIdx).trim();
+                if (afterAns.matches("[A-Ea-e].*")) {
+                    q.put("_inlineAnswer", afterAns.substring(0, 1).toUpperCase());
+                }
+            }
 
             // 行内答案剥离
             var inlineMatcher = inlineAnswerPattern.matcher(qText);
@@ -469,6 +485,22 @@ public class FileController {
 
             // 移除临时字段
             q.remove("_inlineAnswer");
+
+            // 智能推断：根据答案格式重新分类
+            String finalAnswer = q.get("answer") != null ? q.get("answer").toString() : "";
+            String finalType = q.get("type") != null ? q.get("type").toString() : "subjective";
+            if ("subjective".equals(finalType) && !finalAnswer.isEmpty()) {
+                // 情况1：答案是单个字母（A-E）→ 推断为单选题
+                if (finalAnswer.matches("[A-Ea-e]")) {
+                    q.put("type", "single");
+                    q.put("needsOptions", true);
+                }
+                // 情况2：答案是多个字母（如 AB、AC）→ 推断为多选题
+                else if (finalAnswer.matches("[A-Ea-e]{2,5}")) {
+                    q.put("type", "multiple");
+                    q.put("needsOptions", true);
+                }
+            }
 
             questions.add(q);
         }
