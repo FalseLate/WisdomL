@@ -113,8 +113,11 @@ public class QuestionService {
         }
 
         // 真正并行调用
-        int perObj = Math.max(1, objNum / chunks.size());
-        int perSub = Math.max(1, subNum / chunks.size());
+        // 每片最多10道题，防止max_tokens不足导致JSON截断
+        int rawPerObj = Math.max(1, objNum / chunks.size());
+        int rawPerSub = Math.max(1, subNum / chunks.size());
+        int perObj = Math.min(rawPerObj, 10);
+        int perSub = Math.min(rawPerSub, 10);
         
         List<java.util.concurrent.CompletableFuture<QuestionDTO>> futures = new ArrayList<>();
         for (int i = 0; i < chunks.size(); i++) {
@@ -125,7 +128,7 @@ public class QuestionService {
             String adjustedQT = buildAdjustedPrompt(chunk, questionType, cObj, cSub, true);
             futures.add(java.util.concurrent.CompletableFuture.supplyAsync(() -> {
                 try {
-                    String raw = callAi("你是一名专业的出题老师。", adjustedQT, 3072);
+                    String raw = callAi("你是一名专业的出题老师。", adjustedQT, 8192);
                     QuestionDTO part = new QuestionDTO();
                     parseQuestions(raw, part);
                     return part;
@@ -162,16 +165,31 @@ public class QuestionService {
         int missingObj = Math.max(0, objNum - actualObj);
         int missingSub = Math.max(0, subNum - actualSub);
         if (missingObj + missingSub > 0) {
-            log.info("并行出题缺失: 客观{}题, 主观{}题, 自动重试...", missingObj, missingSub);
-            try {
-                String retryPrompt = buildAdjustedPrompt(cleanText.length() > 1500 ? cleanText.substring(0, 1500) : cleanText, questionType, missingObj, missingSub, true);
-                String retryRaw = callAi("你是一名专业的出题老师。", retryPrompt, 3072);
-                QuestionDTO retryPart = new QuestionDTO();
-                parseQuestions(retryRaw, retryPart);
-                partialResults.add(retryPart);
-                log.info("重试成功: 客观{}题, 主观{}题", retryPart.getObjectiveQuestions().size(), retryPart.getSubjectiveQuestions().size());
-            } catch (Exception e) {
-                log.warn("重试失败: {}", e.getMessage());
+            log.info("并行出题缺失: 客观{}题, 主观{}题, 分批重试...", missingObj, missingSub);
+            int BATCH_SIZE = 8;
+            int remainingObj = missingObj;
+            int remainingSub = missingSub;
+            int batchNum = 0;
+            while (remainingObj + remainingSub > 0) {
+                batchNum++;
+                int batchObj = Math.min(remainingObj, (BATCH_SIZE + 1) / 2);
+                int batchSub = Math.min(remainingSub, BATCH_SIZE / 2);
+                if (batchObj + batchSub == 0) break;
+                try {
+                    String retryPrompt = buildAdjustedPrompt(cleanText.length() > 1500 ? cleanText.substring(0, 1500) : cleanText, questionType, batchObj, batchSub, true);
+                    String retryRaw = callAi("你是一名专业的出题老师。", retryPrompt, 8192);
+                    QuestionDTO retryPart = new QuestionDTO();
+                    parseQuestions(retryRaw, retryPart);
+                    partialResults.add(retryPart);
+                    int gotObj = retryPart.getObjectiveQuestions() != null ? retryPart.getObjectiveQuestions().size() : 0;
+                    int gotSub = retryPart.getSubjectiveQuestions() != null ? retryPart.getSubjectiveQuestions().size() : 0;
+                    remainingObj -= gotObj;
+                    remainingSub -= gotSub;
+                    log.info("重试批次{}: 客观{}题, 主观{}题 (剩余: 客观{}, 主观{})", batchNum, gotObj, gotSub, remainingObj, remainingSub);
+                } catch (Exception e) {
+                    log.warn("重试批次{}失败: {}", batchNum, e.getMessage());
+                    break;
+                }
             }
         }
 
@@ -195,7 +213,7 @@ public class QuestionService {
         if (objNum > 0) {
             sb.append("【客观题要求】共").append(objNum).append("道，包含单选题、多选题。每题options格式必须为{\"A\":\"\",\"B\":\"\",\"C\":\"\",\"D\":\"\"}。\n");
             if (noAnswers) {
-                sb.append("每题必须包含type/question/options/answer字段，但不要生成explanation。\n");
+                sb.append("每题必须包含type(必须为single或multiple)/question/options/answer字段，但不要生成explanation。\n");
             }
         } else {
             sb.append("【客观题】无需出客观题，返回空数组。\n");
@@ -265,17 +283,18 @@ public class QuestionService {
         } catch (Exception e) {
             log.error("JSON解析失败: {}", e.getMessage());
         }
-        dto.setObjectiveQuestions(objList);
-        // 简单后处理：按type字段归类，避免主观题混在客观题里
+        // 简单后处理：信任AI返回的type，只做最小验证
         List<Map<String, Object>> finalObj = new ArrayList<>();
         List<Map<String, Object>> finalSub = new ArrayList<>(subList);
         for (Map<String, Object> q : objList) {
             String t = (String) q.get("type");
+            // 保持AI返回的类型，只验证是否有效
             if ("subjective".equals(t)) {
                 finalSub.add(q);
             } else if ("multiple".equals(t) || "single".equals(t)) {
                 finalObj.add(q);
             } else {
+                // 未知类型：通过options判断
                 Object opts = q.get("options");
                 int optCount = 0;
                 if (opts instanceof Map) {
@@ -288,8 +307,30 @@ public class QuestionService {
             }
         }
         for (Map<String, Object> q : finalSub) {
-            q.putIfAbsent("type", "subjective");
+            q.put("type", "subjective"); // 覆盖未知type（如AI返回的"question"）
         }
+
+        // ===== 二次校验：subjective但answer为字母→重分类为客观题 =====
+        List<Map<String, Object>> reclassified = new ArrayList<>();
+        for (Map<String, Object> q : finalSub) {
+            String answer = (String) q.getOrDefault("answer", "");
+            Object opts = q.get("options");
+            boolean hasOpts = opts instanceof Map && ((Map<?,?>) opts).size() >= 2;
+            if (answer != null && answer.matches("[A-E]{1,2}") && !hasOpts) {
+                Map<String, String> defaultOpts = new LinkedHashMap<>();
+                defaultOpts.put("A", "正确");
+                defaultOpts.put("B", "错误");
+                q.put("options", defaultOpts);
+                q.put("type", answer.length() > 1 ? "multiple" : "single");
+                reclassified.add(q);
+                log.info("parseQuestions二次校验: answer={} -> type={}", answer, q.get("type"));
+            }
+        }
+        if (!reclassified.isEmpty()) {
+            finalSub.removeAll(reclassified);
+            finalObj.addAll(reclassified);
+        }
+
         dto.setObjectiveQuestions(finalObj);
         dto.setSubjectiveQuestions(finalSub);
     }
@@ -509,6 +550,21 @@ public class QuestionService {
                 } catch (Exception ignored) {}
                 start = -1;
             }}
+        }
+        // 尝试恢复最后一个未闭合的块
+        if (depth > 0 && start >= 0 && start < json.length() - 1) {
+            String lastChunk = json.substring(start);
+            for (int trim = lastChunk.length() - 1; trim > 20; trim--) {
+                try {
+                    String attempt = lastChunk.substring(0, trim) + "}";
+                    Map<String, Object> q = mapper.readValue(attempt, new TypeReference<Map<String, Object>>() {});
+                    if (q.containsKey("question")) {
+                        if ("subjective".equals(q.getOrDefault("type", ""))) subList.add(q); else objList.add(q);
+                        log.info("截断恢复: 成功恢复最后1道题");
+                        break;
+                    }
+                } catch (Exception ignored) {}
+            }
         }
         if (objList.isEmpty() && subList.isEmpty()) return null;
         Map<String, Object> result = new HashMap<>();

@@ -468,29 +468,42 @@ public class AnswerController {
                 );
             } else {
                 // 客观题：传入题干+所有选项+标准答案，要求逐一分析每个选项
-                systemPrompt = "你是一位专业的考试辅导教师。请为客观题生成简洁解析。要求紧扣题目，明确指出正确答案，简要分析每个选项为什么对或错。解析控制在100字以内，简洁明了。";
-                StringBuilder optsStr = new StringBuilder();
-                if (options != null && !options.isEmpty()) {
+                boolean missingOptions = options == null || options.isEmpty();
+                if (missingOptions) {
+                    // 选项缺失：要求AI同时生成选项
+                    systemPrompt = "你是一位专业的考试辅导教师。请为客观题生成选项、答案和简洁解析。要求紧扣题目，生成4个合理选项，明确指出正确答案，简要分析每个选项为什么对或错。解析控制在100字以内。";
+                    userPrompt = String.format(
+                        "题目：%s\n\n" +
+                        "请生成：\n" +
+                        "1. 4个选项（A/B/C/D）\n" +
+                        "2. 正确答案\n" +
+                        "3. 简洁解析（100字以内）\n\n" +
+                        "请严格以JSON格式返回：{\"options\":{\"A\":\"选项A\",\"B\":\"选项B\",\"C\":\"选项C\",\"D\":\"选项D\"},\"answer\":\"正确答案\",\"explanation\":\"解析内容\"}",
+                        question
+                    );
+                } else {
+                    // 选项已存在：生成解析
+                    systemPrompt = "你是一位专业的考试辅导教师。请为客观题生成简洁解析。要求紧扣题目，明确指出正确答案，简要分析每个选项为什么对或错。解析控制在100字以内，简洁明了。";
+                    StringBuilder optsStr = new StringBuilder();
                     for (Map.Entry<String, Object> entry : options.entrySet()) {
                         optsStr.append(entry.getKey()).append(". ").append(entry.getValue()).append("  ");
                     }
+                    userPrompt = String.format(
+                        "题目：%s\n" +
+                        "选项：%s\n" +
+                        "正确答案：%s\n\n" +
+                        "请生成简洁解析（控制在100字以内），要求：\n" +
+                        "1. 明确指出正确答案\n" +
+                        "2. 简要分析每个选项的对错原因\n" +
+                        "3. 说明考查的核心知识点\n\n" +
+                        "请严格以JSON格式返回：{\"answer\":\"%s\",\"explanation\":\"解析内容\"}",
+                        question,
+                        optsStr.toString(),
+                        correctAnswer.isEmpty() ? "待生成" : correctAnswer,
+                        correctAnswer.isEmpty() ? "待生成" : correctAnswer
+                    );
                 }
-                userPrompt = String.format(
-                    "题目：%s\n" +
-                    "选项：%s\n" +
-                    "正确答案：%s\n\n" +
-                    "请生成简洁解析（控制在100字以内），要求：\n" +
-                    "1. 明确指出正确答案\n" +
-                    "2. 简要分析每个选项的对错原因\n" +
-                    "3. 说明考查的核心知识点\n\n" +
-                    "请严格以JSON格式返回：{\"answer\":\"%s\",\"explanation\":\"解析内容\"}",
-                    question,
-                    optsStr.toString().isEmpty() ? "无" : optsStr.toString(),
-                    correctAnswer.isEmpty() ? "待生成" : correctAnswer,
-                    correctAnswer.isEmpty() ? "待生成" : correctAnswer
-                );
             }
-
             List<Map<String, String>> messages = List.of(
                 Map.of("role", "system", "content", systemPrompt),
                 Map.of("role", "user", "content", userPrompt)

@@ -66,6 +66,9 @@ public class FileController {
             Pattern.DOTALL
     );
 
+    // 【答案】格式（排除【答案解析】）
+    private static final Pattern BRACKET_ANSWER_PATTERN = Pattern.compile("【答案】([A-Ea-e]+)");
+
     @PostMapping("/upload")
     public ResponseEntity<Map<String, Object>> uploadFile(@RequestParam("file") MultipartFile file) {
         Map<String, Object> result = new HashMap<>();
@@ -379,6 +382,20 @@ public class FileController {
     }
 
     private boolean detectPureQuestions(String text) {
+        // 排除编程作业格式：含大量______填空或HTML注释答案
+        int blankCount = 0;
+        int idx = 0;
+        while ((idx = text.indexOf("______", idx)) >= 0) { blankCount++; idx += 6; }
+        if (blankCount > 20) { log.info("检测到编程作业格式(______×{})，不作为纯题目", blankCount); return false; }
+        if (text.contains("<!--") && text.contains("答案")) { log.info("检测到HTML注释答案格式，不作为纯题目"); return false; }
+        if (text.contains("<template>") && text.contains("<script")) { log.info("检测到Vue代码格式，不作为纯题目"); return false; }
+
+        // 检测无编号题目：统计A/B/C/D选项行数量
+        var optLineMatcher = OPTION_PATTERN.matcher(text);
+        int optLineCount = 0;
+        while (optLineMatcher.find()) { optLineCount++; }
+        if (optLineCount >= 8) { log.info("检测到无编号选项行{}行，作为纯题目", optLineCount); return true; }
+
         var matcher = QUESTION_PATTERN.matcher(text);
         int questionCount = 0;
         while (matcher.find()) {
@@ -407,6 +424,15 @@ public class FileController {
 
         while (aMatcher.find()) {
             answers.add(aMatcher.group(1).trim());
+        }
+
+        // 补充提取【答案】格式（排除【答案解析】）
+        if (answers.isEmpty() || answers.stream().allMatch(String::isBlank)) {
+            var baMatcher = BRACKET_ANSWER_PATTERN.matcher(text);
+            answers = new ArrayList<>();
+            while (baMatcher.find()) {
+                answers.add(baMatcher.group(1).trim());
+            }
         }
 
         // 行内答案剥离：匹配 （ A ） 或 ( AB ) 格式
@@ -468,7 +494,9 @@ public class FileController {
                 if (answer.isEmpty() && q.containsKey("_inlineAnswer")) {
                     answer = (String) q.get("_inlineAnswer");
                 }
-                q.put("type", options.size() > 4 || answer.length() > 1 ? "multiple" : "single");
+                // 检查多选关键词
+                boolean hasMultipleKeyword = qText.contains("以下哪些") || qText.contains("哪些是") || qText.contains("哪些属于") || qText.contains("哪些关于") || qText.contains("哪些说法") || qText.contains("哪些选项") || qText.contains("哪些物品");
+                q.put("type", hasMultipleKeyword || options.size() > 4 || answer.length() > 1 ? "multiple" : "single");
                 q.put("answer", answer.isEmpty() ? rawAns : answer);
                 q.put("explanation", "");
             } else {
@@ -486,26 +514,96 @@ public class FileController {
             // 移除临时字段
             q.remove("_inlineAnswer");
 
-            // 智能推断：根据答案格式重新分类
-            String finalAnswer = q.get("answer") != null ? q.get("answer").toString() : "";
-            String finalType = q.get("type") != null ? q.get("type").toString() : "subjective";
-            if ("subjective".equals(finalType) && !finalAnswer.isEmpty()) {
-                // 情况1：答案是单个字母（A-E）→ 推断为单选题
-                if (finalAnswer.matches("[A-Ea-e]")) {
-                    q.put("type", "single");
-                    q.put("needsOptions", true);
-                }
-                // 情况2：答案是多个字母（如 AB、AC）→ 推断为多选题
-                else if (finalAnswer.matches("[A-Ea-e]{2,5}")) {
-                    q.put("type", "multiple");
-                    q.put("needsOptions", true);
-                }
-            }
-
             questions.add(q);
         }
 
+        // ===== 修改1：判断题重分类 + 补默认选项 =====
+        for (Map<String, Object> q : questions) {
+            String type = (String) q.getOrDefault("type", "");
+            String answer = (String) q.getOrDefault("answer", "");
+            Object opts = q.get("options");
+            boolean hasOpts = opts instanceof Map && ((Map<?,?>) opts).size() >= 2;
+
+            if ("subjective".equals(type) && answer != null && answer.matches("[A-E]{1,2}")) {
+                // 这是判断题或选择题，答案是字母但没有选项 → 补充默认选项
+                if (!hasOpts) {
+                    Map<String, String> defaultOpts = new LinkedHashMap<>();
+                    defaultOpts.put("A", "正确");
+                    defaultOpts.put("B", "错误");
+                    q.put("options", defaultOpts);
+                }
+                q.put("type", answer.length() > 1 ? "multiple" : "single");
+                log.info("判断题重分类: answer={} → type={}", answer, q.get("type"));
+            }
+        }
+
+        // ===== 修改3：无编号题目第二遍扫描 =====
+        // 只在第一遍提取数量为0或极少时触发
+        if (questions.size() < 3) {
+            List<Map<String, Object>> unnumbered = extractUnnumberedQuestions(text);
+            if (!unnumbered.isEmpty()) {
+                log.info("无编号题目扫描: 新增{}题", unnumbered.size());
+                questions.addAll(unnumbered);
+            }
+        }
+
         return questions;
+    }
+
+    /**
+     * 第二遍扫描：提取无编号的选择题（问题行 + A. B. C. D. 选项行）
+     */
+    private List<Map<String, Object>> extractUnnumberedQuestions(String text) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        String[] lines = text.split("\\n");
+        int i = 0;
+        while (i < lines.length) {
+            String line = lines[i].trim();
+            // 跳过空行和选项行
+            if (line.isEmpty() || line.matches("^[A-Ea-e][.、)）].*")) { i++; continue; }
+
+            // 检查后续是否有连续的A. B. C. D.选项
+            Map<String, String> options = new LinkedHashMap<>();
+            int j = i + 1;
+            while (j < lines.length && j < i + 10) {
+                String nextLine = lines[j].trim();
+                var m = OPTION_PATTERN.matcher(nextLine);
+                if (m.matches()) {
+                    options.put(m.group(1).toUpperCase(), m.group(2).trim());
+                    j++;
+                } else if (!nextLine.isEmpty() && !nextLine.matches("^[A-Ea-e][.、)）].*")) {
+                    break; // 遇到非空非选项行，停止
+                } else {
+                    j++;
+                }
+            }
+
+            if (options.size() >= 2) {
+                // 找到一道无编号题目
+                Map<String, Object> q = new HashMap<>();
+                q.put("id", UUID.randomUUID().toString());
+                // 题目文本：当前行（去除行内答案标记后）
+                String qText = line;
+                var inlineAnswerPattern = java.util.regex.Pattern.compile("[（(][\\s\\u2003]*([A-Ea-e]{1,5})[\\s\\u2003]*[）)]");
+                var inlineMatcher = inlineAnswerPattern.matcher(qText);
+                String inlineAnswer = null;
+                if (inlineMatcher.find()) {
+                    inlineAnswer = inlineMatcher.group(1).toUpperCase();
+                    qText = inlineMatcher.replaceAll("").trim();
+                }
+                q.put("question", qText);
+                q.put("options", options);
+                q.put("answer", inlineAnswer != null ? inlineAnswer : "");
+                q.put("explanation", "");
+                boolean hasMultipleKeyword = qText.contains("以下哪些") || qText.contains("哪些是") || qText.contains("哪些属于");
+                q.put("type", hasMultipleKeyword || options.size() > 4 ? "multiple" : "single");
+                result.add(q);
+                i = j; // 跳过已处理的行
+            } else {
+                i++;
+            }
+        }
+        return result;
     }
 
     private String extractPdfText(MultipartFile file) throws Exception {

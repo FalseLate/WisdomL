@@ -31,10 +31,7 @@ export function classify(q) {
   }
   if (t !== 'subjective' && t !== 'single' && t !== 'multiple') t = 'subjective'
   // 答案多字母修正：仅当有 options 对象且确实是 single 时才可能升级
-  if (t === 'single' && q.answer && q.options && typeof q.options === 'object' && Object.keys(q.options).length >= 2) {
-    const letters = q.answer.replace(/[^A-Za-z]/g, '')
-    if (letters.length > 1) t = 'multiple'
-  }
+  // 题型由后端决定，前端不做自动升级（避免单选误判为多选）
   // 确保 id 字段存在
   const id = q.id || q._id
   return { type:t, label:LABELS[t]||'单选题', color:COLORS[t]||'#667eea', isSubjective:t==='subjective', id }
