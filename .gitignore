@@ -9,6 +9,10 @@
 !backend/
 !frontend/
 
+# 重点：递归放行文件夹内部所有内容（修复你的源码被忽略问题）
+!backend/**
+!frontend/**
+
 # 允许上传 .gitignore 本身
 !.gitignore
 

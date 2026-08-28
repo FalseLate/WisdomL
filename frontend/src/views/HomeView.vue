@@ -85,6 +85,8 @@
       <div class="bottom-entries">
         <div class="entry-item" @click="$router.push('/question-bank')">📎 我的题库</div>
         <div class="entry-item" @click="$router.push('/history')">📚 历史记录</div>
+        <!--cjj-->
+        <div class="entry-item" @click="goWordQuiz">📖 单词刷题</div>
       </div>
     </div>
     <!-- 登录弹窗 -->
@@ -320,6 +322,16 @@ function goPractice() { showGenDialog.value = false; router.push('/question-bank
 function goProfile() {
   if (!isLoggedIn()) { showLoginDialog.value = true; return }
   router.push("/user-center")
+}
+
+
+//cjj
+const goWordQuiz = () => {
+  if (!isLoggedIn()) {
+    showLoginDialog.value = true
+    return
+  }
+  router.push('/word-quiz')
 }
 </script>
 <style scoped>
