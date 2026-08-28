@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS `user` (
 CREATE TABLE IF NOT EXISTS question_record (
     id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
     user_id BIGINT DEFAULT NULL COMMENT '用户ID',
+    title VARCHAR(200) DEFAULT '' COMMENT '文档标题',
     source_text TEXT NOT NULL COMMENT '用户输入的原始文本',
     questions_json LONGTEXT NOT NULL COMMENT 'AI生成的题目JSON',
     question_count INT DEFAULT 0 COMMENT '题目数量',

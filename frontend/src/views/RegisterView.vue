@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="register-view">
     <div class="page-container">
       <div class="logo-area">
@@ -113,59 +113,14 @@ async function handleRegister() {
 </script>
 
 <style scoped>
-.register-view {
-  min-height: 100vh;
-}
-
-.logo-area {
-  text-align: center;
-  padding: 40px 0 24px;
-}
-
-.logo-icon {
-  font-size: 56px;
-  margin-bottom: 8px;
-}
-
-.logo-title {
-  font-size: 26px;
-  font-weight: 700;
-  color: #fff;
-  letter-spacing: 4px;
-}
-
-.logo-desc {
-  font-size: 14px;
-  color: rgba(255,255,255,0.75);
-  margin-top: 6px;
-}
-
-.form-card {
-  padding: 24px 20px;
-}
-
-.form-title {
-  font-size: 20px;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 20px;
-  text-align: center;
-}
-
-.register-btn {
-  margin-top: 20px;
-}
-
-.switch-link {
-  text-align: center;
-  margin-top: 16px;
-  font-size: 14px;
-  color: #999;
-}
-
-.switch-link span {
-  color: #667eea;
-  font-weight: 500;
-  cursor: pointer;
-}
+.register-view { min-height: 100vh; }
+.logo-area { text-align: center; padding: 40px 0 24px; }
+.logo-icon { font-size: 56px; margin-bottom: 8px; }
+.logo-title { font-size: 26px; font-weight: 700; color: #fff; letter-spacing: 4px; }
+.logo-desc { font-size: 14px; color: rgba(255,255,255,0.75); margin-top: 6px; }
+.form-card { padding: 24px 20px; }
+.form-title { font-size: 20px; font-weight: 600; color: #333; margin-bottom: 20px; text-align: center; }
+.register-btn { margin-top: 20px; }
+.switch-link { text-align: center; margin-top: 16px; font-size: 14px; color: #999; }
+.switch-link span { color: #667eea; font-weight: 500; cursor: pointer; }
 </style>

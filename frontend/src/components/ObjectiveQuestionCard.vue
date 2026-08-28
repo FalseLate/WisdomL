@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="obj-card" :style="{ borderLeft: '4px solid ' + barColor }">
     <div class="card-header">
         <van-icon :name="isFav ? 'star' : 'star-o'" size="18" :color="isFav?'#ff8c00':'#ccc'" class="fav-btn" @click="toggleFav" />

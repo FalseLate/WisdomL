@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="qb-view">
     <van-nav-bar :title="batchMode ? '已选' + selectedIds.length + '条' : '📚 我的题库'" left-text="返回" left-arrow @click-left="$router.back()" fixed placeholder>
       <template #right>
@@ -22,7 +22,27 @@
           <span class="qb-date">{{ item.date }}</span>
           <van-icon v-if="!batchMode" name="delete-o" size="18" color="#ee0a24" class="del-btn" @click="deleteSingle(item.id)" />
         </div>
-        <div class="qb-title">{{ item.title }}</div>
+        <div class="qb-title-row" v-if="editingId !== item.id" @click="startEditTitle(item)">
+          <span class="qb-title-text">{{ item.title }}</span>
+          <span class="qb-title-edit-hint">
+            <van-icon name="edit" size="13" />
+          </span>
+        </div>
+        <div v-else class="qb-title-editor">
+          <input
+            ref="titleInputRef"
+            v-model="editTitleValue"
+            class="qb-title-input"
+            placeholder="输入新标题..."
+            @keyup.enter="saveEditTitle(item)"
+            @keyup.esc="cancelEditTitle"
+            @blur="cancelEditTitle"
+          />
+          <div class="qb-title-actions">
+            <button class="qb-title-btn save" @mousedown.prevent @click.stop="saveEditTitle(item)">✓</button>
+            <button class="qb-title-btn cancel" @mousedown.prevent @click.stop="cancelEditTitle">✕</button>
+          </div>
+        </div>
         <div class="qb-meta">
           <span>{{ item.total }}题</span>
           <span v-if="item.objCount">客观{{ item.objCount }}</span>
@@ -48,6 +68,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQuestionsStore } from '../stores/questions'
 import { usePracticeStore } from '../stores/practice'
@@ -61,6 +82,9 @@ const list = ref([])
 const loading = ref(true)
 const batchMode = ref(false)
 const selectedIds = ref([])
+const editingId = ref(null)
+const editTitleValue = ref('')
+const titleInputRef = ref(null)
 
 onMounted(async () => {
   try {
@@ -83,13 +107,14 @@ onMounted(async () => {
       } catch(e) {}
       return {
         id: item.id || i,
-        title: item.sourceText ? item.sourceText.substring(0, 50) : '出题记录',
+        title: item.title || (item.sourceText ? item.sourceText.substring(0, 50) : '出题记录'),
         date: formatDate(item.createTime),
         total: item.questionCount || 0,
         objCount: objCount || item.questionCount,
         subCount,
         progress: Math.min(progress, 100),
         sourceLabel: item.sourceText?.length > 100 ? '📄 文件' : '✍️ 文本',
+        sourceColor: item.sourceText?.length > 100 ? '#ff8c00' : '#667eea',
         sourceColor: item.sourceText?.length > 100 ? '#ff8c00' : '#667eea',
         questions: item.questionsJson
       }
@@ -119,6 +144,28 @@ async function batchDelete() {
   } catch(e) {}
 }
 
+
+function startEditTitle(item) {
+    editingId.value = item.id
+    editTitleValue.value = item.title || ''
+    nextTick(() => { titleInputRef.value?.focus() })
+}
+
+async function saveEditTitle(item) {
+    if (!editTitleValue.value.trim()) { showFailToast('标题不能为空'); return }
+    try {
+        await request.put('/user/history/' + item.id + '/title', { title: editTitleValue.value.trim() })
+        item.title = editTitleValue.value.trim()
+        editingId.value = null
+        showSuccessToast('标题已更新')
+    } catch (e) {
+        showFailToast(e.message || '保存失败')
+    }
+}
+
+function cancelEditTitle() {
+    editingId.value = null
+}
 function formatDate(d) {
   if (!d) return ''
   const dt = new Date(d)
@@ -159,4 +206,18 @@ function goPractice(item) {
 .del-btn { opacity:0.5; transition:all 0.2s; }
 .del-btn:hover { opacity:1; transform:scale(1.15); }
 .batch-bar { position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:480px; padding:12px 16px 20px; background:#fff; box-shadow:0 -2px 10px rgba(0,0,0,0.06); z-index:100; }
+.qb-title-row { display:flex; align-items:center; gap:6px; margin-bottom:8px; cursor:pointer; padding:4px 8px; border-radius:8px; transition:background .15s; }
+.qb-title-row:hover { background:#f5f5ff; }
+.qb-title-text { font-size:15px; font-weight:500; color:#333; line-height:1.4; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.qb-title-edit-hint { color:#bbb; flex-shrink:0; opacity:0; transition:opacity .15s; }
+.qb-title-row:hover .qb-title-edit-hint { opacity:1; }
+.qb-title-editor { display:flex; gap:6px; align-items:center; margin-bottom:8px; background:#f8f8ff; border:1.5px solid #667eea; border-radius:10px; padding:6px 8px; }
+.qb-title-input { flex:1; border:none; outline:none; background:transparent; font-size:14px; font-weight:500; color:#333; min-width:0; }
+.qb-title-input::placeholder { color:#bbb; }
+.qb-title-actions { display:flex; gap:4px; flex-shrink:0; }
+.qb-title-btn { width:26px; height:26px; border-radius:50%; border:none; cursor:pointer; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; transition:all .15s; }
+.qb-title-btn.save { background:#667eea; color:#fff; }
+.qb-title-btn.save:hover { background:#5a6fd6; }
+.qb-title-btn.cancel { background:#f0f0f0; color:#999; }
+.qb-title-btn.cancel:hover { background:#e8e8e8; color:#666; }
 </style>

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="practice-view">
     <van-nav-bar title="📑 刷题模式" left-text="返回" left-arrow @click-left="goBack" fixed placeholder />
 

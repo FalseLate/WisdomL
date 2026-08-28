@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="landing">
     <!-- Hero -->
     <div class="hero">
@@ -40,23 +40,13 @@ const features = [
 
 <style scoped>
 .landing { min-height:100vh; }
-.hero {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  text-align: center; padding: 80px 30px 50px;
-  color: #fff;
-}
+.hero { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); text-align: center; padding: 80px 30px 50px; color: #fff; }
 .hero-icon { font-size: 64px; margin-bottom: 10px; }
 .hero-title { font-size: 32px; font-weight: 700; margin-bottom: 8px; }
 .hero-desc { font-size: 15px; opacity: 0.85; margin-bottom: 30px; }
 .hero-actions { max-width: 280px; margin: 0 auto; }
-.features {
-  padding: 30px 20px;
-  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
-}
-.feature-card {
-  background: #fff; border-radius: 14px; padding: 20px 16px;
-  text-align: center; box-shadow: 0 2px 12px rgba(0,0,0,0.04);
-}
+.features { padding: 30px 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.feature-card { background: #fff; border-radius: 14px; padding: 20px 16px; text-align: center; box-shadow: 0 2px 12px rgba(0,0,0,0.04); }
 .f-icon { font-size: 32px; margin-bottom: 6px; }
 .f-title { font-size: 15px; font-weight: 600; color: #333; margin-bottom: 4px; }
 .f-desc { font-size: 12px; color: #999; line-height: 1.4; }

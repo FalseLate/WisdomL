@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="skeleton-list">
     <div v-for="i in 3" :key="i" class="skeleton-card">
       <div class="sk-line w-30"></div>

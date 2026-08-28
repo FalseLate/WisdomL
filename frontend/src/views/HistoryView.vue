@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="history-view">
     <van-nav-bar :title="batchMode ? '已选' + selectedIds.length + '条' : '📋 历史记录'" left-text="返回" left-arrow @click-left="$router.back()" fixed placeholder>
       <template #right>
@@ -187,11 +187,9 @@ function showDetail(item) {
 .empty-icon { font-size: 64px; margin-bottom: 12px; }
 .empty-title { font-size: 18px; font-weight: 600; color: #333; margin-bottom: 8px; }
 .empty-desc { font-size: 14px; color: #999; margin-bottom: 20px; }
-
 .stats-overview { display: flex; gap: 10px; margin-bottom: 16px; }
 .so-item { flex:1; background:#fff; border-radius:12px; padding:14px; text-align:center; box-shadow:0 2px 8px rgba(0,0,0,0.04); }
 .so-num { display:block; font-size:22px; font-weight:700; color:#667eea; margin-bottom:2px; }
-
 .history-card { background:#fff; border-radius:16px; padding:16px; margin-bottom:12px; box-shadow:0 2px 12px rgba(0,0,0,0.06); }
 .hc-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
 .hc-date { font-size:12px; color:#999; }

@@ -13,6 +13,9 @@ public class QuestionRecord {
     /** 用户ID */
     private Long userId;
 
+    /** 文档标题 */
+    private String title;
+
     /** 用户输入的原始文本 */
     private String sourceText;
 
@@ -31,6 +34,9 @@ public class QuestionRecord {
 
     public Long getUserId() { return userId; }
     public void setUserId(Long userId) { this.userId = userId; }
+
+    public String getTitle() { return title; }
+    public void setTitle(String title) { this.title = title; }
 
     public String getSourceText() { return sourceText; }
     public void setSourceText(String sourceText) { this.sourceText = sourceText; }

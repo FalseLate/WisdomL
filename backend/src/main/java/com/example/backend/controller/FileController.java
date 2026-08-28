@@ -3,8 +3,11 @@ package com.example.backend.controller;
 import com.example.backend.auth.JwtAuth;
 import com.example.backend.dto.QuestionDTO;
 import com.example.backend.entity.QuestionRecord;
+import com.example.backend.entity.GenerateTask;
+import com.example.backend.entity.TaskManager;
 import com.example.backend.mapper.QuestionRecordMapper;
 import com.example.backend.service.QuestionService;
+import com.example.backend.service.AsyncGenerateService;
 import com.example.backend.service.SectionSplitter;
 import com.example.backend.service.SectionSplitter.Section;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -44,6 +47,12 @@ public class FileController {
 
     @Autowired
     private SectionSplitter sectionSplitter;
+
+    @Autowired
+    private TaskManager taskManager;
+
+    @Autowired
+    private AsyncGenerateService asyncService;
 
     @Value("${ai.api.url}")
     private String apiUrl;
@@ -131,6 +140,7 @@ public class FileController {
         List<String> sectionIds = (List<String>) request.get("sectionIds");
         Map<String, String> sectionTexts = (Map<String, String>) request.get("sectionTexts");
         String questionType = (String) request.getOrDefault("questionType", "all");
+        String title = (String) request.getOrDefault("title", "");
 
         if (sectionIds == null || sectionIds.isEmpty() || sectionTexts == null) {
             result.put("error", "请至少选择一个章节");
@@ -183,7 +193,7 @@ public class FileController {
                 .map(sectionTexts::get)
                 .filter(Objects::nonNull)
                 .toList());
-        saveSectionRecord(combinedText, combinedDto);
+        saveSectionRecord(title, combinedText, combinedDto);
 
         result.put("questions", allObjective);
         result.put("subjectiveQuestions", allSubjective);
@@ -305,8 +315,9 @@ public class FileController {
         dto.setTotalCount(objective.size() + subjective.size());
 
         // 不再同步生成答案和解析，前端可逐个触发重新生成
+        String title2 = (String) request.getOrDefault("title", "");
         String combinedText = "纯题目文档提取";
-        saveSectionRecord(combinedText, dto);
+        saveSectionRecord(title2, combinedText, dto);
 
         result.put("totalCount", dto.getTotalCount());
         result.put("objectiveCount", dto.getObjectiveCount());
@@ -403,6 +414,24 @@ public class FileController {
             if (questionCount >= 3) return true;
         }
         return false;
+    }
+    
+    @PostMapping("/generate-from-sections-async")
+    public Map<String, Object> generateFromSectionsAsync(@RequestBody Map<String, Object> request) {
+        Long userId = null;
+        try { userId = jwtAuth.getCurrentUserId(); } catch (Exception e) { }
+        List<String> sectionIds = (List<String>) request.get("sectionIds");
+        Map<String, String> sectionTexts = (Map<String, String>) request.get("sectionTexts");
+        String questionType = (String) request.getOrDefault("questionType", "all");
+        String title = (String) request.getOrDefault("title", "");
+        String taskId = taskManager.createTask(userId, "file", title);
+        GenerateTask task = taskManager.getTask(taskId);
+        if (task != null) task.setTitle(title);
+        asyncService.generateFromSections(taskId, sectionIds, sectionTexts, questionType);
+        Map<String, Object> result = new HashMap<>();
+        result.put("taskId", taskId);
+        result.put("status", "pending");
+        return result;
     }
 
     private static final Pattern OPTION_PATTERN = Pattern.compile(
@@ -622,11 +651,12 @@ public class FileController {
         }
     }
 
-    private void saveSectionRecord(String text, QuestionDTO dto) {
+    private void saveSectionRecord(String title, String text, QuestionDTO dto) {
         try {
             if (jwtAuth != null && questionRecordMapper != null) {
                 QuestionRecord record = new QuestionRecord();
                 try { record.setUserId(jwtAuth.getCurrentUserId()); } catch (Exception e) { record.setUserId(null); }
+                record.setTitle(title != null ? title : "");
                 record.setSourceText(text != null && text.length() > 500 ? text.substring(0, 500) : text);
                 record.setQuestionsJson(mapper.writeValueAsString(Map.of(
                         "objectiveQuestions", dto.getObjectiveQuestions(),

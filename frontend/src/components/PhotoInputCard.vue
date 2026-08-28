@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="card photo-card">
     <div class="input-guide">📷 拍摄试卷或学习资料（可拍照或从相册选择）</div>
     <van-uploader v-model="fileList" accept="image/*" :max-count="5" multiple :after-read="onRead" />

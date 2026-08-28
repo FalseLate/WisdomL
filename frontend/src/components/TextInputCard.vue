@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="card text-input-card">
     <div class="input-guide">📝 粘贴或输入复习资料</div>
     <van-field

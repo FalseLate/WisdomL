@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="login-view">
     <div class="page-container">
       <!-- Logo 区域 -->
@@ -84,59 +84,14 @@ async function handleLogin() {
 </script>
 
 <style scoped>
-.login-view {
-  min-height: 100vh;
-}
-
-.logo-area {
-  text-align: center;
-  padding: 60px 0 30px;
-}
-
-.logo-icon {
-  font-size: 64px;
-  margin-bottom: 12px;
-}
-
-.logo-title {
-  font-size: 28px;
-  font-weight: 700;
-  color: #fff;
-  letter-spacing: 4px;
-}
-
-.logo-desc {
-  font-size: 14px;
-  color: rgba(255,255,255,0.75);
-  margin-top: 8px;
-}
-
-.form-card {
-  padding: 24px 20px;
-}
-
-.form-title {
-  font-size: 20px;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 20px;
-  text-align: center;
-}
-
-.login-btn {
-  margin-top: 20px;
-}
-
-.switch-link {
-  text-align: center;
-  margin-top: 16px;
-  font-size: 14px;
-  color: #999;
-}
-
-.switch-link span {
-  color: #667eea;
-  font-weight: 500;
-  cursor: pointer;
-}
+.login-view { min-height: 100vh; }
+.logo-area { text-align: center; padding: 60px 0 30px; }
+.logo-icon { font-size: 64px; margin-bottom: 12px; }
+.logo-title { font-size: 28px; font-weight: 700; color: #fff; letter-spacing: 4px; }
+.logo-desc { font-size: 14px; color: rgba(255,255,255,0.75); margin-top: 8px; }
+.form-card { padding: 24px 20px; }
+.form-title { font-size: 20px; font-weight: 600; color: #333; margin-bottom: 20px; text-align: center; }
+.login-btn { margin-top: 20px; }
+.switch-link { text-align: center; margin-top: 16px; font-size: 14px; color: #999; }
+.switch-link span { color: #667eea; font-weight: 500; cursor: pointer; }
 </style>

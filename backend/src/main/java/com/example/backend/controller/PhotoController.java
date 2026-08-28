@@ -3,9 +3,12 @@ package com.example.backend.controller;
 import com.example.backend.auth.JwtAuth;
 import com.example.backend.dto.QuestionDTO;
 import com.example.backend.entity.QuestionRecord;
+import com.example.backend.entity.GenerateTask;
+import com.example.backend.entity.TaskManager;
 import com.example.backend.mapper.QuestionRecordMapper;
 import com.example.backend.service.OcrServiceClient;
 import com.example.backend.service.QuestionService;
+import com.example.backend.service.AsyncGenerateService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,6 +36,12 @@ public class PhotoController {
 
     @Autowired(required = false)
     private QuestionRecordMapper questionRecordMapper;
+
+    @Autowired
+    private TaskManager taskManager;
+
+    @Autowired
+    private AsyncGenerateService asyncService;
 
     private static final ObjectMapper mapper = new ObjectMapper();
 
@@ -101,6 +110,39 @@ public class PhotoController {
             result.put("error", "系统异常: " + e.getMessage());
             return ResponseEntity.status(500).body(result);
         }
+    }
+    
+    @PostMapping("/photo-and-generate-async")
+    public ResponseEntity<Map<String, Object>> photoAndGenerateAsync(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "questionType", defaultValue = "all") String questionType) {
+        if (file == null || file.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "请上传图片"));
+        }
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "仅支持图片格式"));
+        }
+        Long userId = null;
+        try { userId = jwtAuth.getCurrentUserId(); } catch (Exception e) { }
+        String taskId = taskManager.createTask(userId, "photo", file.getOriginalFilename());
+        try {
+            Map<String, Object> ocrResult = ocrServiceClient.recognizeText(file);
+            String recognizedText = (String) ocrResult.get("text");
+            if (recognizedText == null || recognizedText.trim().length() < 10) {
+                GenerateTask task = taskManager.getTask(taskId);
+                if (task != null) { task.setStatus(GenerateTask.Status.FAILED); task.setErrorMessage("图片中未检测到足够文字"); }
+            } else {
+                asyncService.generateFromText(taskId, recognizedText, questionType);
+            }
+        } catch (Exception e) {
+            GenerateTask task = taskManager.getTask(taskId);
+            if (task != null) { task.setStatus(GenerateTask.Status.FAILED); task.setErrorMessage("OCR识别失败: " + e.getMessage()); }
+        }
+        Map<String, Object> result = new HashMap<>();
+        result.put("taskId", taskId);
+        result.put("status", "pending");
+        return ResponseEntity.ok(result);
     }
 
     private void saveOcrRecord(String text, QuestionDTO dto) {
