@@ -62,3 +62,25 @@ CREATE TABLE IF NOT EXISTS favorite (
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     INDEX idx_user_id (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户收藏';
+
+-- 单词表
+CREATE TABLE `word` (
+                        `id` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
+                        `word` VARCHAR(100) NOT NULL COMMENT '英文单词',
+                        `phonetic` VARCHAR(100) COMMENT '音标',
+                        `cn_mean` VARCHAR(500) NOT NULL COMMENT '中文释义',
+                        `sentence` VARCHAR(1000) COMMENT '例句',
+                        `level` VARCHAR(20) COMMENT 'CET4 / CET6',
+                        `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 用户生词本
+CREATE TABLE `user_word` (
+                             `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+                             `user_id` BIGINT NOT NULL COMMENT '用户id',
+                             `word_id` BIGINT NOT NULL COMMENT '单词id',
+                             `master` TINYINT DEFAULT 0 COMMENT '0未掌握 1已掌握',
+                             UNIQUE KEY uk_uid_wid(user_id,word_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+

@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import { isLoggedIn } from '../utils/auth.js'
 
+
 const routes = [
   { path: '/', name: 'home', component: HomeView },
   { path: '/login', name: 'login', component: () => import('../views/LoginView.vue') },
@@ -14,6 +15,11 @@ const routes = [
   { path: '/collections', name: 'collections', component: () => import('../views/CollectionsView.vue'), meta: { requiresAuth: true } },
   { path: '/user-center', name: 'user-center', component: () => import('../views/UserCenter.vue') },
   { path: '/favorites', name: 'favorites', component: () => import('../views/FavoritesView.vue'), meta: { requiresAuth: true } },
+  {
+    path: '/word-quiz',
+    name: 'WordQuiz',
+    component: () => import('../components/WordStudy.vue')
+  },
   { path: '/:pathMatch(.*)*', redirect: '/' }
 ]
 
