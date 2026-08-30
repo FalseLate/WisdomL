@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="home-view">
     <van-nav-bar title="📚智复习" fixed placeholder>
       <template #right><van-icon name="user-o" size="20" class="user-icon" @click="goProfile" /></template>
@@ -107,7 +107,6 @@
         <van-button round plain block @click="showGenDialog=false">留在首页</van-button>
       </div>
     </van-dialog>
-    <LoadingDialog :visible="showLoadingDialog" />
   </div>
 </template>
 <script setup>
@@ -117,16 +116,18 @@ import { useRouter } from 'vue-router'
 import { isLoggedIn } from '../utils/auth.js'
 import { useQuestionsStore } from '../stores/questions'
 import { usePracticeStore } from '../stores/practice'
+import { useNotificationStore } from '../stores/notification'
+import { pollTask } from '../utils/pollTask.js'
 import request from '../utils/request.js'
 import TextInputCard from '../components/TextInputCard.vue'
 import PhotoInputCard from '../components/PhotoInputCard.vue'
 import FileUploadCard from '../components/FileUploadCard.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
-import LoadingDialog from '../components/LoadingDialog.vue'
 
 const router = useRouter()
 const qStore = useQuestionsStore()
 const pStore = usePracticeStore()
+const notifyStore = useNotificationStore()
 const activeTab = ref(0)
 const inputText = ref('')
 const loading = ref(false)
@@ -149,7 +150,6 @@ const selSecs = ref([])
 const selPures = ref([])
 const secTexts = ref({})
 const fileQT = ref('all')
-const showLoadingDialog = ref(false)
 
 const totalSecCount = computed(() => {
   let c = 0; fileResults.value.forEach(fr => c += fr.sections.length); return c
@@ -161,21 +161,24 @@ const totalWords = computed(() => {
 async function handleGenerate({ text, questionType }) {
   if (!text?.trim()) { showFailToast('请输入复习资料'); return }
   if (!isLoggedIn()) { showLoginDialog.value = true; return }
-  loading.value = true
-  showLoadingDialog.value = true
-  try {
-    const r = await request.post('/generate', { text, questionType })
-    if (r.errorMessage) { showFailToast(r.errorMessage); return }
-    popDialog(r)
-  } catch (e) { showFailToast(e.message || "error") }
-  finally { loading.value = false; showLoadingDialog.value = false }
+    loading.value = true
+    notifyStore.startGenerating('正在分析文本，生成试题...')
+    try {
+      const res = await request.post('/generate-async', { text, questionType, title: '文本出题' })
+      const taskId = res.taskId
+      if (!taskId) { showFailToast('创建任务失败'); notifyStore.finishGenerating(null); return }
+      notifyStore.message = 'AI正在出题中...（你可以去刷其他题目）'
+      const result = await pollTask(taskId)
+      popDialog(result)
+    } catch (e) { showFailToast(e.message || '出题失败'); notifyStore.finishGenerating(null) }
+    finally { loading.value = false }
 }
 
 async function handlePhotoGenerate({ files, questionType }) {
   if (!files || files.length===0) { showFailToast('请先拍照或选择图片'); return }
   if (!isLoggedIn()) { showLoginDialog.value = true; return }
   pLoading.value = true
-  showLoadingDialog.value = true
+  notifyStore.startGenerating('正在OCR识别，生成试题...')
   try {
     // ================================================================
     // Promise.all 并发上传多张图片
@@ -186,7 +189,9 @@ async function handlePhotoGenerate({ files, questionType }) {
       const fd = new FormData()
       fd.append('file', file)
       fd.append('questionType', questionType)
-      return request.post('/photo-and-generate', fd, { timeout: 180000 }).catch(() => null)
+      return request.post('/photo-and-generate-async', fd, { timeout: 180000 })
+        .then(res => pollTask(res.taskId))
+        .catch(() => null)
     })
     const results = await Promise.all(tasks)
 
@@ -203,12 +208,12 @@ async function handlePhotoGenerate({ files, questionType }) {
       subCount += r.subjectiveCount || 0
     })
 
-    if (allObj.length === 0 && allSub.length === 0) { showFailToast('所有图片识别失败'); return }
+    if (allObj.length === 0 && allSub.length === 0) { showFailToast('所有图片识别失败'); notifyStore.finishGenerating(null); return }
     visImg.value = firstVis ? 'data:image/jpeg;base64,' + firstVis : ''
     regCount.value = firstRegCount
     popDialog({ totalCount, objectiveCount: objCount, subjectiveCount: subCount, objectiveQuestions: allObj, subjectiveQuestions: allSub })
-  } catch (e) { showFailToast(e.message || '识别失败') }
-  finally { pLoading.value = false; showLoadingDialog.value = false }
+  } catch (e) { showFailToast(e.message || '识别失败'); notifyStore.finishGenerating(null) }
+  finally { pLoading.value = false }
 }
 
 // ================================================================
@@ -269,7 +274,7 @@ async function genFromSecs() {
   if (selSecs.value.length === 0 && selPures.value.length === 0) { showFailToast('请选择章节或纯题目'); return }
   if (!isLoggedIn()) { showLoginDialog.value = true; return }
   genLoading.value = true
-  showLoadingDialog.value = true
+  notifyStore.startGenerating('正在生成试题...')
   try {
     let allQs = []
     let pureQuestions = []
@@ -283,28 +288,35 @@ async function genFromSecs() {
       try { await request.post('/generate-from-extracted', { questions: pureQuestions }) } catch(e) { console.warn('纯题目保存失败', e.message) }
     }
     if (selSecs.value.length > 0) {
-      const r = await request.post('/generate-from-sections', { sectionIds: selSecs.value, sectionTexts: secTexts.value, questionType: fileQT.value })
-      if (!r.error) { allQs.push(...(r.questions || [])); allQs.push(...(r.subjectiveQuestions || [])) }
+      const createRes = await request.post('/generate-from-sections-async', { sectionIds: selSecs.value, sectionTexts: secTexts.value, questionType: fileQT.value, title: fileResults.value[selPures.value[0]]?.name || '文件出题' })
+      const taskId = createRes.taskId
+      notifyStore.message = 'AI正在按章节出题...（你可以去刷其他题目）'
+      const result = await pollTask(taskId)
+      if (result.error) { showFailToast(result.error); notifyStore.finishGenerating(null); return }
+      allQs.push(...(result.objectiveQuestions || []))
+      allQs.push(...(result.subjectiveQuestions || []))
     }
     if (allQs.length === 0) { showFailToast('生成失败'); return }
     const subQs = allQs.filter(q => q.type === 'subjective')
     const objQs = allQs.filter(q => q.type !== 'subjective')
     popDialog({ totalCount: allQs.length, objectiveQuestions: objQs, subjectiveQuestions: subQs })
-  } catch (e) { showFailToast(e.message || '出题失败') }
-  finally { genLoading.value = false; showLoadingDialog.value = false }
+  } catch (e) { showFailToast(e.message || '出题失败'); notifyStore.finishGenerating(null) }
+  finally { genLoading.value = false }
 }
 
 function popDialog(r) {
   const qs = r.objectiveQuestions || []; const ss = r.subjectiveQuestions || []
   const all = [...qs, ...ss]
-  qStore.setQuestions(all)
-  pStore.currentSectionId = 'sec-' + Date.now()
-  pStore.initSection(pStore.currentSectionId, all.length, '新题目', 'text')
   genTotal.value = r.totalCount || qs.length + ss.length
   genObj.value = qs.length
   genSub.value = ss.length
   genMissingCount.value = countMissingAnswers(all)
-  showLoadingDialog.value = false
+  notifyStore.finishGenerating({
+    total: r.totalCount || qs.length + ss.length,
+    objectiveCount: qs.length,
+    subjectiveCount: ss.length,
+    missingCount: countMissingAnswers(all)
+  })
   showGenDialog.value = true
 }
 
@@ -318,7 +330,7 @@ function countMissingAnswers(questions) {
   }).length
 }
 
-function goPractice() { showGenDialog.value = false; router.push('/question-bank') }
+function goPractice() { showGenDialog.value = false; if (router.currentRoute.value.path === '/question-bank') { window.location.reload() } else { router.push('/question-bank') } }
 function goProfile() {
   if (!isLoggedIn()) { showLoginDialog.value = true; return }
   router.push("/user-center")

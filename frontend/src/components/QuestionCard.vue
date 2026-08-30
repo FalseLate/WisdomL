@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="question-card" :style="{ borderLeft: '4px solid ' + accentColor }">
     <div class="card-header">
       <van-tag :color="accentColor" size="medium">{{ isSingle ? '单选题' : '多选题' }}</van-tag>
@@ -64,7 +64,7 @@ const props = defineProps({
 const emit = defineEmits(['submit'])
 
 const isSingle = computed(() => props.question.type === 'single' || props.question.type === '单选题')
-const accentColor = computed(() => isSingle.value ? '#667eea' : '#ee6a9c')
+const accentColor = computed(() => isSingle.value ? '#667eea' : '#667eea')
 
 const localAnswer = ref('')
 const localMultiAnswer = ref([])
@@ -96,45 +96,23 @@ function handleSubmit() {
 </script>
 
 <style scoped>
-.question-card {
-  background: #fff; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-  padding: 20px; margin-bottom: 12px;
-}
+.question-card { background: #fff; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); padding: 20px; margin-bottom: 12px; }
 .card-header { display: flex; align-items: center; gap: 10px; }
 .q-number { font-size: 14px; color: #999; }
 .question-text { font-size: 16px; font-weight: 500; color: #333; margin: 12px 0; line-height: 1.6; }
-
 .options-area { margin-bottom: 12px; }
-.option-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 12px 14px; margin-bottom: 6px;
-  border-radius: 10px; border: 1.5px solid #eee;
-  cursor: pointer; transition: all 0.2s;
-}
+.option-item { display: flex; align-items: center; gap: 10px; padding: 12px 14px; margin-bottom: 6px; border-radius: 10px; border: 1.5px solid #eee; cursor: pointer; transition: all 0.2s; }
 .option-item:hover { border-color: #ccc; }
 .option-item.active { border-color: #667eea; background: #f0f0ff; }
 .option-item.multi.active { border-color: #ee6a9c; background: #fff0f5; }
-
-.option-circle {
-  width: 20px; height: 20px; border-radius: 50%;
-  border: 2px solid #ddd; display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0; transition: all 0.2s;
-}
+.option-circle { width: 20px; height: 20px; border-radius: 50%; border: 2px solid #ddd; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.2s; }
 .option-circle.checked { border-color: #667eea; background: #667eea; }
 .option-circle .dot { width: 8px; height: 8px; border-radius: 50%; background: #fff; }
-
-.option-square {
-  width: 20px; height: 20px; border-radius: 4px;
-  border: 2px solid #ddd; display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0; transition: all 0.2s;
-}
+.option-square { width: 20px; height: 20px; border-radius: 4px; border: 2px solid #ddd; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.2s; }
 .option-square.checked { border-color: #ee6a9c; background: #ee6a9c; }
-
 .option-label { font-weight: 600; color: #666; font-size: 14px; }
 .option-text { font-size: 14px; color: #333; }
-
 .submit-area { text-align: right; }
-
 .result-correct { color: #07c160; font-weight: 500; font-size: 14px; margin-bottom: 8px; }
 .result-wrong { color: #ee0a24; font-weight: 500; font-size: 14px; margin-bottom: 8px; }
 .explain-content { font-size: 13px; line-height: 1.6; color: #555; }

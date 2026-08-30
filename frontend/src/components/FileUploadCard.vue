@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="card file-card">
     <div class="input-guide">📄 上传学习资料（PDF/Word/TXT，可多选）</div>
     <van-uploader v-model="fileList" accept=".pdf,.docx,.txt" :max-count="10" multiple :after-read="onRead" />

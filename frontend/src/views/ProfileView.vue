@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="profile-view">
     <van-nav-bar title="个人中心" left-text="返回" left-arrow @click-left="$router.back()" fixed placeholder />
 
@@ -92,86 +92,18 @@ function handleLogout() {
 
 <style scoped>
 .profile-view { min-height: 100vh; }
-
-.error-box {
-  text-align: center;
-  color: #ee0a24;
-  font-size: 14px;
-  cursor: pointer;
-  padding: 12px;
-}
-
-.user-card {
-  text-align: center;
-  padding: 30px 20px;
-}
-
-.avatar {
-  border: 3px solid #667eea;
-  padding: 2px;
-}
-
-.user-name {
-  font-size: 20px;
-  font-weight: 600;
-  color: #333;
-  margin-top: 12px;
-}
-
-.user-id {
-  font-size: 13px;
-  color: #999;
-  margin-top: 4px;
-}
-
-.stats-row {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 16px;
-}
-
-.stat-item {
-  flex: 1;
-  text-align: center;
-  padding: 16px 8px;
-  cursor: pointer;
-}
-
-.stat-num {
-  font-size: 22px;
-  font-weight: 700;
-  color: #667eea;
-}
-
-.stat-num.correct {
-  color: #07c160;
-}
-
-.stat-label {
-  font-size: 12px;
-  color: #999;
-  margin-top: 4px;
-}
-
-.menu-list {
-  padding: 0;
-}
-
-.logout-area {
-  margin-top: 30px;
-  padding: 0 16px 40px;
-}
-
-.logout-btn {
-  background: #f5f5f5 !important;
-  color: #999 !important;
-  border: none !important;
-  height: 44px;
-  font-size: 14px;
-}
-
-.center-loading {
-  display: block;
-  margin: 40px auto;
-}
+.error-box { text-align: center; color: #ee0a24; font-size: 14px; cursor: pointer; padding: 12px; }
+.user-card { text-align: center; padding: 30px 20px; }
+.avatar { border: 3px solid #667eea; padding: 2px; }
+.user-name { font-size: 20px; font-weight: 600; color: #333; margin-top: 12px; }
+.user-id { font-size: 13px; color: #999; margin-top: 4px; }
+.stats-row { display: flex; gap: 10px; margin-bottom: 16px; }
+.stat-item { flex: 1; text-align: center; padding: 16px 8px; cursor: pointer; }
+.stat-num { font-size: 22px; font-weight: 700; color: #667eea; }
+.stat-num.correct { color: #07c160; }
+.stat-label { font-size: 12px; color: #999; margin-top: 4px; }
+.menu-list { padding: 0; }
+.logout-area { margin-top: 30px; padding: 0 16px 40px; }
+.logout-btn { background: #f5f5f5 !important; color: #999 !important; border: none !important; height: 44px; font-size: 14px; }
+.center-loading { display: block; margin: 40px auto; }
 </style>

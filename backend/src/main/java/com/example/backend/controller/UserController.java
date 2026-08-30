@@ -78,6 +78,7 @@ public class UserController {
             Map<String, Object> item = new HashMap<>();
             item.put("id", r.getId());
             String source = r.getSourceText();
+            item.put("title", r.getTitle() != null && !r.getTitle().isEmpty() ? r.getTitle() : (source != null ? source.substring(0, Math.min(50, source.length())) : "出题记录"));
             item.put("sourceText", source != null && source.length() > 100 ? source.substring(0, 100) + "..." : source);
             item.put("questionCount", r.getQuestionCount() != null ? r.getQuestionCount() : 0);
             item.put("questionsJson", r.getQuestionsJson());
@@ -214,4 +215,19 @@ public class UserController {
         }
         return result;
     }
+    @PutMapping("/history/{id}/title")
+    public Map<String, Object> updateTitle(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        String newTitle = body.get("title");
+        if (newTitle == null || newTitle.trim().isEmpty()) {
+            return Map.of("error", "title is empty");
+        }
+        QuestionRecord record = questionRecordMapper.selectById(id);
+        if (record == null) {
+            return Map.of("error", "not found");
+        }
+        record.setTitle(newTitle.trim());
+        questionRecordMapper.updateById(record);
+        return Map.of("success", true, "title", newTitle.trim());
+    }
+
 }

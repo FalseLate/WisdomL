@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="wrong-view">
     <van-nav-bar title="❌ 错题本" left-text="返回" left-arrow @click-left="$router.back()" fixed placeholder />
     <div class="page-container">

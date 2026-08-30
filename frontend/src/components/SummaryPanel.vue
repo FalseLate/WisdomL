@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="summary card" v-if="total > 0">
     <div class="sum-row">
       <div class="sum-item"><span class="sum-num">{{ total }}</span>总题数</div>
@@ -31,14 +31,14 @@ const subPct = computed(() => props.total > 0 ? Math.round(props.subCount / prop
 <style scoped>
 .summary { padding: 16px; margin-bottom: 12px; }
 .sum-row { display: flex; justify-content: space-around; text-align: center; font-size: 12px; color: #999; margin-bottom: 12px; }
-.sum-num { display: block; font-size: 24px; font-weight: 700; color: #667eea; margin-bottom: 2px; }
-.sum-num.obj { color: #667eea; }
-.sum-num.sub { color: #ff8c00; }
+.sum-num { display: block; font-size: 24px; font-weight: 700; color: #2563eb; margin-bottom: 2px; }
+.sum-num.obj { color: #2563eb; }
+.sum-num.sub { color: #f59e0b; }
 .progress-bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: #f0f0f0; }
-.progress-obj { background: linear-gradient(90deg, #667eea, #764ba2); transition: width .3s; }
-.progress-sub { background: linear-gradient(90deg, #ff8c00, #ff6b6b); transition: width .3s; }
+.progress-obj { background: linear-gradient(90deg, #2563eb, #1e40af); transition: width .3s; }
+.progress-sub { background: linear-gradient(90deg, #f59e0b, #ff6b6b); transition: width .3s; }
 .progress-label { font-size: 11px; color: #999; margin-top: 4px; text-align: center; }
 .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin: 0 4px 0 8px; vertical-align: middle; }
-.dot.obj { background: #667eea; }
-.dot.sub { background: #ff8c00; }
+.dot.obj { background: #2563eb; }
+.dot.sub { background: #f59e0b; }
 </style>

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="fav-view">
     <van-nav-bar title="⭐ 我的收藏" left-text="返回" left-arrow @click-left="$router.back()" fixed placeholder />
 
@@ -66,48 +66,11 @@ async function removeFav(id) {
 
 <style scoped>
 .fav-view { min-height: 100vh; }
-
-.fav-card {
-  padding: 16px;
-}
-
-.fav-q {
-  font-size: 15px;
-  font-weight: 500;
-  color: #333;
-  line-height: 1.6;
-  margin-bottom: 10px;
-}
-
-.fav-opts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.fav-opt {
-  font-size: 13px;
-  color: #666;
-  background: #f5f5f5;
-  padding: 4px 10px;
-  border-radius: 6px;
-}
-
-.fav-opt b {
-  color: #667eea;
-}
-
-.fav-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding-top: 8px;
-  border-top: 1px solid #f5f5f5;
-}
-
-.center-loading {
-  display: block;
-  margin: 40px auto;
-}
+.fav-card { padding: 16px; }
+.fav-q { font-size: 15px; font-weight: 500; color: #333; line-height: 1.6; margin-bottom: 10px; }
+.fav-opts { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.fav-opt { font-size: 13px; color: #666; background: #f5f5f5; padding: 4px 10px; border-radius: 6px; }
+.fav-opt b { color: #667eea; }
+.fav-footer { display: flex; justify-content: space-between; align-items: center; padding-top: 8px; border-top: 1px solid #f5f5f5; }
+.center-loading { display: block; margin: 40px auto; }
 </style>
