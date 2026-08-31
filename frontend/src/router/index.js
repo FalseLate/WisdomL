@@ -23,9 +23,32 @@ const routes = [
   { path: '/:pathMatch(.*)*', redirect: '/' }
 ]
 
-const router = createRouter({ history: createWebHistory(), routes })
+// 保存每个页面的滚动位置
+const scrollPositions = {}
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes,
+  scrollBehavior(to, from, savedPosition) {
+    // 浏览器前进/后退时，优先用保存的位置
+    if (savedPosition) {
+      return savedPosition
+    }
+    // 如果该页面有记录的滚动位置，恢复
+    if (scrollPositions[to.fullPath] !== undefined) {
+      return { top: scrollPositions[to.fullPath] }
+    }
+    // 否则滚动到顶部
+    return { top: 0 }
+  }
+})
 
 router.beforeEach((to, from, next) => {
+  // 离开当前页面前保存滚动位置
+  if (from.fullPath) {
+    scrollPositions[from.fullPath] = window.scrollY
+  }
+
   if (to.meta.requiresAuth && !isLoggedIn()) {
     sessionStorage.setItem('redirect', to.fullPath)
     next('/login')

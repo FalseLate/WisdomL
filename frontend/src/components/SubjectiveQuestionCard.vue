@@ -1,31 +1,48 @@
-﻿<template>
+<template>
   <div class="sub-card">
     <div class="card-header">
-        <van-icon :name="isFav ? 'star' : 'star-o'" size="18" :color="isFav?'#ff8c00':'#ccc'" class="fav-btn" @click="toggleFav" />
-      <van-tag color="#ff8c00" size="medium">{{ q.category || '主观题' }}</van-tag>
+      <span class="fav-btn" :class="{ active: isFav }" @click="toggleFav">
+        {{ isFav ? '⭐' : '☆' }}
+      </span>
+      <CyberTag color="#ff8c00">{{ q.category || '主观题' }}</CyberTag>
       <span class="q-num">第{{ index + 1 }}题</span>
     </div>
     <div class="q-text">{{ q.question }}</div>
 
     <!-- 作答区 -->
     <div class="answer-area">
-      <van-field v-model="userAnswer" type="textarea" :placeholder="'请在此输入你的答案...'" rows="3" autosize :maxlength="2000" show-word-limit :disabled="isLocked" />
+      <textarea
+        v-model="userAnswer"
+        class="answer-textarea"
+        placeholder="请在此输入你的答案..."
+        rows="3"
+        maxlength="2000"
+        :disabled="isLocked"
+      ></textarea>
+      <div class="word-count">{{ userAnswer.length }}/2000</div>
     </div>
 
     <div class="btn-group">
-      <!-- 未锁定：显示提交和查看答案 -->
-      <van-button v-if="!isLocked" size="small" round type="primary" @click="submitAnswer" :loading="submitting" :disabled="!userAnswer.trim()">📤 提交答案</van-button>
-      <van-button v-if="!isLocked" size="small" round plain @click="showReference = !showReference">📖 {{ showReference ? '隐藏参考答案' : '查看参考答案' }}</van-button>
-      <!-- 已锁定：显示重新作答 -->
-      <van-button v-if="isLocked" size="small" round type="warning" @click="reAnswer">🔄 重新作答</van-button>
-      <van-button v-if="isLocked" size="small" round plain @click="showReference = !showReference">📖 {{ showReference ? '隐藏参考答案' : '查看参考答案' }}</van-button>
-      <!-- 答案/解析缺失：重试生成 -->
-      <van-button v-if="isAnswerMissing" size="small" round plain type="danger" @click="retryGenerateAnswer" :loading="retryingAnswer">🔁 重试生成解析</van-button>
+      <CyberButton v-if="!isLocked" variant="primary" size="small" :loading="submitting" :disabled="!userAnswer.trim()" @click="submitAnswer">
+        📤 提交答案
+      </CyberButton>
+      <CyberButton v-if="!isLocked" variant="ghost" size="small" @click="showReference = !showReference">
+        📖 {{ showReference ? '隐藏参考答案' : '查看参考答案' }}
+      </CyberButton>
+      <CyberButton v-if="isLocked" variant="warning" size="small" @click="reAnswer">
+        🔄 重新作答
+      </CyberButton>
+      <CyberButton v-if="isLocked" variant="ghost" size="small" @click="showReference = !showReference">
+        📖 {{ showReference ? '隐藏参考答案' : '查看参考答案' }}
+      </CyberButton>
+      <CyberButton v-if="isAnswerMissing" variant="danger" size="small" :loading="retryingAnswer" @click="retryGenerateAnswer">
+        🔁 重试生成解析
+      </CyberButton>
     </div>
 
     <!-- AI 评价结果 -->
     <div v-if="showResult" class="result-section">
-      <van-divider />
+      <div class="res-divider"></div>
       <div class="ai-eval">
         <div class="eval-title">
           🤖 AI 评价
@@ -37,7 +54,7 @@
 
     <!-- 参考答案 -->
     <div v-if="showReference" class="ref-section">
-      <van-divider />
+      <div class="res-divider"></div>
       <div class="ref-card"><div class="ref-title">📌 参考答案</div>{{ q.answer || '未提供' }}</div>
       <div class="ref-card idea"><div class="ref-title">💡 答题思路</div>{{ q.explanation || '未提供' }}</div>
     </div>
@@ -49,6 +66,7 @@ import { ref, computed, watch } from 'vue'
 import request from '../utils/request.js'
 import { showFailToast, showSuccessToast } from 'vant'
 import { classify } from '../utils/questionType.js'
+import { CyberButton, CyberTag } from './cyber'
 
 const props = defineProps({
   question: { type: Object, required: true },
@@ -76,7 +94,7 @@ const scoreClass = computed(() => {
   if (score.value >= 3) return 'score-mid'
   return 'score-low'
 })
-// 检测答案/解析是否缺失
+
 const isAnswerMissing = computed(() => {
   const ans = q.value.answer
   const exp = q.value.explanation
@@ -85,16 +103,16 @@ const isAnswerMissing = computed(() => {
   return missing || missingExp
 })
 
-// 预加载结果时：仅显示历史评价，不锁定输入框
 watch(() => props.result, (val) => {
   if (val) {
+    isLocked.value = true
     showResult.value = true
+    showReference.value = true
     evaluation.value = val.evaluation || ''
     score.value = val.score || 0
   }
-})
+}, { immediate: true })
 
-// 当题目对象引用变化时重置状态（而非监听 index）
 watch(() => props.question, (newQ, oldQ) => {
   if (newQ !== oldQ) {
     showReference.value = false
@@ -107,7 +125,6 @@ watch(() => props.question, (newQ, oldQ) => {
   }
 })
 
-// 实时保存草稿到 localStorage
 watch(userAnswer, (val) => {
   if (val && val.trim()) {
     localStorage.setItem(storageKey.value, val)
@@ -120,7 +137,6 @@ defineExpose({
   getCurrentAnswer: () => userAnswer.value
 })
 
-// 重新作答：解锁输入框，清除评价结果
 function reAnswer() {
   isLocked.value = false
   showResult.value = false
@@ -129,7 +145,6 @@ function reAnswer() {
   localStorage.removeItem(storageKey.value)
 }
 
-// 重试生成解析：调用后端接口为当前题目生成答案和解析
 async function retryGenerateAnswer() {
   retryingAnswer.value = true
   try {
@@ -147,7 +162,6 @@ async function retryGenerateAnswer() {
       q.value.explanation = res.explanation
     }
     showSuccessToast('解析已生成')
-    // 通知父组件答案已更新
     emit('update-answer', { questionId: q.value.id || q.value._id || props.index, answer: res.answer, explanation: res.explanation })
   } catch (e) {
     showFailToast(e.message || '解析生成失败')
@@ -171,14 +185,14 @@ async function submitAnswer() {
       userAnswer: userAnswer.value,
       question: q.value
     })
-    
+
     showResult.value = true
     evaluation.value = res.evaluation || '评价生成失败'
     score.value = res.score || 0
     isLocked.value = true
-    
+
     localStorage.setItem(storageKey.value, userAnswer.value)
-    
+
     emit('submit', {
       questionId: qId,
       userAnswer: userAnswer.value,
@@ -195,22 +209,188 @@ async function submitAnswer() {
 </script>
 
 <style scoped>
-.sub-card { background: #fff; border-radius: 16px; padding: 20px; margin-bottom: 12px; border-left: 4px solid #ff8c00; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
-.card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.q-num { font-size: 13px; color: #999; }
-.q-text { font-size: 15px; font-weight: 500; color: #333; line-height: 1.6; margin-bottom: 12px; }
-.answer-area { margin-bottom: 10px; }
-.btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
-.result-section { margin-top: 12px; }
-.ai-eval { background: #f0f8ff; border-radius: 10px; padding: 14px; }
-.eval-title { font-size: 14px; font-weight: 600; color: #333; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
-.eval-score { font-size: 13px; font-weight: 700; padding: 2px 10px; border-radius: 10px; }
-.eval-score.score-high { background: #e8f5e9; color: #2e7d32; }
-.eval-score.score-mid { background: #fff3e0; color: #e65100; }
-.eval-score.score-low { background: #ffebee; color: #c62828; }
-.eval-content { font-size: 13px; line-height: 1.6; color: #555; white-space: pre-wrap; }
-.ref-section { margin-top: 4px; }
-.ref-card { background: #fff8f0; border-radius: 10px; padding: 14px; margin-bottom: 10px; font-size: 13px; line-height: 1.6; color: #555; }
-.ref-card.idea { background: #f0f8ff; }
-.ref-title { font-size: 14px; font-weight: 600; color: #333; margin-bottom: 6px; }
+.sub-card {
+  background: var(--bg-card);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-card);
+  padding: 20px;
+  margin-bottom: 12px;
+  border-left: 4px solid #ff8c00;
+  backdrop-filter: blur(12px);
+  transition: all 0.3s var(--ease-out);
+}
+
+.sub-card:hover {
+  border-color: #ff8c00;
+  box-shadow: 0 4px 20px rgba(255, 140, 0, 0.1);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.fav-btn {
+  font-size: 18px;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: all 0.2s;
+}
+
+.fav-btn:hover, .fav-btn.active {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.q-num {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-display);
+}
+
+.q-text {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.6;
+  margin-bottom: 14px;
+}
+
+/* 作答区 */
+.answer-area {
+  margin-bottom: 12px;
+}
+
+.answer-textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--accent-border);
+  border-radius: 10px;
+  font-size: 14px;
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  line-height: 1.6;
+  resize: vertical;
+  outline: none;
+  transition: all 0.25s var(--ease-out);
+}
+
+.answer-textarea:focus {
+  border-color: #ff8c00;
+  box-shadow: 0 0 0 3px rgba(255, 140, 0, 0.1);
+}
+
+.answer-textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.answer-textarea::placeholder {
+  color: var(--text-muted);
+}
+
+.word-count {
+  text-align: right;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  font-family: var(--font-display);
+}
+
+/* 按钮组 */
+.btn-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* 结果区 */
+.result-section {
+  margin-top: 14px;
+}
+
+.res-divider {
+  height: 1px;
+  background: var(--accent-border);
+  margin: 12px 0;
+}
+
+.ai-eval {
+  background: rgba(0, 245, 255, 0.05);
+  border: 1px solid var(--accent-border);
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.eval-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+}
+
+.eval-score {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: 10px;
+}
+
+.eval-score.score-high {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.eval-score.score-mid {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.eval-score.score-low {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.eval-content {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+}
+
+/* 参考答案 */
+.ref-section {
+  margin-top: 8px;
+}
+
+.ref-card {
+  background: rgba(255, 140, 0, 0.05);
+  border: 1px solid rgba(255, 140, 0, 0.2);
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
+
+.ref-card.idea {
+  background: rgba(0, 245, 255, 0.05);
+  border-color: var(--accent-border);
+}
+
+.ref-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
 </style>

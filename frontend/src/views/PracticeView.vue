@@ -1,6 +1,6 @@
-﻿<template>
+<template>
   <div class="practice-view">
-    <van-nav-bar title="📑 刷题模式" left-text="返回" left-arrow @click-left="goBack" fixed placeholder />
+    <CyberNavbar title="刷题模式" :show-back="true" @back="goBack" />
 
     <div class="practice-container" v-if="allQuestions.length > 0">
       <!-- 顶部进度条 -->
@@ -9,108 +9,145 @@
           <span class="progress-label">复习进度</span>
           <span class="progress-num">{{ answeredCount }}/{{ allQuestions.length }}</span>
         </div>
-        <van-progress :percentage="progressPct" :show-pivot="false" color="#667eea" stroke-width="6" />
+        <CyberProgress :percentage="progressPct" :show-pivot="false" />
         <div class="progress-stats">
-          <span>✅ {{ correctCount }} 正确</span>
-          <span>❌ {{ wrongCount }} 错误</span>
-          <span>📊 {{ accuracyPct }}%</span>
+          <span class="stat-correct">✅ {{ correctCount }} 正确</span>
+          <span class="stat-wrong">❌ {{ wrongCount }} 错误</span>
+          <span class="stat-acc">📊 {{ accuracyPct }}%</span>
         </div>
       </div>
 
       <!-- 整卷提交按钮 -->
       <div class="batch-bar" v-if="!allSubmitted && pendingCount > 0">
-        <van-button round block type="warning" @click="batchSubmit" :loading="batchSubmitting">
+        <CyberButton variant="warning" block :loading="batchSubmitting" @click="batchSubmit">
           📤 整卷提交（{{ pendingCount }}题待提交）
-        </van-button>
+        </CyberButton>
       </div>
 
       <!-- 题型Tab切换 -->
-      <van-tabs v-if="hasBoth" v-model="qTab" color="#667eea" title-active-color="#667eea">
-        <van-tab :title="'客观题(' + objQ.length + ')'">
-          <div class="q-scroll">
-            <template v-if="chapterGroups.length > 0">
-              <template v-for="g in chapterGroups" :key="g.name">
-                <div v-if="g.questions.some(q=>q.type!=='subjective')" class="chapter-header">{{ g.name }}</div>
-                <ObjectiveQuestionCard v-for="(q,i) in g.questions.filter(q=>q.type!=='subjective')" :key="getQid(q,i)" :question="q" :result="results[getQid(q,i)]||null" :index="i" ref="objCardRefs" @submit="(e)=>handleSubmitObjective(e,getQid(q,i),q)" @change="(e)=>handleSelectionChange(e)" @update-answer="(e)=>handleUpdateAnswer(e,q)" />
-              </template>
-            </template>
-            <template v-else>
-              <ObjectiveQuestionCard v-for="(q,i) in objQ" :key="getQid(q,i)" :question="q" :result="results[getQid(q,i)]||null" :index="i" ref="objCardRefs" @submit="(e)=>handleSubmitObjective(e,getQid(q,i),q)" @change="(e)=>handleSelectionChange(e)" @update-answer="(e)=>handleUpdateAnswer(e,q)" />
-            </template>
-          </div>
-        </van-tab>
-        <van-tab :title="'主观题(' + subQ.length + ')'">
-          <div class="q-scroll">
-            <template v-if="chapterGroups.length > 0">
-              <template v-for="g in chapterGroups" :key="g.name">
-                <div v-if="g.questions.some(q=>q.type==='subjective')" class="chapter-header">{{ g.name }}</div>
-                <SubjectiveQuestionCard v-for="(q,i) in g.questions.filter(q=>q.type==='subjective')" :key="getQid(q,i)" :question="q" :result="results[getQid(q,i)]||null" :index="i" ref="subCardRefs" @submit="(e)=>handleSubmitSubjective(e,getQid(q,i))" @update-answer="(e)=>handleUpdateAnswer(e,q)" />
-              </template>
-            </template>
-            <template v-else>
-              <SubjectiveQuestionCard v-for="(q,i) in subQ" :key="getQid(q,i)" :question="q" :result="results[getQid(q,i)]||null" :index="i" ref="subCardRefs" @submit="(e)=>handleSubmitSubjective(e,getQid(q,i))" @update-answer="(e)=>handleUpdateAnswer(e,q)" />
-            </template>
-          </div>
-        </van-tab>
-      </van-tabs>
+      <div v-if="hasBoth" class="cyber-tabs">
+        <div
+          class="tab-item"
+          :class="{ active: qTab === 0 }"
+          @click="qTab = 0"
+        >客观题 ({{ objQ.length }})</div>
+        <div
+          class="tab-item"
+          :class="{ active: qTab === 1 }"
+          @click="qTab = 1"
+        >主观题 ({{ subQ.length }})</div>
+      </div>
 
-      <!-- 仅客观题 -->
-      <div v-if="!hasBoth && objQ.length>0" class="q-scroll">
+      <!-- 客观题列表 -->
+      <div v-if="!hasBoth || qTab === 0" class="q-scroll">
         <template v-if="chapterGroups.length > 0">
           <template v-for="g in chapterGroups" :key="g.name">
             <div v-if="g.questions.some(q=>q.type!=='subjective')" class="chapter-header">{{ g.name }}</div>
-            <ObjectiveQuestionCard v-for="(q,i) in g.questions.filter(q=>q.type!=='subjective')" :key="getQid(q,i)" :question="q" :result="results[getQid(q,i)]||null" :index="i" ref="objCardRefs" @submit="(e)=>handleSubmitObjective(e,getQid(q,i),q)" @change="(e)=>handleSelectionChange(e)" @update-answer="(e)=>handleUpdateAnswer(e,q)" />
+            <ObjectiveQuestionCard
+              v-for="(q,i) in g.questions.filter(q=>q.type!=='subjective')"
+              :key="getQid(q,i)"
+              :question="q"
+              :result="results[getQid(q,i)]||null"
+              :index="i"
+              ref="objCardRefs"
+              @submit="(e)=>handleSubmitObjective(e,getQid(q,i),q)"
+              @change="(e)=>handleSelectionChange(e)"
+              @update-answer="(e)=>handleUpdateAnswer(e,q)"
+            />
           </template>
         </template>
         <template v-else>
-          <ObjectiveQuestionCard v-for="(q,i) in objQ" :key="getQid(q,i)" :question="q" :result="results[getQid(q,i)]||null" :index="i" ref="objCardRefs" @submit="(e)=>handleSubmitObjective(e,getQid(q,i),q)" @change="(e)=>handleSelectionChange(e)" @update-answer="(e)=>handleUpdateAnswer(e,q)" />
+          <ObjectiveQuestionCard
+            v-for="(q,i) in objQ"
+            :key="getQid(q,i)"
+            :question="q"
+            :result="results[getQid(q,i)]||null"
+            :index="i"
+            ref="objCardRefs"
+            @submit="(e)=>handleSubmitObjective(e,getQid(q,i),q)"
+            @change="(e)=>handleSelectionChange(e)"
+            @update-answer="(e)=>handleUpdateAnswer(e,q)"
+          />
         </template>
       </div>
 
-      <!-- 仅主观题 -->
-      <div v-if="!hasBoth && subQ.length>0" class="q-scroll">
+      <!-- 主观题列表 -->
+      <div v-if="hasBoth && qTab === 1" class="q-scroll">
         <template v-if="chapterGroups.length > 0">
           <template v-for="g in chapterGroups" :key="g.name">
             <div v-if="g.questions.some(q=>q.type==='subjective')" class="chapter-header">{{ g.name }}</div>
-            <SubjectiveQuestionCard v-for="(q,i) in g.questions.filter(q=>q.type==='subjective')" :key="getQid(q,i)" :question="q" :result="results[getQid(q,i)]||null" :index="i" ref="subCardRefs" @submit="(e)=>handleSubmitSubjective(e,getQid(q,i))" @update-answer="(e)=>handleUpdateAnswer(e,q)" />
+            <SubjectiveQuestionCard
+              v-for="(q,i) in g.questions.filter(q=>q.type==='subjective')"
+              :key="getQid(q,i)"
+              :question="q"
+              :result="results[getQid(q,i)]||null"
+              :index="i"
+              ref="subCardRefs"
+              @submit="(e)=>handleSubmitSubjective(e,getQid(q,i))"
+              @update-answer="(e)=>handleUpdateAnswer(e,q)"
+            />
           </template>
         </template>
         <template v-else>
-          <SubjectiveQuestionCard v-for="(q,i) in subQ" :key="getQid(q,i)" :question="q" :result="results[getQid(q,i)]||null" :index="i" ref="subCardRefs" @submit="(e)=>handleSubmitSubjective(e,getQid(q,i))" @update-answer="(e)=>handleUpdateAnswer(e,q)" />
+          <SubjectiveQuestionCard
+            v-for="(q,i) in subQ"
+            :key="getQid(q,i)"
+            :question="q"
+            :result="results[getQid(q,i)]||null"
+            :index="i"
+            ref="subCardRefs"
+            @submit="(e)=>handleSubmitSubjective(e,getQid(q,i))"
+            @update-answer="(e)=>handleUpdateAnswer(e,q)"
+          />
         </template>
       </div>
 
       <!-- 完成按钮 -->
       <div class="finish-bar" v-if="allSubmitted">
-        <van-button round block type="primary" class="gradient-btn" @click="showComplete">🎉 完成复习</van-button>
+        <CyberButton variant="primary" block @click="showComplete">🎉 完成复习</CyberButton>
       </div>
     </div>
 
     <!-- 空状态 -->
-    <van-empty v-if="allQuestions.length===0" description="还没有题目，先去首页生成吧！">
-      <van-button round type="primary" @click="$router.push('/')">去首页出题</van-button>
-    </van-empty>
+    <div v-if="allQuestions.length===0" class="empty-state">
+      <div class="empty-icon">📝</div>
+      <div class="empty-title">还没有题目</div>
+      <div class="empty-desc">先去首页生成题目吧！</div>
+      <CyberButton variant="primary" @click="$router.push('/')">去首页出题</CyberButton>
+    </div>
 
     <!-- 完成弹窗 -->
-    <van-dialog v-model:show="showDialog" title="🎉 复习完成！" :show-confirm-button="false" class="complete-dialog">
-      <div class="dialog-body">
+    <div v-if="showDialog" class="complete-dialog-overlay" @click.self="showDialog=false">
+      <div class="complete-dialog">
+        <div class="dialog-accent-line"></div>
+        <div class="dialog-icon">🎉</div>
+        <div class="dialog-title">复习完成</div>
         <div class="dialog-stats">
-          <div class="ds-item"><span class="ds-num">{{ allQuestions.length }}</span>总题数</div>
-          <div class="ds-item"><span class="ds-num correct">{{ correctCount }}</span>答对</div>
-          <div class="ds-item"><span class="ds-num">{{ accuracyPct }}%</span>正确率</div>
+          <div class="ds-item">
+            <span class="ds-num">{{ allQuestions.length }}</span>
+            <span class="ds-label">总题数</span>
+          </div>
+          <div class="ds-item">
+            <span class="ds-num correct">{{ correctCount }}</span>
+            <span class="ds-label">答对</span>
+          </div>
+          <div class="ds-item">
+            <span class="ds-num magenta">{{ accuracyPct }}%</span>
+            <span class="ds-label">正确率</span>
+          </div>
         </div>
         <p class="dialog-msg">{{ encouragement }}</p>
         <div class="dialog-actions">
-          <van-button round block type="primary" class="gradient-btn" @click="goHistory">📚 查看历史记录</van-button>
-          <van-button round plain block @click="showDialog=false; stay=true">继续复习</van-button>
+          <CyberButton variant="primary" block @click="goHistory">📚 查看历史记录</CyberButton>
+          <CyberButton variant="ghost" block @click="showDialog=false">继续复习</CyberButton>
         </div>
       </div>
-    </van-dialog>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQuestionsStore } from '../stores/questions'
 import { usePracticeStore } from '../stores/practice'
@@ -118,6 +155,7 @@ import { showSuccessToast, showFailToast } from 'vant'
 import request from '../utils/request.js'
 import ObjectiveQuestionCard from '../components/ObjectiveQuestionCard.vue'
 import SubjectiveQuestionCard from '../components/SubjectiveQuestionCard.vue'
+import { CyberNavbar, CyberButton, CyberProgress } from '../components/cyber'
 
 const router = useRouter()
 const qStore = useQuestionsStore()
@@ -125,7 +163,6 @@ const pStore = usePracticeStore()
 const qTab = ref(0)
 const results = reactive({})
 const showDialog = ref(false)
-const stay = ref(false)
 const batchSubmitting = ref(false)
 const objCardRefs = ref([])
 const subCardRefs = ref([])
@@ -180,11 +217,11 @@ const pendingCount = computed(() => {
 })
 
 const encouragements = [
-  '坚持就是胜利，你离学霸又近了一步！📚',
-  '复习是最好的老师，继续保持！💪',
-  '今天的努力是明天的实力！🌟',
-  '每一次复习都是对知识的致敬！🎓',
-  '你的认真程度已经超过了99%的人！👍'
+  '坚持就是胜利，你离学霸又近了一步！',
+  '复习是最好的老师，继续保持！',
+  '今天的努力是明天的实力！',
+  '每一次复习都是对知识的致敬！',
+  '你的认真程度已经超过了99%的人！'
 ]
 const encouragement = computed(() => encouragements[Math.floor(Math.random() * encouragements.length)])
 
@@ -214,15 +251,17 @@ function handleSelectionChange(e) {
 async function handleSubmitObjective(e, questionId, question) {
   if (results[questionId]) return
   if (!question) { results[questionId] = e; return }
-  
+
   try {
-    const r = await request.post("/check", { 
-      questionId, 
-      userAnswer: e.userAnswer, 
+    // 修复：单题提交必须带 recordId，打通后端进度链路
+    const r = await request.post("/check", {
+      questionId,
+      userAnswer: e.userAnswer,
       question,
-      questionType: question.type
+      questionType: question.type,
+      recordId: qStore.recordId || null
     })
-    r.userAnswer = e.userAnswer  // 确保存储用户选择
+    r.userAnswer = e.userAnswer
     results[questionId] = r
     pendingAnswers.delete(questionId)
     const secId = pStore.currentSectionId
@@ -231,6 +270,7 @@ async function handleSubmitObjective(e, questionId, question) {
     pStore.recordAnswerResult(secId, questionId, r)
   } catch(err) {
     console.error('客观题提交失败:', err)
+    showFailToast('提交失败，请重试')
   }
 }
 
@@ -257,10 +297,10 @@ function handleUpdateAnswer(e, question) {
 async function batchSubmit() {
   if (batchSubmitting.value) return
   batchSubmitting.value = true
-  
+
   try {
     const answers = []
-    
+
     // 收集客观题待提交答案
     for (const [questionId, userAnswer] of pendingAnswers.entries()) {
       const q = allQuestions.value.find(x => (x.id || x._id) === questionId)
@@ -275,7 +315,7 @@ async function batchSubmit() {
         })
       }
     }
-    
+
     // 收集主观题答案（从组件 ref 读取，回退 localStorage）
     const subCards = subCardRefs.value || []
     subQ.value.forEach((q, idx) => {
@@ -294,15 +334,15 @@ async function batchSubmit() {
         }
       }
     })
-    
+
     if (answers.length === 0) {
       showFailToast('没有待提交的题目')
       batchSubmitting.value = false
       return
     }
-    
+
     const res = await request.post('/check-batch', { answers })
-    
+
     res.results.forEach((r, idx) => {
       const qId = getQid(answers[idx].question, answers[idx].questionIndex)
       if (results[qId]) return
@@ -313,10 +353,10 @@ async function batchSubmit() {
       pStore.recordAnswer(secId, r?.correct === true)
       pStore.recordAnswerResult(secId, qId, r)
     })
-    
+
     showSuccessToast(`已提交 ${answers.length} 题`)
-    
-    // 批量并行生成缺失的解析
+
+    // 批量并行生成缺失的解析（后端 check-batch 只返回判分，解析需前端补全）
     const missingExps = allQuestions.value.filter((q, qi) => {
       const qId = getQid(q, qi)
       const r = results[qId]
@@ -367,22 +407,255 @@ function goHistory() {
 </script>
 
 <style scoped>
-.practice-view { min-height: 100vh; background: #f5f5f5; }
-.practice-container { padding: 12px 16px 80px; }
-.progress-header { background: #fff; border-radius: 16px; padding: 16px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
-.progress-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.progress-label { font-size: 14px; color: #666; }
-.progress-num { font-size: 18px; font-weight: 700; color: #667eea; }
-.progress-stats { display: flex; justify-content: space-around; margin-top: 8px; font-size: 12px; color: #999; }
-.batch-bar { position: sticky; top: 0; z-index: 10; background: #fff; border-radius: 16px; padding: 12px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
-.q-scroll { padding-bottom: 16px; }
-.chapter-header { font-size: 14px; font-weight: 700; color: #667eea; background: #f0f0ff; border-left: 4px solid #667eea; padding: 10px 14px; margin: 12px 0 8px; border-radius: 0 8px 8px 0; }
-.finish-bar { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; padding: 12px 16px 20px; background: #fff; box-shadow: 0 -2px 10px rgba(0,0,0,0.06); }
-.dialog-body { padding: 0 16px 20px; text-align: center; }
-.dialog-stats { display: flex; justify-content: space-around; margin-bottom: 16px; }
-.ds-item { text-align: center; font-size: 12px; color: #999; }
-.ds-num { display: block; font-size: 28px; font-weight: 700; color: #667eea; margin-bottom: 2px; }
-.ds-num.correct { color: #07c160; }
-.dialog-msg { font-size: 15px; color: #333; margin-bottom: 16px; line-height: 1.6; }
-.dialog-actions { display: flex; flex-direction: column; gap: 8px; }
+.practice-view {
+  min-height: 100dvh;
+  background: var(--bg-base);
+  position: relative;
+}
+
+.practice-container {
+  padding: 12px 16px 100px;
+  position: relative;
+  z-index: 10;
+}
+
+/* 进度头部 */
+.progress-header {
+  background: var(--bg-card);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-card);
+  backdrop-filter: blur(12px);
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.progress-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.progress-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
+}
+
+.progress-num {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--accent);
+  text-shadow: 0 0 8px var(--accent-soft);
+}
+
+.progress-stats {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 10px;
+  font-size: 12px;
+}
+
+.stat-correct { color: var(--success); }
+.stat-wrong { color: var(--danger); }
+.stat-acc { color: var(--accent); }
+
+/* 整卷提交栏 */
+.batch-bar {
+  position: sticky;
+  top: 56px;
+  z-index: 20;
+  margin-bottom: 12px;
+}
+
+.batch-bar .cyber-button.warning {
+  animation: batchPulse 2s ease-in-out infinite;
+  letter-spacing: 1px;
+}
+
+@keyframes batchPulse {
+  0%, 100% {
+    box-shadow: 0 4px 16px rgba(249, 240, 2, 0.35);
+  }
+  50% {
+    box-shadow: 0 4px 32px rgba(249, 240, 2, 0.65), 0 0 24px rgba(249, 240, 2, 0.3);
+  }
+}
+
+/* 题型Tabs */
+.cyber-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  background: var(--bg-elevated);
+  padding: 4px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--accent-border);
+}
+
+.tab-item {
+  flex: 1;
+  text-align: center;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: all 0.25s var(--ease-out);
+}
+
+.tab-item.active {
+  background: linear-gradient(135deg, var(--accent), #00c8d4);
+  color: #000;
+  box-shadow: 0 2px 12px var(--accent-soft);
+}
+
+/* 题目滚动区 */
+.q-scroll {
+  padding-bottom: 16px;
+}
+
+/* 章节标题 */
+.chapter-header {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-left: 3px solid var(--accent);
+  padding: 8px 14px;
+  margin: 16px 0 10px;
+  border-radius: 0 8px 8px 0;
+  letter-spacing: 0.5px;
+}
+
+/* 完成按钮栏 */
+.finish-bar {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  background: rgba(10, 10, 15, 0.95);
+  backdrop-filter: blur(20px);
+  border-top: 1px solid var(--accent-border);
+  z-index: 30;
+}
+
+/* 完成弹窗 */
+.complete-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  z-index: 4000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.complete-dialog {
+  position: relative;
+  background: rgba(10, 10, 15, 0.98);
+  border: 1px solid var(--accent-border);
+  border-radius: 20px;
+  padding: 32px 24px 24px;
+  max-width: 360px;
+  width: 100%;
+  box-shadow: 0 0 40px var(--accent-soft), 0 20px 60px rgba(0, 0, 0, 0.5);
+  animation: dialogPop 0.4s var(--ease-out);
+  overflow: hidden;
+}
+
+@keyframes dialogPop {
+  from { opacity: 0; transform: scale(0.9) translateY(20px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.dialog-accent-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--secondary));
+}
+
+.dialog-icon {
+  font-size: 48px;
+  text-align: center;
+  margin-bottom: 12px;
+  filter: drop-shadow(0 0 12px var(--accent-soft));
+}
+
+.dialog-title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-align: center;
+  margin-bottom: 20px;
+  letter-spacing: 2px;
+}
+
+.dialog-stats {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 16px;
+  padding: 16px 0;
+  border-top: 1px solid var(--accent-border);
+  border-bottom: 1px solid var(--accent-border);
+}
+
+.ds-item {
+  text-align: center;
+}
+
+.ds-num {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.ds-num.correct {
+  color: var(--success);
+  text-shadow: 0 0 10px var(--success-soft);
+}
+
+.ds-num.magenta {
+  color: var(--secondary);
+  text-shadow: 0 0 10px var(--secondary-soft);
+}
+
+.ds-label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.dialog-msg {
+  font-size: 14px;
+  color: var(--text-secondary);
+  text-align: center;
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+
+.dialog-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
 </style>

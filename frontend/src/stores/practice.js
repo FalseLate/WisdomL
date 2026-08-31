@@ -2,8 +2,11 @@ import { defineStore, acceptHMRUpdate } from 'pinia'
 import { ref, computed } from 'vue'
 
 export const usePracticeStore = defineStore('practice', () => {
-  // 章节进度: { [sectionId]: { total, done, correct, source, type, timestamp } }
+  // 章节进度: { [sectionId]: { total, done, correct, source, type, timestamp, answers } }
   const sections = ref({})
+
+  // 从后端拉取的进度缓存: { [sectionId]: { totalCount, completedCount, correctCount, wrongCount, progressPercent } }
+  const serverProgress = ref({})
 
   // 当前刷题的章节ID
   const currentSectionId = ref(null)
@@ -56,18 +59,83 @@ export const usePracticeStore = defineStore('practice', () => {
     return s && s.done >= s.total && s.total > 0
   }
 
+  /**
+   * 获取进度（优先后端，后端没有则用本地，都没有返回0）
+   * 空值保护：杜绝 undefined%
+   */
   function getProgress(sectionId) {
+    // 优先用后端进度
+    if (serverProgress.value[sectionId]) {
+      const p = serverProgress.value[sectionId].progressPercent
+      if (typeof p === 'number' && !isNaN(p)) {
+        return Math.min(p, 100)
+      }
+    }
+    // 回退到本地进度
     const s = sections.value[sectionId]
-    if (!s || s.total === 0) return 0
+    if (!s || !s.total || s.total === 0) return 0
     const answeredKeys = s.answers ? Object.keys(s.answers).length : 0
-    return Math.round((answeredKeys / s.total) * 100)
+    const pct = Math.round((answeredKeys / s.total) * 100)
+    return Math.min(pct, 100)
   }
 
-  return { sections, currentSectionId, completedCount, accuracy, initSection, recordAnswer, recordAnswerResult, getSectionAnswers, isSectionComplete, getProgress }
+  /**
+   * 设置从后端拉取的进度
+   */
+  function setServerProgress(sectionId, data) {
+    if (sectionId && data) {
+      serverProgress.value[sectionId] = {
+        totalCount: data.totalCount || 0,
+        completedCount: data.completedCount || 0,
+        correctCount: data.correctCount || 0,
+        wrongCount: data.wrongCount || 0,
+        progressPercent: data.progressPercent || 0
+      }
+    }
+  }
+
+  /**
+   * 批量设置后端进度
+   */
+  function setServerProgressBatch(map) {
+    if (map && typeof map === 'object') {
+      Object.keys(map).forEach(key => {
+        setServerProgress(key, map[key])
+      })
+    }
+  }
+
+  /**
+   * 清除后端进度缓存（重新进入时刷新）
+   */
+  function clearServerProgress() {
+    serverProgress.value = {}
+  }
+
+  return {
+    sections,
+    serverProgress,
+    currentSectionId,
+    completedCount,
+    accuracy,
+    initSection,
+    recordAnswer,
+    recordAnswerResult,
+    getSectionAnswers,
+    isSectionComplete,
+    getProgress,
+    setServerProgress,
+    setServerProgressBatch,
+    clearServerProgress
+  }
 }, {
-  persist: { key: 'zhifuxi-practice', pick: ['sections', 'currentSectionId'] }
+  persist: {
+    key: 'zhifuxi-practice',
+    pick: ['sections', 'currentSectionId']
+  }
 })
 
+// HMR 支持
 if (import.meta.hot) {
   import.meta.hot.accept(acceptHMRUpdate(usePracticeStore, import.meta.hot))
 }

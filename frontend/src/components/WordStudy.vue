@@ -1,40 +1,53 @@
 <template>
   <div class="page-wrap">
+    <CyberNavbar title="单词刷题" :show-back="true" @back="backHome" />
+
     <!-- 初始选择页 -->
     <div v-if="page === 'select'" class="select-wrap">
       <div class="my-card">
-        <h2 style="text-align:center;margin:0 0 24px 0;">单词刷题</h2>
+        <h2 class="card-title">单词刷题</h2>
 
         <div class="form-item">
           <div class="label">题目类型</div>
-          <van-radio-group v-model="form.type" direction="horizontal">
-            <van-radio name="option">四选一选择题</van-radio>
-            <van-radio name="spell">拼写默写题</van-radio>
-          </van-radio-group>
+          <div class="radio-group">
+            <label class="radio-item" :class="{ checked: form.type === 'option' }" @click="form.type='option'">
+              <span class="radio-dot"></span>四选一选择题
+            </label>
+            <label class="radio-item" :class="{ checked: form.type === 'spell' }" @click="form.type='spell'">
+              <span class="radio-dot"></span>拼写默写题
+            </label>
+          </div>
         </div>
 
         <div class="form-item">
           <div class="label">单词等级</div>
-          <van-field
-            v-model="form.level"
-            is-link
-            readonly
-            placeholder="请选择"
-            @click="showLevelPopup = true"
-          />
+          <div class="select-field" @click="showLevelPopup = true">
+            <span>{{ form.level === '4' ? '四级' : '六级' }}</span>
+            <span class="select-arrow">›</span>
+          </div>
         </div>
 
-        <van-popup v-model:show="showLevelPopup" position="bottom">
-          <van-picker
-            :columns="levelColumns"
-            @confirm="onLevelConfirm"
-            @cancel="showLevelPopup=false"
-          />
-        </van-popup>
+        <!-- 等级选择弹窗 -->
+        <div v-if="showLevelPopup" class="level-popup-overlay" @click.self="showLevelPopup=false">
+          <div class="level-popup">
+            <div class="popup-title">选择单词等级</div>
+            <div
+              class="level-option"
+              :class="{ active: form.level === '4' }"
+              @click="selectLevel('4')"
+            >四级</div>
+            <div
+              class="level-option"
+              :class="{ active: form.level === '6' }"
+              @click="selectLevel('6')"
+            >六级</div>
+            <div class="popup-cancel" @click="showLevelPopup=false">取消</div>
+          </div>
+        </div>
 
         <div class="btn-group">
-          <van-button type="primary" size="large" @click="startQuiz">开始刷题</van-button>
-          <van-button size="large" @click="openWordBook">生词本</van-button>
+          <CyberButton variant="primary" @click="startQuiz">开始刷题</CyberButton>
+          <CyberButton variant="ghost" @click="openWordBook">生词本</CyberButton>
         </div>
       </div>
     </div>
@@ -42,103 +55,108 @@
     <!-- 刷题页面 -->
     <div v-if="page === 'quiz'" class="quiz-wrap">
       <div class="my-card">
-        <!-- 关键：v-if 保护，currentWord为null，整块不渲染 -->
         <div v-if="currentWord">
           <div class="header-row">
-            <h3 v-if="form.type === 'option'">{{ currentWord?.word }} &nbsp; {{ currentWord?.phonetic }}</h3>
-            <h3 v-else>&nbsp;</h3>
-            <van-button type="text" :loading="collectLoading" @click="addWordBook">加入生词本</van-button>
+            <h3 v-if="form.type === 'option'" class="word-title">
+              {{ currentWord?.word }}
+              <span class="phonetic">{{ currentWord?.phonetic }}</span>
+            </h3>
+            <h3 v-else class="word-title">&nbsp;</h3>
+            <span class="collect-btn" :class="{ loading: collectLoading }" @click="addWordBook">
+              ⭐ 加入生词本
+            </span>
           </div>
 
           <!-- 选择题模式 -->
           <div v-if="form.type === 'option'">
-            <p style="font-size:18px;margin:16px 0;">请选择正确释义：</p>
+            <p class="question-text">请选择正确释义：</p>
             <div class="option-list">
-              <van-button
+              <button
                 v-for="item in optionList"
                 :key="item"
-                @click="selectAnswer(item)"
-                :type="getBtnType(item)"
-                block
-                size="large"
+                class="option-btn"
+                :class="getBtnClass(item)"
                 :disabled="hasSubmit"
-                style="margin:8px 0;"
+                @click="selectAnswer(item)"
               >
                 {{ item }}
-              </van-button>
+              </button>
             </div>
           </div>
 
           <!-- 拼写默写模式 -->
           <div v-if="form.type === 'spell'">
-            <p style="font-size:20px;margin:16px 0;">中文释义：{{ currentWord?.cnMean }}</p>
-            <van-field
+            <p class="question-text">中文释义：{{ currentWord?.cnMean }}</p>
+            <input
               v-model="userInput"
+              class="spell-input"
               placeholder="请输入英文单词"
-              size="large"
               @keyup.enter="submitSpell"
               :disabled="hasSubmit"
             />
-            <div style="margin-top:12px;">
-              <van-button type="primary" @click="submitSpell" :disabled="hasSubmit">提交答案</van-button>
+            <div class="spell-submit">
+              <CyberButton variant="primary" @click="submitSpell" :disabled="hasSubmit">提交答案</CyberButton>
             </div>
           </div>
 
           <!-- 答题结果提示 -->
-          <div v-if="hasSubmit" style="margin-top:20px;">
-            <van-notice-bar
-              :type="isCorrect ? 'success' : 'danger'"
-              :text="isCorrect ? '回答正确 ✔' : `回答错误 ✘ 正确答案：${rightAnswer}`"
-            />
+          <div v-if="hasSubmit" class="result-bar" :class="{ correct: isCorrect, wrong: !isCorrect }">
+            {{ isCorrect ? '回答正确 ✔' : `回答错误 ✘ 正确答案：${rightAnswer}` }}
           </div>
 
-          <div style="margin-top:24px;display:flex;gap:12px;">
-            <van-button type="primary" @click="nextWord">下一题</van-button>
-            <van-button @click="backHome">返回首页</van-button>
+          <div class="quiz-actions">
+            <CyberButton variant="primary" @click="nextWord">下一题</CyberButton>
+            <CyberButton variant="ghost" @click="backHome">返回首页</CyberButton>
           </div>
         </div>
+
         <!-- 单词为空提示 -->
-        <div v-else style="text-align:center;padding:40px 0;">
-          <p style="font-size:16px;color:#666;">暂无该等级单词，请先导入单词数据</p>
-          <van-button style="margin-top:16px;" @click="backHome">返回选择页</van-button>
+        <div v-else class="empty-word">
+          <p>暂无该等级单词，请先导入单词数据</p>
+          <CyberButton variant="primary" @click="backHome">返回选择页</CyberButton>
         </div>
       </div>
     </div>
 
     <!-- 生词本弹窗 -->
-    <van-popup v-model:show="wordBookVisible" position="center" round style="width:90%;max-width:700px;height:70vh;">
-      <div class="popup-header">生词本</div>
-      <div class="table-wrap">
-        <table class="word-table">
-          <thead>
-            <tr>
-              <th>单词</th>
-              <th>音标</th>
-              <th>释义</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="item in wordBookList" :key="item.id">
-              <td>{{ item.word }}</td>
-              <td>{{ item.phonetic }}</td>
-              <td>{{ item.cnMean }}</td>
-              <td>
-                <van-button type="danger" size="mini" @click="removeWord(item.id)">删除</van-button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+    <div v-if="wordBookVisible" class="wordbook-overlay" @click.self="wordBookVisible=false">
+      <div class="wordbook-popup">
+        <div class="popup-header">生词本</div>
+        <div class="table-wrap">
+          <table class="word-table">
+            <thead>
+              <tr>
+                <th>单词</th>
+                <th>音标</th>
+                <th>释义</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in wordBookList" :key="item.id">
+                <td>{{ item.word }}</td>
+                <td>{{ item.phonetic }}</td>
+                <td>{{ item.cnMean }}</td>
+                <td>
+                  <span class="table-del" @click="removeWord(item.id)">删除</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-if="wordBookList.length === 0" class="table-empty">
+            生词本是空的
+          </div>
+        </div>
+        <div class="popup-footer">
+          <CyberButton variant="ghost" block @click="wordBookVisible=false">关闭</CyberButton>
+        </div>
       </div>
-      <div class="popup-footer">
-        <van-button @click="wordBookVisible=false">关闭</van-button>
-      </div>
-    </van-popup>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive } from 'vue'
 import { showSuccessToast, showFailToast } from 'vant'
 import {
   getRandomWord,
@@ -148,6 +166,7 @@ import {
   removeWordCollect,
   getMyCollectList
 } from '../api/word'
+import { CyberNavbar, CyberButton } from './cyber'
 
 const userId = ref(1)
 
@@ -158,12 +177,7 @@ const form = reactive({
 })
 
 const showLevelPopup = ref(false)
-const levelColumns = [
-  { text: '四级', value: '4' },
-  { text: '六级', value: '6' }
-]
 
-// 初始为 null，不是空对象
 const currentWord = ref(null)
 const optionList = ref([])
 const userInput = ref('')
@@ -178,8 +192,8 @@ const collectLoading = ref(false)
 
 const wrongMeans = ['苹果', '放弃', '思考', '学习', '城市', '河流', '电脑', '书籍']
 
-function onLevelConfirm({ selectedOptions }) {
-  form.level = selectedOptions[0].value
+function selectLevel(level) {
+  form.level = level
   showLevelPopup.value = false
 }
 
@@ -252,7 +266,6 @@ async function fetchNewWord() {
   optionList.value = []
   try {
     const res = await getRandomWord(form.level)
-    // 判断返回数据
     if(res.code === 200 && res.data){
       currentWord.value = res.data
       if (form.type === 'option') {
@@ -320,12 +333,12 @@ async function submitSpell() {
   }
 }
 
-function getBtnType(text) {
-  if (!hasSubmit.value || !currentWord.value) return 'default'
+function getBtnClass(text) {
+  if (!hasSubmit.value || !currentWord.value) return ''
   const right = currentWord.value.cnMean
-  if (text === right) return 'success'
-  if (!isCorrect.value && text !== right) return 'danger'
-  return 'default'
+  if (text === right) return 'correct'
+  if (!isCorrect.value && text !== right) return 'wrong'
+  return ''
 }
 
 async function nextWord() {
@@ -337,76 +350,465 @@ function backHome() {
   currentWord.value = null
   hasSubmit.value = false
 }
-
-onMounted(() => {
-
-})
 </script>
 
 <style scoped>
 .page-wrap {
-  min-height: 100vh;
-  padding: 20px 12px;
-  box-sizing: border-box;
+  min-height: 100dvh;
+  background: var(--bg-base);
+  position: relative;
 }
+
 .select-wrap, .quiz-wrap {
   max-width: 620px;
   margin: 0 auto;
+  padding: 16px;
+  position: relative;
+  z-index: 10;
 }
+
 .my-card {
-  background:#f7f8fa;
-  padding:24px;
-  border-radius:12px;
+  background: var(--bg-card);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-card);
+  backdrop-filter: blur(12px);
+  padding: 24px;
 }
+
+.card-title {
+  text-align: center;
+  margin: 0 0 24px 0;
+  font-family: var(--font-display);
+  font-size: 22px;
+  color: var(--text-primary);
+  letter-spacing: 2px;
+}
+
 .form-item {
-  margin-bottom:20px;
+  margin-bottom: 20px;
 }
+
 .label {
-  font-size:15px;
-  color:#333;
-  margin-bottom:8px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+  font-weight: 600;
 }
+
+/* 单选组 */
+.radio-group {
+  display: flex;
+  gap: 12px;
+}
+
+.radio-item {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--accent-border);
+  border-radius: 12px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.25s var(--ease-out);
+}
+
+.radio-item.checked {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.radio-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--accent-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.radio-item.checked .radio-dot {
+  border-color: var(--accent);
+}
+
+.radio-item.checked .radio-dot::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
+}
+
+/* 选择框 */
+.select-field {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--accent-border);
+  border-radius: 12px;
+  font-size: 14px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.25s var(--ease-out);
+}
+
+.select-field:hover {
+  border-color: var(--accent);
+}
+
+.select-arrow {
+  color: var(--text-muted);
+  font-size: 18px;
+}
+
+/* 等级选择弹窗 */
+.level-popup-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  z-index: 5000;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.level-popup {
+  width: 100%;
+  max-width: 480px;
+  background: rgba(10, 10, 15, 0.98);
+  border: 1px solid var(--accent-border);
+  border-radius: 20px 20px 0 0;
+  padding: 20px;
+  animation: slideUp 0.3s var(--ease-out);
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.popup-title {
+  text-align: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+  font-family: var(--font-display);
+  letter-spacing: 1px;
+}
+
+.level-option {
+  padding: 16px;
+  text-align: center;
+  font-size: 16px;
+  color: var(--text-secondary);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 8px;
+}
+
+.level-option:hover {
+  background: var(--bg-elevated);
+}
+
+.level-option.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 700;
+  border: 1px solid var(--accent);
+}
+
+.popup-cancel {
+  padding: 14px;
+  text-align: center;
+  font-size: 15px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--accent-border);
+  margin-top: 8px;
+  cursor: pointer;
+}
+
+/* 按钮组 */
 .btn-group {
-  display:flex;
-  gap:12px;
-  margin-top:24px;
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
 }
+
+.btn-group > * {
+  flex: 1;
+}
+
+/* 刷题页 */
 .header-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap:8px;
+  gap: 8px;
+  margin-bottom: 16px;
 }
+
+.word-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  margin: 0;
+}
+
+.phonetic {
+  font-size: 16px;
+  color: var(--accent);
+  margin-left: 12px;
+  font-weight: 400;
+}
+
+.collect-btn {
+  font-size: 13px;
+  color: var(--warning);
+  cursor: pointer;
+  padding: 6px 12px;
+  border: 1px solid var(--warning);
+  border-radius: 8px;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.collect-btn:hover {
+  background: var(--warning-soft);
+}
+
+.collect-btn.loading {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.question-text {
+  font-size: 16px;
+  color: var(--text-secondary);
+  margin: 16px 0;
+}
+
+/* 选项按钮 */
 .option-list {
   margin-top: 12px;
 }
+
+.option-btn {
+  display: block;
+  width: 100%;
+  padding: 14px 16px;
+  margin: 8px 0;
+  background: var(--bg-elevated);
+  border: 1px solid var(--accent-border);
+  border-radius: 12px;
+  font-size: 15px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.25s var(--ease-out);
+  text-align: left;
+}
+
+.option-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  transform: translateX(4px);
+}
+
+.option-btn:disabled {
+  cursor: default;
+}
+
+.option-btn.correct {
+  background: var(--success-soft);
+  border-color: var(--success);
+  color: var(--success);
+  font-weight: 700;
+}
+
+.option-btn.wrong {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* 拼写输入 */
+.spell-input {
+  width: 100%;
+  padding: 14px 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--accent-border);
+  border-radius: 12px;
+  font-size: 16px;
+  color: var(--text-primary);
+  outline: none;
+  transition: all 0.25s var(--ease-out);
+}
+
+.spell-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.spell-input:disabled {
+  opacity: 0.6;
+}
+
+.spell-submit {
+  margin-top: 16px;
+}
+
+/* 结果提示 */
+.result-bar {
+  margin-top: 20px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.result-bar.correct {
+  background: var(--success-soft);
+  color: var(--success);
+  border: 1px solid var(--success);
+}
+
+.result-bar.wrong {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border: 1px solid var(--danger);
+}
+
+/* 刷题操作 */
+.quiz-actions {
+  margin-top: 24px;
+  display: flex;
+  gap: 12px;
+}
+
+.quiz-actions > * {
+  flex: 1;
+}
+
+/* 空单词 */
+.empty-word {
+  text-align: center;
+  padding: 40px 0;
+}
+
+.empty-word p {
+  font-size: 15px;
+  color: var(--text-secondary);
+  margin-bottom: 20px;
+}
+
+/* 生词本弹窗 */
+.wordbook-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  z-index: 5000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.wordbook-popup {
+  width: 100%;
+  max-width: 700px;
+  height: 70vh;
+  background: rgba(10, 10, 15, 0.98);
+  border: 1px solid var(--accent-border);
+  border-radius: 20px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: dialogPop 0.3s var(--ease-out);
+}
+
+@keyframes dialogPop {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
 .popup-header {
-  padding:16px;
-  font-size:16px;
-  font-weight:bold;
-  text-align:center;
-  border-bottom:1px solid #eee;
+  padding: 16px;
+  font-size: 16px;
+  font-weight: 700;
+  text-align: center;
+  border-bottom: 1px solid var(--accent-border);
+  font-family: var(--font-display);
+  letter-spacing: 1px;
+  color: var(--text-primary);
 }
+
 .table-wrap {
-  padding:12px;
-  overflow:auto;
-  height: calc(100% - 110px);
+  flex: 1;
+  padding: 12px;
+  overflow: auto;
 }
-.popup-footer {
-  padding:12px;
-  border-top:1px solid #eee;
-  text-align:center;
-}
+
 .word-table {
-  width:100%;
+  width: 100%;
   border-collapse: collapse;
+  font-size: 13px;
 }
-.word-table th,.word-table td {
-  border:1px solid #eee;
-  padding:10px;
+
+.word-table th, .word-table td {
+  border: 1px solid var(--accent-border);
+  padding: 10px;
+  text-align: left;
 }
+
 .word-table th {
-  background:#f7f8fa;
+  background: var(--bg-elevated);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.word-table td {
+  color: var(--text-secondary);
+}
+
+.table-del {
+  color: var(--danger);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 4px 8px;
+  border: 1px solid var(--danger);
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.table-del:hover {
+  background: var(--danger-soft);
+}
+
+.table-empty {
+  text-align: center;
+  padding: 40px 0;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.popup-footer {
+  padding: 12px;
+  border-top: 1px solid var(--accent-border);
 }
 </style>
