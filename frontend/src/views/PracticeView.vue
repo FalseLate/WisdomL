@@ -18,9 +18,9 @@
       </div>
 
       <!-- 整卷提交按钮 -->
-      <div class="batch-bar" v-if="!allSubmitted && pendingCount > 0">
+      <div class="batch-bar" v-if="(!allSubmitted && pendingCount > 0) || batchSubmitting">
         <CyberButton variant="warning" block :loading="batchSubmitting" @click="batchSubmit">
-          📤 整卷提交（{{ pendingCount }}题待提交）
+          {{ batchSubmitting ? '提交并生成解析中...' : '📤 整卷提交（' + pendingCount + '题待提交）' }}
         </CyberButton>
       </div>
 
@@ -354,17 +354,19 @@ async function batchSubmit() {
       pStore.recordAnswerResult(secId, qId, r)
     })
 
-    showSuccessToast(`已提交 ${answers.length} 题`)
+    // 提交成功，先不弹提示，等解析生成完一起弹
 
-    // 批量并行生成缺失的解析（后端 check-batch 只返回判分，解析需前端补全）
+    // 只处理已提交的题目中缺失解析的（没提交的不处理，避免坏数据报错）
     const missingExps = allQuestions.value.filter((q, qi) => {
       const qId = getQid(q, qi)
       const r = results[qId]
-      const exp = r?.explanation || q.explanation
+      if (!r) return false // 没提交的跳过
+      const exp = r.explanation || q.explanation
       return !exp || typeof exp !== 'string' || exp === '未提供' || exp === '解析未提供' || exp === '解析生成失败' || exp.trim() === ''
     })
+
+    let genOk = 0, genFail = 0
     if (missingExps.length > 0) {
-      let genOk = 0, genFail = 0
       const genTasks = missingExps.map(q => {
         const qIdx = allQuestions.value.indexOf(q)
         return request.post('/generate-answer', {
@@ -382,8 +384,15 @@ async function batchSubmit() {
         }).catch(() => { genFail++ })
       })
       await Promise.all(genTasks)
-      if (genOk > 0) showSuccessToast(`解析生成完成 (${genOk}/${missingExps.length})`)
-      if (genFail > 0) showFailToast(`${genFail} 道题解析生成失败`)
+    }
+
+    // 等解析全部生成完成后，弹出最终提示
+    if (genFail > 0) {
+      showSuccessToast(`已提交 ${answers.length} 题，${genOk} 道解析已生成，${genFail} 道失败（可点"重新生成解析"重试）`)
+    } else if (genOk > 0) {
+      showSuccessToast(`已提交 ${answers.length} 题，解析全部生成完成`)
+    } else {
+      showSuccessToast(`已提交 ${answers.length} 题`)
     }
   } catch (err) {
     showFailToast(err.message || '整卷提交失败')
