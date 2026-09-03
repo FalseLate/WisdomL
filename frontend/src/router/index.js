@@ -8,6 +8,7 @@ const routes = [
   { path: '/login', name: 'login', component: () => import('../views/LoginView.vue') },
   { path: '/register', name: 'register', component: () => import('../views/RegisterView.vue') },
   { path: '/practice', name: 'practice', component: () => import('../views/PracticeView.vue'), meta: { requiresAuth: true } },
+  { path: '/lazy-practice', name: 'lazy-practice', component: () => import('../views/LazyPracticeView.vue'), meta: { requiresAuth: true } },
   { path: '/profile', name: 'profile', component: () => import('../views/ProfileView.vue'), meta: { requiresAuth: true } },
   { path: '/history', name: 'history', component: () => import('../views/HistoryView.vue'), meta: { requiresAuth: true } },
   { path: '/question-bank', name: 'question-bank', component: () => import('../views/QuestionBankView.vue'), meta: { requiresAuth: true } },

@@ -63,7 +63,8 @@
 
         <div class="qb-actions">
           <CyberButton v-if="item.progress>=100" variant="success" size="small" disabled>✅ 已完成</CyberButton>
-          <CyberButton v-else variant="primary" size="small" @click="goPractice(item)">继续刷题</CyberButton>
+          <CyberButton v-else variant="primary" size="small" @click="goPractice(item)">试卷模式</CyberButton>
+          <CyberButton variant="secondary" size="small" @click="goPracticeLazy(item)">懒人模式</CyberButton>
         </div>
       </div>
 
@@ -230,6 +231,26 @@ function goPractice(item) {
     }
   }
 }
+
+// 懒人模式（手势刷题）入口
+function goPracticeLazy(item) {
+  if (item.questions) {
+    try {
+      const parsed = JSON.parse(item.questions)
+      const objArr = Array.isArray(parsed) ? parsed : (parsed.objectiveQuestions || [])
+      const subArr = parsed.subjectiveQuestions || []
+      const qs = [...objArr, ...subArr]
+      qStore.setQuestions(qs, item.id)
+      const secId = item.id?.toString() || Date.now().toString()
+      pStore.currentSectionId = secId
+      pStore.initSection(secId, qs.length, item.sourceText || '题目', 'text')
+      router.push('/lazy-practice')
+    } catch (e) {
+      showFailToast('题目数据解析失败:' + e.message)
+    }
+  }
+}
+
 </script>
 
 <style scoped>

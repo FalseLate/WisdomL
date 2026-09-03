@@ -9,6 +9,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@mediapipe/camera_utils": "^0.3.1675466862",
+    "@mediapipe/hands": "^0.4.1675469240",
     "axios": "^1.18.1",
     "cropperjs": "^2.1.1",
     "pinia": "^4.0.2",
