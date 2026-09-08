@@ -159,6 +159,12 @@
             </div>
           </div>
 
+          <!-- 客观题答案对照：你的答案 vs 正确答案，对绿错红 -->
+          <div v-if="!isSubjective && currentResult" class="lp-answer-compare">
+            <span class="ac-item">你的答案：<b :class="isCurrentCorrect ? 'ac-ok' : 'ac-bad'">{{ currentResult.userAnswer || '未作答' }}</b></span>
+            <span class="ac-item">正确答案：<b class="ac-ok">{{ currentQuestion?.answer || currentResult.correctAnswer || '—' }}</b></span>
+          </div>
+
           <!-- 主观题结果 -->
           <div v-else class="lp-subjective-result">
             <div class="result-section">
@@ -260,6 +266,7 @@ import { usePracticeStore } from '../stores/practice'
 import { showFailToast, showSuccessToast, showConfirmDialog, showToast } from 'vant'
 import request from '../utils/request.js'
 import { classify } from '../utils/questionType.js'
+import { loadDraftStore, writeDraftAnswers, clearDraftStore } from '../utils/practiceDraft.js'
 import { ParticleBackground } from '../components/cyber'
 import GestureHUD from '../components/cyber/GestureHUD.vue'
 
@@ -284,10 +291,11 @@ const showTutorial = ref(false)
 // 答题结果
 const results = ref({})
 
-// 草稿/结果只保留在内存（ref）：懒人模式刻意不写 localStorage，
-// 这样同一套题可无限重复进入、重复提交，不会被历史结果锁进结果页。
-// 注意：试卷模式 PracticeView、章节进度 store（含进度条）的持久化不受影响。
+// 未提交草稿：与试卷模式共享统一草稿层（practice_draft_{sectionId}），刷新不丢、双模式互通；
+// 判分结果 results 只留内存、不持久化、不锁结果页，因此同一套题仍可无限重复整卷提交。
 const drafts = ref({})
+// 统一草稿章节键：优先持久化的 currentSectionId，兜底 recordId
+const draftSectionId = computed(() => pStore.currentSectionId || (qStore.recordId != null ? String(qStore.recordId) : 'default'))
 
 // ===== 计算属性 =====
 const currentQuestion = computed(() => questions.value[currentIndex.value])
@@ -407,10 +415,45 @@ watch(currentIndex, () => {
   triggerCardAnim()
 })
 
-// ===== 草稿（纯内存，不持久化，方便重复刷题与重复提交）=====
+// ===== 草稿：统一持久化（与试卷模式互通），results 仍只留内存保证可重复整卷提交 =====
 function clearDrafts() {
   drafts.value = {}
 }
+
+// 进入页面时从统一草稿层恢复（含异常兜底、qid 白名单防串题、recordId 回填）
+function restoreDrafts() {
+  const validQids = questions.value.map((q, i) => getQid(q, i))
+  const store = loadDraftStore(draftSectionId.value, validQids)
+  drafts.value = store.answers || {}
+  // recordId 不被 questions store 持久化，刷新后回填，保证整卷提交后端记录仍能关联套题
+  if (qStore.recordId == null && store.recordId != null) qStore.recordId = store.recordId
+  // 主观题草稿镜像写回 subj_ans_{qid}，试卷模式的主观题卡片挂载时直接读取
+  questions.value.forEach((q, i) => {
+    if (classify(q).type !== 'subjective') return
+    const qid = getQid(q, i)
+    const ans = drafts.value[qid]?.answer
+    try {
+      if (ans) localStorage.setItem('subj_ans_' + qid, ans)
+      else localStorage.removeItem('subj_ans_' + qid)
+    } catch (e) { /* 忽略存储异常 */ }
+  })
+  // 首题若是主观题，watch(currentIndex) 不会触发，这里立即回填一次
+  if (isSubjective.value) {
+    subjectiveAnswer.value = drafts.value[currentQid.value]?.answer || ''
+  }
+}
+
+// drafts 任意变化（点击/手势/触摸/主观输入）统一落盘，并同步当前主观题到 subj_ans
+watch(drafts, (val) => {
+  writeDraftAnswers(draftSectionId.value, val, qStore.recordId)
+  if (currentQuestion.value && isSubjective.value) {
+    const ans = val[currentQid.value]?.answer
+    try {
+      if (ans) localStorage.setItem('subj_ans_' + currentQid.value, ans)
+      else localStorage.removeItem('subj_ans_' + currentQid.value)
+    } catch (e) { /* 忽略存储异常 */ }
+  }
+}, { deep: true })
 
 // ===== 导航 =====
 function prevQuestion() {
@@ -510,8 +553,8 @@ async function handleSubmit() {
       await Promise.all(genTasks)
     }
 
-    // 清除内存草稿（结果保留在内存 results 中，点「再做一次」或返回题库重进均可重新答题）
-    clearDrafts()
+    // 注意：提交后【不能】清空 drafts —— 结果页的错误数/正确率统计、选项回显、
+    // 错项标红、题号“已做”态全部依赖 drafts；草稿只在「再做一次」resetPractice 时清。
 
     // 切换到结果模式
     showResult.value = true
@@ -566,8 +609,13 @@ function handleGesture(gesture) {
 
 // ===== 再做一次：清空内存结果与草稿，回到第一题（无需退出重进，可立即重复提交）=====
 function resetPractice() {
+  // 真正重做：清内存结果/草稿 + 统一草稿存储 + 本套题的 subj_ans 镜像
+  questions.value.forEach((q, i) => {
+    try { localStorage.removeItem('subj_ans_' + getQid(q, i)) } catch (e) { /* 忽略 */ }
+  })
   results.value = {}
-  drafts.value = {}
+  clearDrafts() // 先清内存（watch 会回写一次空草稿），随后删掉存储键，避免残留空壳
+  clearDraftStore(draftSectionId.value)
   subjectiveAnswer.value = ''
   submitting.value = false
   showResult.value = false
@@ -618,7 +666,8 @@ function onTouchEnd(e) {
 
 // ===== 生命周期 =====
 onMounted(() => {
-  // 懒人模式：草稿/结果纯内存，每次进入都是全新答题，可重复提交
+  // 恢复未提交草稿（刷新不丢、与试卷模式互通）；判分结果不恢复，故不会被锁进结果页
+  restoreDrafts()
   // 添加触摸滑动监听
   document.addEventListener('touchstart', onTouchStart, { passive: true })
   document.addEventListener('touchend', onTouchEnd, { passive: true })
@@ -841,6 +890,27 @@ onUnmounted(() => {
 }
 .opt-check.correct { color: var(--success); }
 .opt-check.wrong { color: var(--danger); }
+
+/* 结果页答案对照条 */
+.lp-answer-compare {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-button);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.lp-answer-compare .ac-item b {
+  font-weight: 700;
+  letter-spacing: 1px;
+  margin-left: 2px;
+}
+.lp-answer-compare .ac-ok { color: var(--success); }
+.lp-answer-compare .ac-bad { color: var(--danger); }
 
 /* 主观题 */
 .lp-subjective {

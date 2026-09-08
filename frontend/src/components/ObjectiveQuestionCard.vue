@@ -64,7 +64,9 @@ import { CyberButton, CyberTag } from './cyber'
 const props = defineProps({
   question: { type: Object, required: true },
   result: { type: Object, default: null },
-  index: { type: Number, default: 0 }
+  index: { type: Number, default: 0 },
+  // 来自另一模式/刷新恢复的未提交答案，用于回显选中态（已提交结果仍以 result 为准）
+  initialAnswer: { type: String, default: null }
 })
 const emit = defineEmits(['submit', 'change', 'update-answer'])
 
@@ -75,8 +77,9 @@ const qId = computed(() => q.value.id || q.value._id || props.index)
 const barColor = computed(() => qType.value.color)
 const label = computed(() => qType.value.label)
 
-const selected = ref(null)
-const multiSelected = ref([])
+// 初始选中态：优先外部恢复的未提交答案（result 的回显由下方 watch 负责）
+const selected = ref(isSingle.value && props.initialAnswer ? props.initialAnswer : null)
+const multiSelected = ref(!isSingle.value && props.initialAnswer ? props.initialAnswer.split('') : [])
 const showExp = ref(false)
 const isFav = ref(false)
 const retrying = ref(false)

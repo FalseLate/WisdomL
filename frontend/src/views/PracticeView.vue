@@ -49,6 +49,7 @@
               :question="q"
               :result="results[getQid(q,i)]||null"
               :index="i"
+              :initial-answer="getDraftAnswer(getQid(q,i))"
               ref="objCardRefs"
               @submit="(e)=>handleSubmitObjective(e,getQid(q,i),q)"
               @change="(e)=>handleSelectionChange(e)"
@@ -63,6 +64,7 @@
             :question="q"
             :result="results[getQid(q,i)]||null"
             :index="i"
+            :initial-answer="getDraftAnswer(getQid(q,i))"
             ref="objCardRefs"
             @submit="(e)=>handleSubmitObjective(e,getQid(q,i),q)"
             @change="(e)=>handleSelectionChange(e)"
@@ -84,6 +86,7 @@
               :index="i"
               ref="subCardRefs"
               @submit="(e)=>handleSubmitSubjective(e,getQid(q,i))"
+              @change="(e)=>handleSubjectiveDraft(e)"
               @update-answer="(e)=>handleUpdateAnswer(e,q)"
             />
           </template>
@@ -97,6 +100,7 @@
             :index="i"
             ref="subCardRefs"
             @submit="(e)=>handleSubmitSubjective(e,getQid(q,i))"
+            @change="(e)=>handleSubjectiveDraft(e)"
             @update-answer="(e)=>handleUpdateAnswer(e,q)"
           />
         </template>
@@ -153,6 +157,8 @@ import { useQuestionsStore } from '../stores/questions'
 import { usePracticeStore } from '../stores/practice'
 import { showSuccessToast, showFailToast } from 'vant'
 import request from '../utils/request.js'
+import { classify } from '../utils/questionType.js'
+import { loadDraftStore, saveDraftAnswer, removeDraftAnswer } from '../utils/practiceDraft.js'
 import ObjectiveQuestionCard from '../components/ObjectiveQuestionCard.vue'
 import SubjectiveQuestionCard from '../components/SubjectiveQuestionCard.vue'
 import { CyberNavbar, CyberButton, CyberProgress } from '../components/cyber'
@@ -172,6 +178,12 @@ function getQid(q, idx) { return q?.id || q?._id || idx }
 
 // 暂存用户选择但未提交的答案
 const pendingAnswers = reactive(new Map())
+// 双模式共享的未提交草稿缓存（供客观题卡片 initial-answer 回显）
+const draftCache = reactive({})
+function getDraftAnswer(qid) { return draftCache[qid]?.answer || null }
+function findQIndex(qid) {
+  return allQuestions.value.findIndex((q, i) => getQid(q, i) === qid)
+}
 
 const allQuestions = computed(() => qStore.questions || [])
 const objQ = computed(() => allQuestions.value.filter(q => q.type !== 'subjective'))
@@ -225,6 +237,25 @@ const encouragements = [
 ]
 const encouragement = computed(() => encouragements[Math.floor(Math.random() * encouragements.length)])
 
+// setup 阶段立即恢复共享草稿：必须早于子组件 setup（主观卡挂载即读 subj_ans localStorage）
+;(function restoreDraftOnSetup() {
+  const sectionId = pStore.currentSectionId
+  if (!sectionId) return
+  const validQids = (qStore.questions || []).map((q, i) => getQid(q, i))
+  const store = loadDraftStore(sectionId, validQids)
+  // recordId 不被 questions store 持久化，刷新后回填，保证提交仍关联套题
+  if (qStore.recordId == null && store.recordId != null) qStore.recordId = store.recordId
+  Object.entries(store.answers || {}).forEach(([qid, item]) => {
+    draftCache[qid] = item
+    if (item.type === 'subjective') {
+      // 主观卡挂载时直接从该 key 读取，必须在其 setup 前写好
+      try { localStorage.setItem('subj_ans_' + qid, item.answer) } catch (e) { /* 忽略 */ }
+    } else {
+      pendingAnswers.set(qid, item.answer)
+    }
+  })
+})()
+
 onMounted(() => {
   initFromStore()
 })
@@ -233,19 +264,49 @@ function initFromStore() {
   const sectionId = pStore.currentSectionId
   if (!sectionId) return
   Object.keys(results).forEach(k => delete results[k])
-  pendingAnswers.clear()
   pStore.initSection(sectionId, allQuestions.value.length, '刷题练习', 'practice')
   const saved = pStore.getSectionAnswers(sectionId)
-  Object.keys(saved).forEach(k => { results[k] = saved[k] })
+  Object.keys(saved).forEach(k => {
+    results[k] = saved[k]
+    // 已提交结果优先：清掉对应未提交草稿，避免卡片回显旧选择、待提交数虚高
+    if (draftCache[k]) { delete draftCache[k]; pendingAnswers.delete(k) }
+  })
 }
 
 function handleSelectionChange(e) {
   if (results[e.questionId]) return
+  const secId = pStore.currentSectionId
+  const qi = findQIndex(e.questionId)
+  const type = qi >= 0 ? classify(allQuestions.value[qi]).type : ''
   if (e.userAnswer) {
     pendingAnswers.set(e.questionId, e.userAnswer)
+    draftCache[e.questionId] = { answer: e.userAnswer, type, ts: Date.now() }
+    saveDraftAnswer(secId, e.questionId, e.userAnswer, type)
   } else {
     pendingAnswers.delete(e.questionId)
+    delete draftCache[e.questionId]
+    removeDraftAnswer(secId, e.questionId)
   }
+}
+
+// 主观题输入同步到共享草稿（subj_ans 镜像仍由子组件自己维护）
+function handleSubjectiveDraft(e) {
+  if (results[e.questionId]) return
+  const secId = pStore.currentSectionId
+  const val = (e.userAnswer || '').trim()
+  if (val) {
+    draftCache[e.questionId] = { answer: e.userAnswer, type: 'subjective', ts: Date.now() }
+    saveDraftAnswer(secId, e.questionId, e.userAnswer, 'subjective')
+  } else {
+    delete draftCache[e.questionId]
+    removeDraftAnswer(secId, e.questionId)
+  }
+}
+
+// 已提交：从共享草稿移除（结果归 pinia 持久化），并清本地缓存
+function dropDraft(questionId) {
+  delete draftCache[questionId]
+  removeDraftAnswer(pStore.currentSectionId, questionId)
 }
 
 async function handleSubmitObjective(e, questionId, question) {
@@ -264,6 +325,7 @@ async function handleSubmitObjective(e, questionId, question) {
     r.userAnswer = e.userAnswer
     results[questionId] = r
     pendingAnswers.delete(questionId)
+    dropDraft(questionId)
     const secId = pStore.currentSectionId
     if (!secId) return
     pStore.recordAnswer(secId, r?.correct === true)
@@ -278,6 +340,7 @@ function handleSubmitSubjective(e, questionId) {
   if (results[questionId]) return
   results[questionId] = { correct: e.isCorrect === true, evaluation: e.evaluation || '', score: e.score || 0 }
   pendingAnswers.delete(questionId)
+  dropDraft(questionId)
   const secId = pStore.currentSectionId
   if (!secId) return
   pStore.recordAnswer(secId, e.isCorrect === true)
@@ -348,6 +411,7 @@ async function batchSubmit() {
       if (results[qId]) return
       results[qId] = r
       pendingAnswers.delete(qId)
+      dropDraft(qId)
       const secId = pStore.currentSectionId
       if (!secId) return
       pStore.recordAnswer(secId, r?.correct === true)
