@@ -1,63 +1,19 @@
 <template>
   <div class="page-wrap">
-    <CyberNavbar title="单词刷题" :show-back="true" @back="backHome" />
+    <CyberNavbar :title="modeTitle" :show-back="true" @back="router.back()" />
 
-    <!-- 初始选择页 -->
-    <div v-if="page === 'select'" class="select-wrap">
-      <div class="my-card">
-        <h2 class="card-title">单词刷题</h2>
-
-        <div class="form-item">
-          <div class="label">题目类型</div>
-          <div class="radio-group">
-            <label class="radio-item" :class="{ checked: form.type === 'option' }" @click="form.type='option'">
-              <span class="radio-dot"></span>四选一选择题
-            </label>
-            <label class="radio-item" :class="{ checked: form.type === 'spell' }" @click="form.type='spell'">
-              <span class="radio-dot"></span>拼写默写题
-            </label>
-          </div>
-        </div>
-
-        <div class="form-item">
-          <div class="label">单词等级</div>
-          <div class="select-field" @click="showLevelPopup = true">
-            <span>{{ form.level === '4' ? '四级' : '六级' }}</span>
-            <span class="select-arrow">›</span>
-          </div>
-        </div>
-
-        <!-- 等级选择弹窗 -->
-        <div v-if="showLevelPopup" class="level-popup-overlay" @click.self="showLevelPopup=false">
-          <div class="level-popup">
-            <div class="popup-title">选择单词等级</div>
-            <div
-              class="level-option"
-              :class="{ active: form.level === '4' }"
-              @click="selectLevel('4')"
-            >四级</div>
-            <div
-              class="level-option"
-              :class="{ active: form.level === '6' }"
-              @click="selectLevel('6')"
-            >六级</div>
-            <div class="popup-cancel" @click="showLevelPopup=false">取消</div>
-          </div>
-        </div>
-
-        <div class="btn-group">
-          <CyberButton variant="primary" @click="startQuiz">开始刷题</CyberButton>
-          <CyberButton variant="ghost" @click="openWordBook">生词本</CyberButton>
-        </div>
-      </div>
+    <!-- 学习进度条 -->
+    <div class="progress-wrap" v-if="session.total > 0">
+      <van-progress :percentage="progressPct" stroke-width="8" :show-pivot="false" color="#00f5ff" track-color="rgba(255,255,255,0.08)" />
+      <div class="progress-text">{{ session.done }}/{{ session.total }} · 已答对 {{ session.correct }} 题</div>
     </div>
 
-    <!-- 刷题页面 -->
+    <!-- 学习页面 -->
     <div v-if="page === 'quiz'" class="quiz-wrap">
       <div class="my-card">
         <div v-if="currentWord">
           <div class="header-row">
-            <h3 v-if="form.type === 'option'" class="word-title">
+            <h3 v-if="mode === 'choice'" class="word-title">
               {{ currentWord?.word }}
               <span class="phonetic">{{ currentWord?.phonetic }}</span>
             </h3>
@@ -67,8 +23,8 @@
             </span>
           </div>
 
-          <!-- 选择题模式 -->
-          <div v-if="form.type === 'option'">
+          <!-- 刷单词（选择题） -->
+          <div v-if="mode === 'choice'">
             <p class="question-text">请选择正确释义：</p>
             <div class="option-list">
               <button
@@ -84,8 +40,8 @@
             </div>
           </div>
 
-          <!-- 拼写默写模式 -->
-          <div v-if="form.type === 'spell'">
+          <!-- 拼写单词 -->
+          <div v-if="mode === 'spell'">
             <p class="question-text">中文释义：{{ currentWord?.cnMean }}</p>
             <input
               v-model="userInput"
@@ -105,15 +61,23 @@
           </div>
 
           <div class="quiz-actions">
-            <CyberButton variant="primary" @click="nextWord">下一题</CyberButton>
-            <CyberButton variant="ghost" @click="backHome">返回首页</CyberButton>
+            <CyberButton variant="primary" @click="nextWord">
+              {{ isLast ? '完成本组' : '下一题' }}
+            </CyberButton>
           </div>
         </div>
+      </div>
+    </div>
 
-        <!-- 单词为空提示 -->
-        <div v-else class="empty-word">
-          <p>暂无该等级单词，请先导入单词数据</p>
-          <CyberButton variant="primary" @click="backHome">返回选择页</CyberButton>
+    <!-- 完成弹窗：休息 / 追加 -->
+    <div v-if="showFinish" class="finish-overlay">
+      <div class="finish-popup">
+        <div class="finish-emoji">🎉</div>
+        <div class="finish-title">本组完成！</div>
+        <div class="finish-score">共 {{ session.total }} 题，答对 {{ session.correct }} 题</div>
+        <div class="finish-actions">
+          <CyberButton variant="ghost" @click="restNow">休息一下</CyberButton>
+          <CyberButton variant="primary" @click="studyAgain" :loading="againLoading">再来一组</CyberButton>
         </div>
       </div>
     </div>
@@ -152,69 +116,127 @@
         </div>
       </div>
     </div>
-
-    <!-- AI 口语陪练虚拟人（pet-tutor 模块）：桌宠+对话+语音+翻译（后端已并入本项目 backend:8080） -->
-    <PetTutor api-base="http://127.0.0.1:8080" session-id="word-quiz-user" />
   </div>
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
-import { showSuccessToast, showFailToast } from 'vant'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { showSuccessToast, showFailToast, showToast } from 'vant'
 import {
-  getRandomWord,
   checkSpellApi,
   checkOptionApi,
   addWordCollect,
   removeWordCollect,
   getMyCollectList
 } from '../api/word'
+import {
+  startStudy,
+  reportAnswer,
+  finishStudy
+} from '../api/study'
 import { CyberNavbar, CyberButton } from './cyber'
-import PetTutor from '../pet-tutor/PetTutor.vue'
 
-const userId = ref(1)
+const route = useRoute()
+const router = useRouter()
 
-const page = ref('select')
-const form = reactive({
-  type: 'option',
-  level: '4'
+// 词书等级与模式都由前面的页面带进来：/word/study?level=4&mode=choice
+const level = route.query.level || '4'
+const mode = route.query.mode === 'spell' ? 'spell' : 'choice'
+const modeTitle = mode === 'spell' ? '拼写单词' : '刷单词'
+
+const page = ref('loading')
+const session = reactive({
+  id: null,
+  words: [],
+  done: 0,
+  total: 0,
+  correct: 0
 })
+const index = ref(0)          // 当前第几个单词
 
-const showLevelPopup = ref(false)
+const currentWord = computed(() => session.words[index.value] || null)
+const isLast = computed(() => index.value >= session.words.length - 1)
+const progressPct = computed(() =>
+  session.total ? Math.round((session.done / session.total) * 100) : 0
+)
 
-const currentWord = ref(null)
-const optionList = ref([])
 const userInput = ref('')
+const optionList = ref([])
 
 const hasSubmit = ref(false)
 const isCorrect = ref(false)
 const rightAnswer = ref('')
 const selectedMean = ref('')   // 用户本次选中的选项（判红用，答完即存）
 
+const showFinish = ref(false)
+const againLoading = ref(false)
+
 const wordBookVisible = ref(false)
 const wordBookList = ref([])
 const collectLoading = ref(false)
 
-const wrongMeans = ['苹果', '放弃', '思考', '学习', '城市', '河流', '电脑', '书籍']
+// 会话内其他单词的释义可作干扰项，不够时用兜底词库
+const wrongMeans = ['苹果', '放弃', '思考', '学习', '城市', '河流', '电脑', '书籍', '音乐', '森林', '勇气', '机会']
 
-function selectLevel(level) {
-  form.level = level
-  showLevelPopup.value = false
+onMounted(async () => {
+  await startSession(false)
+})
+
+// 开始/恢复一组学习；again=true 表示完成后再追加一组
+async function startSession(again) {
+  page.value = 'loading'
+  try {
+    const res = await startStudy(level, mode)
+    if (res.code !== 200 || !res.data) {
+      showFailToast(res.msg || '开始学习失败')
+      return
+    }
+    const data = res.data
+    if (data.finished) {
+      showToast('这个词书已经背完啦，换个词书继续吧～')
+      router.replace('/word/book')
+      return
+    }
+    session.id = data.sessionId
+    session.words = data.words || []
+    session.done = data.done || 0
+    session.total = data.total || 0
+    session.correct = data.correct || 0
+    // 断点续刷：跳到未完成的那个单词
+    index.value = Math.min(session.done, session.words.length - 1)
+    if (data.resume && session.done > 0) {
+      showToast(`已恢复上次进度（第 ${session.done + 1} 题）`)
+    } else if (!again && data.sameWordsAsToday) {
+      showToast('复习今天的单词')
+    }
+    resetQuestionState()
+    page.value = 'quiz'
+  } catch (err) {
+    showFailToast(err.message || '网络异常')
+  }
+}
+
+function resetQuestionState() {
+  hasSubmit.value = false
+  userInput.value = ''
+  selectedMean.value = ''
+  isCorrect.value = false
+  rightAnswer.value = ''
+  if (mode === 'choice') {
+    generateOptions()
+  }
 }
 
 async function addWordBook() {
-  if (!userId.value) {
-    showFailToast('请先登录！')
-    return
-  }
   const word = currentWord.value
   if (!word?.id) return
   collectLoading.value = true
   try {
-    const res = await addWordCollect(userId.value, word.id)
-    if(res.code === 200){
+    const res = await addWordCollect(1, word.id)
+    if (res.code === 200) {
       showSuccessToast('加入生词本成功')
-    }else{
+    } else {
       showFailToast(res.msg)
     }
   } catch (err) {
@@ -225,12 +247,8 @@ async function addWordBook() {
 }
 
 async function loadWordBook() {
-  if (!userId.value) {
-    showFailToast('请先登录')
-    return
-  }
   try {
-    const res = await getMyCollectList(userId.value)
+    const res = await getMyCollectList(1)
     if (res.code === 200) {
       wordBookList.value = res.data
     }
@@ -241,7 +259,7 @@ async function loadWordBook() {
 
 async function removeWord(wordId) {
   try {
-    const res = await removeWordCollect(userId.value, wordId)
+    const res = await removeWordCollect(1, wordId)
     if (res.code === 200) {
       showSuccessToast('已移除生词')
       loadWordBook()
@@ -251,51 +269,22 @@ async function removeWord(wordId) {
   }
 }
 
-async function openWordBook() {
-  await loadWordBook()
-  wordBookVisible.value = true
-}
-
-async function startQuiz() {
-  if (!form.level) {
-    showFailToast('请选择单词等级')
-    return
-  }
-  page.value = 'quiz'
-  await fetchNewWord()
-}
-
-async function fetchNewWord() {
-  hasSubmit.value = false
-  userInput.value = ''
-  selectedMean.value = ''
-  optionList.value = []
-  try {
-    const res = await getRandomWord(form.level)
-    if(res.code === 200 && res.data){
-      currentWord.value = res.data
-      if (form.type === 'option') {
-        generateOptions()
-      }
-    }else{
-      showFailToast(res.msg || "没有该等级单词数据")
-      currentWord.value = null
-    }
-  } catch (err) {
-    showFailToast(err.message || "加载单词异常")
-    currentWord.value = null
-  }
-}
-
+// 从会话单词里抽干扰项，保证刷题/拼写内容一致的同时选项也更贴近所学词
 function generateOptions() {
-  if(!currentWord.value) return
+  if (!currentWord.value) return
   const correct = currentWord.value.cnMean
-  const temp = [...wrongMeans]
+  const pool = session.words
+    .map(w => w.cnMean)
+    .filter(m => m && m !== correct)
   const selectedWrong = []
-  while (selectedWrong.length < 3) {
-    const idx = Math.floor(Math.random() * temp.length)
-    const m = temp.splice(idx, 1)[0]
-    if (m !== correct) selectedWrong.push(m)
+  while (selectedWrong.length < 3 && pool.length > 0) {
+    const idx = Math.floor(Math.random() * pool.length)
+    const m = pool.splice(idx, 1)[0]
+    if (!selectedWrong.includes(m)) selectedWrong.push(m)
+  }
+  const fallback = wrongMeans.filter(m => m !== correct && !selectedWrong.includes(m))
+  while (selectedWrong.length < 3 && fallback.length > 0) {
+    selectedWrong.push(fallback.splice(Math.floor(Math.random() * fallback.length), 1)[0])
   }
   let arr = [correct, ...selectedWrong]
   arr.sort(() => Math.random() - 0.5)
@@ -308,15 +297,15 @@ async function selectAnswer(selectMean) {
   selectedMean.value = selectMean
   const rightMean = currentWord.value.cnMean
   rightAnswer.value = rightMean
+  let correct = false
   try {
-    const res = await checkOptionApi({
-      rightMean,
-      selectMean
-    })
-    isCorrect.value = res.correct
+    const res = await checkOptionApi({ rightMean, selectMean })
+    correct = !!res.correct
+    isCorrect.value = correct
   } catch (err) {
     showFailToast(err.message)
   }
+  reportProgress(correct)
 }
 
 async function submitSpell() {
@@ -329,15 +318,29 @@ async function submitSpell() {
   hasSubmit.value = true
   const answer = currentWord.value.word
   rightAnswer.value = answer
+  let correct = false
   try {
-    const res = await checkSpellApi({
-      answer,
-      input: val
-    })
-    isCorrect.value = res.correct
+    const res = await checkSpellApi({ answer, input: val })
+    correct = !!res.correct
+    isCorrect.value = correct
   } catch (err) {
     showFailToast(err.message)
   }
+  reportProgress(correct)
+}
+
+// 每答一题立即上报，中途退出进度不丢
+function reportProgress(correct) {
+  if (!session.id) return
+  reportAnswer(session.id, correct)
+    .then(res => {
+      if (res.code === 200 && res.data) {
+        session.done = res.data.done
+        session.total = res.data.total
+      }
+    })
+    .catch(() => {})
+  if (correct) session.correct += 1
 }
 
 function getBtnClass(text) {
@@ -349,13 +352,33 @@ function getBtnClass(text) {
 }
 
 async function nextWord() {
-  await fetchNewWord()
+  if (!isLast.value) {
+    index.value += 1
+    resetQuestionState()
+    return
+  }
+  // 最后一题 → 结束本组
+  try {
+    const res = await finishStudy(session.id)
+    if (res.code === 200 && res.data) {
+      showFinish.value = true
+    }
+  } catch (err) {
+    showFailToast(err.message || '提交失败')
+  }
 }
 
-function backHome() {
-  page.value = 'select'
-  currentWord.value = null
-  hasSubmit.value = false
+// 完成后：休息 / 追加
+function restNow() {
+  showFinish.value = false
+  router.replace('/word/book')
+}
+
+async function studyAgain() {
+  againLoading.value = true
+  showFinish.value = false
+  await startSession(true)
+  againLoading.value = false
 }
 </script>
 
@@ -366,10 +389,26 @@ function backHome() {
   position: relative;
 }
 
-.select-wrap, .quiz-wrap {
+/* 进度条 */
+.progress-wrap {
   max-width: 620px;
-  margin: 0 auto;
-  padding: 16px;
+  margin: 14px auto 0;
+  padding: 0 16px;
+  position: relative;
+  z-index: 10;
+}
+
+.progress-text {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.quiz-wrap {
+  max-width: 620px;
+  margin: 12px auto 0;
+  padding: 0 16px 16px;
   position: relative;
   z-index: 10;
 }
@@ -380,182 +419,6 @@ function backHome() {
   border-radius: var(--radius-card);
   backdrop-filter: blur(12px);
   padding: 24px;
-}
-
-.card-title {
-  text-align: center;
-  margin: 0 0 24px 0;
-  font-family: var(--font-display);
-  font-size: 22px;
-  color: var(--text-primary);
-  letter-spacing: 2px;
-}
-
-.form-item {
-  margin-bottom: 20px;
-}
-
-.label {
-  font-size: 14px;
-  color: var(--text-secondary);
-  margin-bottom: 10px;
-  font-weight: 600;
-}
-
-/* 单选组 */
-.radio-group {
-  display: flex;
-  gap: 12px;
-}
-
-.radio-item {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 16px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--accent-border);
-  border-radius: 12px;
-  font-size: 14px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all 0.25s var(--ease-out);
-}
-
-.radio-item.checked {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-weight: 600;
-}
-
-.radio-dot {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: 2px solid var(--accent-border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.radio-item.checked .radio-dot {
-  border-color: var(--accent);
-}
-
-.radio-item.checked .radio-dot::after {
-  content: '';
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 6px var(--accent);
-}
-
-/* 选择框 */
-.select-field {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 14px 16px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--accent-border);
-  border-radius: 12px;
-  font-size: 14px;
-  color: var(--text-primary);
-  cursor: pointer;
-  transition: all 0.25s var(--ease-out);
-}
-
-.select-field:hover {
-  border-color: var(--accent);
-}
-
-.select-arrow {
-  color: var(--text-muted);
-  font-size: 18px;
-}
-
-/* 等级选择弹窗 */
-.level-popup-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(4px);
-  z-index: 5000;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-}
-
-.level-popup {
-  width: 100%;
-  max-width: 480px;
-  background: rgba(10, 10, 15, 0.98);
-  border: 1px solid var(--accent-border);
-  border-radius: 20px 20px 0 0;
-  padding: 20px;
-  animation: slideUp 0.3s var(--ease-out);
-}
-
-@keyframes slideUp {
-  from { transform: translateY(100%); }
-  to { transform: translateY(0); }
-}
-
-.popup-title {
-  text-align: center;
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 16px;
-  font-family: var(--font-display);
-  letter-spacing: 1px;
-}
-
-.level-option {
-  padding: 16px;
-  text-align: center;
-  font-size: 16px;
-  color: var(--text-secondary);
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.2s;
-  margin-bottom: 8px;
-}
-
-.level-option:hover {
-  background: var(--bg-elevated);
-}
-
-.level-option.active {
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-weight: 700;
-  border: 1px solid var(--accent);
-}
-
-.popup-cancel {
-  padding: 14px;
-  text-align: center;
-  font-size: 15px;
-  color: var(--text-muted);
-  border-top: 1px solid var(--accent-border);
-  margin-top: 8px;
-  cursor: pointer;
-}
-
-/* 按钮组 */
-.btn-group {
-  display: flex;
-  gap: 12px;
-  margin-top: 24px;
-}
-
-.btn-group > * {
-  flex: 1;
 }
 
 /* 刷题页 */
@@ -711,16 +574,61 @@ function backHome() {
   flex: 1;
 }
 
-/* 空单词 */
-.empty-word {
-  text-align: center;
-  padding: 40px 0;
+/* 完成弹窗 */
+.finish-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
+  z-index: 5000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
 }
 
-.empty-word p {
-  font-size: 15px;
+.finish-popup {
+  width: 100%;
+  max-width: 360px;
+  background: var(--bg-card);
+  border: 1px solid var(--accent-border);
+  border-radius: 20px;
+  padding: 32px 24px 24px;
+  text-align: center;
+  animation: dialogPop 0.3s var(--ease-out);
+}
+
+@keyframes dialogPop {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.finish-emoji {
+  font-size: 48px;
+}
+
+.finish-title {
+  margin-top: 12px;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+}
+
+.finish-score {
+  margin-top: 8px;
+  font-size: 14px;
   color: var(--text-secondary);
-  margin-bottom: 20px;
+}
+
+.finish-actions {
+  margin-top: 24px;
+  display: flex;
+  gap: 12px;
+}
+
+.finish-actions > * {
+  flex: 1;
 }
 
 /* 生词本弹窗 */
@@ -747,11 +655,6 @@ function backHome() {
   flex-direction: column;
   overflow: hidden;
   animation: dialogPop 0.3s var(--ease-out);
-}
-
-@keyframes dialogPop {
-  from { opacity: 0; transform: scale(0.9); }
-  to { opacity: 1; transform: scale(1); }
 }
 
 .popup-header {

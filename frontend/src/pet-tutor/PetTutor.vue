@@ -1,8 +1,8 @@
 <template>
-  <div class="pet-world">
+  <div class="pet-world" @pointerdown.capture="onPetAreaPointerDown">
     <!-- 桌宠层：只装人物，拖动/滚轮缩放；滚轮挂在 pet-holder 上不影响对话框文字 -->
-    <div class="pet-combo" :style="comboStyle">
-      <div class="pet-holder" :style="petScale" @wheel.prevent="onWheelZoom">
+    <div class="pet-combo" ref="comboRef" :style="comboStyle">
+      <div class="pet-holder" ref="holderRef" :style="petScale" @wheel.prevent="onWheelZoom">
         <VirtualHuman ref="avatarRef" :model-url="modelUrl" @clicked="onAvatarClicked" @drag-move="onPetDrag" />
       </div>
     </div>
@@ -200,7 +200,7 @@ function pickFeature(m) {
 
 // ========== 桌宠层：拖拽移动 / 滚轮缩放 / 位置记忆（localStorage） ==========
 const chatOpen = ref(false)   // 进页面只出人物；点角色菜单「打开聊天面板」才弹出
-const PET_LAYOUT_KEY = 'pet-tutor-layout-v2'
+const PET_LAYOUT_KEY = 'pet-tutor-layout-v3'
 const petPos = ref({ x: 24, y: 24, scale: 1 })
 function clamp(v, a, b) { return Math.max(a, Math.min(b, v)) }
 function initPetLayout() {
@@ -208,11 +208,16 @@ function initPetLayout() {
     const saved = JSON.parse(localStorage.getItem(PET_LAYOUT_KEY) || 'null')
     if (saved && typeof saved.x === 'number') { petPos.value = saved; return }
   } catch { /* 存档损坏则用默认 */ }
-  // 人物停靠屏幕右侧，给左侧吸附的对话面板留出展开空间
+  // 人物停靠屏幕右下角；手机宽度下默认缩小一号，少挡页面内容。
+  // 注意按"缩放后的视觉尺寸"贴边（holder 的 scale 以左下角为原点）
+  const small = window.innerWidth <= 900
+  const baseW = small ? 300 : 380
+  const baseH = small ? 500 : 600
+  const scale = small ? 0.75 : 1
   petPos.value = {
-    x: Math.max(16, window.innerWidth - 380 - 24),
-    y: Math.max(16, window.innerHeight - 600 - 24),
-    scale: 1
+    x: Math.max(16, window.innerWidth - baseW * scale - 24),
+    y: Math.max(16, window.innerHeight - baseH * scale - 24),
+    scale
   }
 }
 function savePetLayout() {
@@ -241,6 +246,70 @@ function onWheelZoom(e) {
     scale: clamp(petPos.value.scale - Math.sign(e.deltaY) * 0.08, 0.5, 1.8)
   }
   savePetLayout()
+}
+
+// ========== 空白穿透：combo 是矩形，人物是透明背景的模型 ——
+// 落在人物成像区之外的按下事件转发给下层页面元素，否则整个矩形都会挡住页面点击 ==========
+const comboRef = ref(null)
+const holderRef = ref(null)
+// 人物在 holder 内的大致成像区（比例），命中区内保留拖拽/点击人物本身。
+// 用 holder 的 getBoundingClientRect（含缩放 transform），人物缩小后空白区自动扩大穿透范围。
+const PET_HIT = { x0: 0.18, x1: 0.82, y0: 0.05, y1: 0.96 }
+
+function onPetAreaPointerDown(e) {
+  const combo = comboRef.value
+  if (!combo || !combo.contains(e.target)) return // 聊天窗/菜单等不受影响
+  const holder = holderRef.value
+  if (!holder) return
+  const r = holder.getBoundingClientRect() // 实际视觉矩形（缩放后）
+  const relX = (e.clientX - r.left) / r.width
+  const relY = (e.clientY - r.top) / r.height
+  const inHit = relX >= PET_HIT.x0 && relX <= PET_HIT.x1 &&
+                relY >= PET_HIT.y0 && relY <= PET_HIT.y1
+  if (!inHit) { startPassThrough(e, combo); return }
+
+  // 命中人物区：但脚下若是可以点的页面控件（指针样式/表单元素），优先让位给页面。
+  // 否则人物压住按钮时（小屏难免），按钮永远点不到
+  combo.style.pointerEvents = 'none'
+  const beneath = document.elementFromPoint(e.clientX, e.clientY)
+  const interactive = beneath && (getComputedStyle(beneath).cursor === 'pointer' ||
+    beneath.closest('button, a, input, textarea, select, label'))
+  combo.style.pointerEvents = ''
+  if (interactive) startPassThrough(e, combo)
+}
+
+function startPassThrough(e, combo) {
+  // 拦截并转发给下层
+  e.stopPropagation()
+  e.preventDefault()
+  combo.style.pointerEvents = 'none'
+  const opts = {
+    bubbles: true, cancelable: true, view: window,
+    clientX: e.clientX, clientY: e.clientY,
+    pointerId: e.pointerId, pointerType: e.pointerType, isPrimary: e.isPrimary,
+    button: e.button, buttons: e.buttons
+  }
+  const beneath = document.elementFromPoint(e.clientX, e.clientY)
+  if (beneath) beneath.dispatchEvent(new PointerEvent('pointerdown', opts))
+  const restore = () => { combo.style.pointerEvents = '' }
+  // pointerup 时把 click 补发给当时所在的下层元素（合成事件浏览器不会自动生成 click）
+  const onUp = (up) => {
+    window.removeEventListener('pointerup', onUp, true)
+    window.removeEventListener('pointercancel', onUp, true)
+    clearTimeout(safety)
+    const target = document.elementFromPoint(up.clientX, up.clientY)
+    restore()
+    if (target && up.type === 'pointerup') {
+      target.dispatchEvent(new MouseEvent('click', {
+        bubbles: true, cancelable: true, view: window,
+        clientX: up.clientX, clientY: up.clientY
+      }))
+    }
+  }
+  // 兜底：极少数情况下 pointerup 丢失，超时恢复 combo 可点
+  const safety = setTimeout(restore, 2000)
+  window.addEventListener('pointerup', onUp, true)
+  window.addEventListener('pointercancel', onUp, true)
 }
 
 // ========== 聊天悬浮窗：独立于人物——拖标题栏移动、标题栏上滚轮缩放、布局记忆 ==========
@@ -481,7 +550,8 @@ async function scrollBottom() {
 .drawer-enter-active, .drawer-leave-active { transition: transform 0.25s ease, opacity 0.25s ease; }
 .drawer-enter-from, .drawer-leave-to { transform: translateX(24px); opacity: 0; }
 @media (max-width: 900px) {
-  /* 小屏：人物贴左下角；聊天窗同套悬浮逻辑（位置由 JS 记忆，不特殊处理） */
+  /* 小屏：combo 盒子同步缩小（与 .pet-holder 一致），定位/命中计算才不会错位 */
+  .pet-combo { width: 300px; height: 500px; }
   .pet-holder { width: 300px; height: 500px; top: auto; bottom: 0; }
 }
 /* ===== 点击角色的功能菜单 ===== */

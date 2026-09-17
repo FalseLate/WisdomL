@@ -5,18 +5,20 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("word")
-public class Word {
+@TableName("user_plan")
+public class
+UserPlan {
     @TableId(type = IdType.AUTO)
     private Long id;
-    private String word;
-    private String phonetic;
-    private String cnMean;
-    private String sentence;
-
+    private Long userId;
     private String level;
+    private Integer dailyCount;
+    private LocalDate startDate;
+    private String status;
     private LocalDateTime createTime;
+    private LocalDateTime updateTime;
 }

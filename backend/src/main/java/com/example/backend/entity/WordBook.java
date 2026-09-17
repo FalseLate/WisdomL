@@ -8,15 +8,15 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("word")
-public class Word {
+@TableName("word_book")
+public class WordBook {
     @TableId(type = IdType.AUTO)
     private Long id;
-    private String word;
-    private String phonetic;
-    private String cnMean;
-    private String sentence;
-
+    private String name;
+    private String description;
+    private String category;
     private String level;
+    private String coverColor;
+    private Integer sort;
     private LocalDateTime createTime;
 }

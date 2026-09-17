@@ -16,9 +16,26 @@ const routes = [
   { path: '/user-center', name: 'user-center', component: () => import('../views/UserCenter.vue') },
   { path: '/favorites', name: 'favorites', component: () => import('../views/FavoritesView.vue'), meta: { requiresAuth: true } },
   {
+    path: '/word/book',
+    name: 'WordBook',
+    component: () => import('../views/WordBookView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/word/plan',
+    name: 'WordPlan',
+    component: () => import('../views/WordPlanView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/word/study',
+    name: 'WordStudy',
+    component: () => import('../components/WordStudy.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/word-quiz',
-    name: 'WordQuiz',
-    component: () => import('../components/WordStudy.vue')
+    redirect: '/word/book'
   },
   { path: '/:pathMatch(.*)*', redirect: '/' }
 ]

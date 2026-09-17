@@ -10,6 +10,10 @@
     <router-view v-show="!showSplash" />
   </div>
 
+  <!-- 记单词（/word/*）页面常驻的 AI 口语陪练虚拟人（pet-tutor 模块）：
+       挂在 App 层按路由显隐，词书/计划/学习三页切换时不会重新加载模型 -->
+  <PetTutor v-if="showPetTutor" api-base="http://127.0.0.1:8080" session-id="word-quiz-user" />
+
   <!-- 全局生成中浮动条 -->
   <div v-if="notifyStore.isGenerating" class="global-loading-bar">
     <div class="glb-loading-inner">
@@ -51,15 +55,20 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useNotificationStore } from './stores/notification'
 import { useQuestionsStore } from './stores/questions'
 import { ParticleBackground, SplashScreen } from './components/cyber'
+import PetTutor from './pet-tutor/PetTutor.vue'
 
 const router = useRouter()
+const route = useRoute()
 const notifyStore = useNotificationStore()
 const qStore = useQuestionsStore()
+
+// 记单词流程（/word/*）显示虚拟人陪练
+const showPetTutor = computed(() => route.path.startsWith('/word/'))
 
 // 开局动画只在首次进入时展示
 const showSplash = ref(true)
