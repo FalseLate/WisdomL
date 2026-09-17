@@ -1,0 +1,6 @@
+{"type":"message","id":"650aebfa-9cfd-44f7-a5da-51754b53c801","timestamp":1789613699.894667200,"role":"USER","content":"hello"}
+{"type":"message","id":"20260917105456a84f631f90244454","parentId":"650aebfa-9cfd-44f7-a5da-51754b53c801","timestamp":1789613699.895163900,"role":"ASSISTANT","content":"Hi there! I'm Leo, your English practice partner. How can I help you today?"}
+{"type":"message","id":"f4dfb2fd-cc06-4133-b340-d5199068be4c","parentId":"20260917105456a84f631f90244454","timestamp":1789613803.179730400,"role":"USER","content":"hello"}
+{"type":"message","id":"2026091710564016d24b16d6564e73","parentId":"f4dfb2fd-cc06-4133-b340-d5199068be4c","timestamp":1789613803.179730400,"role":"ASSISTANT","content":"Hi again! Nice to meet you. What would you like to practice in English today?"}
+{"type":"message","id":"9e6868e5-f1f7-429e-ab89-bbe5b5cedfcb","parentId":"2026091710564016d24b16d6564e73","timestamp":1789613871.577385600,"role":"USER","content":"gave me some food"}
+{"type":"message","id":"202609171057495a419fb972cf4e6f","parentId":"9e6868e5-f1f7-429e-ab89-bbe5b5cedfcb","timestamp":1789613871.577385600,"role":"ASSISTANT","content":"You gave me some food? That's very kind of you! What kind of food did you give me?"}

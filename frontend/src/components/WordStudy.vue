@@ -153,8 +153,8 @@
       </div>
     </div>
 
-    <!-- AI 口语陪练虚拟人（pet-tutor 模块）：桌宠+对话+语音+翻译 -->
-    <PetTutor api-base="http://127.0.0.1:8081" session-id="word-quiz-user" />
+    <!-- AI 口语陪练虚拟人（pet-tutor 模块）：桌宠+对话+语音+翻译（后端已并入本项目 backend:8080） -->
+    <PetTutor api-base="http://127.0.0.1:8080" session-id="word-quiz-user" />
   </div>
 </template>
 
