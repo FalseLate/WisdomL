@@ -152,6 +152,9 @@
         </div>
       </div>
     </div>
+
+    <!-- AI 口语陪练虚拟人（pet-tutor 模块）：桌宠+对话+语音+翻译 -->
+    <PetTutor api-base="http://127.0.0.1:8081" session-id="word-quiz-user" />
   </div>
 </template>
 
@@ -167,6 +170,7 @@ import {
   getMyCollectList
 } from '../api/word'
 import { CyberNavbar, CyberButton } from './cyber'
+import PetTutor from '../pet-tutor/PetTutor.vue'
 
 const userId = ref(1)
 
@@ -185,6 +189,7 @@ const userInput = ref('')
 const hasSubmit = ref(false)
 const isCorrect = ref(false)
 const rightAnswer = ref('')
+const selectedMean = ref('')   // 用户本次选中的选项（判红用，答完即存）
 
 const wordBookVisible = ref(false)
 const wordBookList = ref([])
@@ -263,6 +268,7 @@ async function startQuiz() {
 async function fetchNewWord() {
   hasSubmit.value = false
   userInput.value = ''
+  selectedMean.value = ''
   optionList.value = []
   try {
     const res = await getRandomWord(form.level)
@@ -299,6 +305,7 @@ function generateOptions() {
 async function selectAnswer(selectMean) {
   if (hasSubmit.value || !currentWord.value) return
   hasSubmit.value = true
+  selectedMean.value = selectMean
   const rightMean = currentWord.value.cnMean
   rightAnswer.value = rightMean
   try {
@@ -336,9 +343,9 @@ async function submitSpell() {
 function getBtnClass(text) {
   if (!hasSubmit.value || !currentWord.value) return ''
   const right = currentWord.value.cnMean
-  if (text === right) return 'correct'
-  if (!isCorrect.value && text !== right) return 'wrong'
-  return ''
+  if (text === right) return 'correct'                                // 正确项：绿色
+  if (!isCorrect.value && text === selectedMean.value) return 'wrong' // 只有用户选错的那个：红色
+  return ''                                                           // 其余干扰项保持原样
 }
 
 async function nextWord() {
