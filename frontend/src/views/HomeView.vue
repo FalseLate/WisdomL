@@ -72,7 +72,7 @@
               @click="goWordQuiz">
               <div class="func-tag tag-new">NEW</div>
               <div class="func-icon">📖</div>
-              <div class="func-name">记单词</div>
+              <div class="func-name">英语学习</div>
               <div class="func-desc">词书计划 · 刷题拼写 · 断点续学</div>
             </div>
 
@@ -275,7 +275,7 @@
         <div class="bottom-entries">
           <div class="entry-item" @click="$router.push('/question-bank')">📎 我的题库</div>
           <div class="entry-item" @click="$router.push('/history')">📚 历史记录</div>
-          <div class="entry-item" @click="goWordQuiz">📖 记单词</div>
+          <div class="entry-item" @click="goWordQuiz">📖 英语学习</div>
         </div>
       </div>
     </div>

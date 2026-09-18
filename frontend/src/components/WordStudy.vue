@@ -112,7 +112,7 @@
           </div>
         </div>
         <div class="popup-footer">
-          <CyberButton variant="ghost" block @click="wordBookVisible=false">关闭</CyberButton>
+          <CyberButton variant="ghost" block @click="$router.push('/word/notebook')">打开完整生词本</CyberButton>
         </div>
       </div>
     </div>
@@ -135,10 +135,24 @@ import {
   reportAnswer,
   finishStudy
 } from '../api/study'
+import { authState } from '../utils/auth.js'
+import request from '../utils/request'
 import { CyberNavbar, CyberButton } from './cyber'
 
 const route = useRoute()
 const router = useRouter()
+
+// 生词本按 userId 隔离，取当前登录用户（不再硬编码 1）；老会话可能只有 token，兜底再查一次 profile
+let collectUserId = authState.user?.id || null
+
+async function ensureCollectUserId() {
+  if (collectUserId) return collectUserId
+  try {
+    const res = await request.get('/user/profile')
+    collectUserId = res.user?.id || null
+  } catch (e) { /* 未登录时保持 null */ }
+  return collectUserId
+}
 
 // 词书等级与模式都由前面的页面带进来：/word/study?level=4&mode=choice
 const level = route.query.level || '4'
@@ -233,7 +247,7 @@ async function addWordBook() {
   if (!word?.id) return
   collectLoading.value = true
   try {
-    const res = await addWordCollect(1, word.id)
+    const res = await addWordCollect(await ensureCollectUserId(), word.id)
     if (res.code === 200) {
       showSuccessToast('加入生词本成功')
     } else {
@@ -248,7 +262,7 @@ async function addWordBook() {
 
 async function loadWordBook() {
   try {
-    const res = await getMyCollectList(1)
+    const res = await getMyCollectList(await ensureCollectUserId())
     if (res.code === 200) {
       wordBookList.value = res.data
     }
@@ -259,7 +273,7 @@ async function loadWordBook() {
 
 async function removeWord(wordId) {
   try {
-    const res = await removeWordCollect(1, wordId)
+    const res = await removeWordCollect(await ensureCollectUserId(), wordId)
     if (res.code === 200) {
       showSuccessToast('已移除生词')
       loadWordBook()

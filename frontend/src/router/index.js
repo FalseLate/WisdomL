@@ -35,7 +35,25 @@ const routes = [
   },
   {
     path: '/word-quiz',
-    redirect: '/word/book'
+    redirect: '/word/home'
+  },
+  {
+    path: '/word/home',
+    name: 'WordHome',
+    component: () => import('../views/WordHomeView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/word/my',
+    name: 'WordMyStudy',
+    component: () => import('../views/WordMyStudyView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/word/notebook',
+    name: 'VocabNotebook',
+    component: () => import('../views/VocabNotebookView.vue'),
+    meta: { requiresAuth: true }
   },
   { path: '/:pathMatch(.*)*', redirect: '/' }
 ]
