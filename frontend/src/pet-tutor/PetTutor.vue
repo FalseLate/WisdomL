@@ -71,7 +71,8 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { showToast } from 'vant'
 import { createWLipSyncNode } from 'wlipsync'
 import VirtualHuman from './components/VirtualHuman.vue'
 import { AudioSentenceQueue } from './utils/AudioSentenceQueue.js'
@@ -174,6 +175,8 @@ const MENU_ITEMS = [
   { key: 'translate', icon: '🔤', label: '帮我翻译这句', tip: '' },
   { key: 'practice',  icon: '🗣️', label: '陪我练口语',   tip: '' },
   { key: 'story',     icon: '📖', label: '讲个短故事',    tip: 'Tell me a short English story. ' },
+  { key: 'lookup-word',    icon: '🔍', label: '查单词（阅读页）' },
+  { key: 'analyze-sentence', icon: '🧩', label: '解句子（阅读页）' },
   { key: 'chat',      icon: '🗨️', label: '打开聊天面板' }
 ]
 const menu = ref({ show: false, x: 0, y: 0 })
@@ -192,11 +195,46 @@ function pickFeature(m) {
     nextTick(() => inputRef.value?.focus())
     return
   }
+  // 阅读页联动：广播模式事件，阅读页自行切换 查词/解句 状态
+  if (m.key === 'lookup-word' || m.key === 'analyze-sentence') {
+    window.dispatchEvent(new CustomEvent('reading-mode', { detail: { mode: m.key === 'lookup-word' ? 'word' : 'sentence' } }))
+    showToast(m.key === 'lookup-word' ? '已进入查词模式，去点文章里的单词吧' : '已进入解句模式，去选文章里的句子吧')
+    return
+  }
   // 翻译走独立 mode（后端换翻译提示词、关闭 TTS），其余功能仍在 chat 模式
   mode.value = m.key === 'translate' ? 'translate' : 'chat'
   inputText.value = m.tip
   nextTick(() => inputRef.value?.focus())
 }
+
+// ========== 纯 TTS 朗读：阅读页通过 pet-speak 事件让虚拟人读指定句子 ==========
+async function speakText(text, rate) {
+  if (!text) return
+  try {
+    const actx = player.ensureContext()
+    await actx.resume()
+    player.beginTurn(actx)
+    const resp = await fetch(`${props.apiBase}/unity/ai/tts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, rate, characterId: characterId.value })
+    })
+    const res = await resp.json()
+    if (res.code === 200 && res.data?.audioUrl) {
+      await player.push({ audioUrl: res.data.audioUrl, sentenceIndex: 0, text })
+    } else {
+      showToast(res.msg || '朗读失败')
+    }
+  } catch (e) {
+    console.warn('[PetTutor] pet-speak 失败', e)
+    showToast('朗读失败，请稍后再试')
+  }
+}
+function onPetSpeak(e) {
+  speakText(e.detail?.text, e.detail?.rate)
+}
+window.addEventListener('pet-speak', onPetSpeak)
+onUnmounted(() => window.removeEventListener('pet-speak', onPetSpeak))
 
 // ========== 桌宠层：拖拽移动 / 滚轮缩放 / 位置记忆（localStorage） ==========
 const chatOpen = ref(false)   // 进页面只出人物；点角色菜单「打开聊天面板」才弹出

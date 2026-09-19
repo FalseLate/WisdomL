@@ -55,6 +55,18 @@ const routes = [
     component: () => import('../views/VocabNotebookView.vue'),
     meta: { requiresAuth: true }
   },
+  {
+    path: '/reading/home',
+    name: 'ReadingHome',
+    component: () => import('../views/ReadingHomeView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/reading/article',
+    name: 'ReadingArticle',
+    component: () => import('../views/ReadingArticleView.vue'),
+    meta: { requiresAuth: true }
+  },
   { path: '/:pathMatch(.*)*', redirect: '/' }
 ]
 

@@ -4,3 +4,7 @@
 {"type":"message","id":"2026091710564016d24b16d6564e73","parentId":"f4dfb2fd-cc06-4133-b340-d5199068be4c","timestamp":1789613803.179730400,"role":"ASSISTANT","content":"Hi again! Nice to meet you. What would you like to practice in English today?"}
 {"type":"message","id":"9e6868e5-f1f7-429e-ab89-bbe5b5cedfcb","parentId":"2026091710564016d24b16d6564e73","timestamp":1789613871.577385600,"role":"USER","content":"gave me some food"}
 {"type":"message","id":"202609171057495a419fb972cf4e6f","parentId":"9e6868e5-f1f7-429e-ab89-bbe5b5cedfcb","timestamp":1789613871.577385600,"role":"ASSISTANT","content":"You gave me some food? That's very kind of you! What kind of food did you give me?"}
+{"type":"message","id":"2b0b9034-17d8-4c26-b1cc-7b8484b94b45","parentId":"202609171057495a419fb972cf4e6f","timestamp":1789788669.188995400,"role":"USER","content":"Hello"}
+{"type":"message","id":"202609191131050033dba210cf40bd","parentId":"2b0b9034-17d8-4c26-b1cc-7b8484b94b45","timestamp":1789788669.188995400,"role":"ASSISTANT","content":"Hi there! How are you doing today?"}
+{"type":"message","id":"6248a5a7-c012-4e9c-ae7d-46fffc1c4e77","parentId":"202609191131050033dba210cf40bd","timestamp":1789788740.030201000,"role":"USER","content":"What's Union?"}
+{"type":"message","id":"20260919113217602fe99aeae64ea9","parentId":"6248a5a7-c012-4e9c-ae7d-46fffc1c4e77","timestamp":1789788740.030201000,"role":"ASSISTANT","content":"The Union is a group of countries working together, like the European Union. It helps with trade and cooperation between member states."}

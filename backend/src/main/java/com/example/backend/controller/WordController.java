@@ -24,6 +24,16 @@ public class WordController {
     @Resource
     private UserWordService userWordService;
 
+    // 阅读划词查词：先查词库，查不到时 GLM 兜底出音标释义并动态入库（level=ext），下次命中词库
+    @GetMapping("/query")
+    public Map<String, Object> queryWord(@RequestParam String text) {
+        Map<String, Object> res = new HashMap<>();
+        Word word = wordService.findByTextOrFetch(text);
+        res.put("code", 200);
+        res.put("data", word); // GLM 也查不到（非单词/调用失败）时 data 为 null，前端据此提示未收录
+        return res;
+    }
+
     // 随机单词（拼写模式）
     @GetMapping("/random")
     public Map<String, Object> getRandom(@RequestParam(required = false) String level) {
@@ -106,6 +116,8 @@ public class WordController {
         long count = userWordService.count(wrapper);
 
         Map<String, Object> map = new HashMap<>();
+
+
         if (count > 0) {
             map.put("code", 400);
             map.put("msg", "该单词已加入生词本");

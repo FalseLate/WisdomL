@@ -62,3 +62,12 @@ export function getMyCollectList(userId) {
     params: { userId }
   })
 }
+
+// 阅读划词：按单词文本精确查询
+export function queryWord(text) {
+  return request({
+    url: '/word/query',
+    method: 'GET',
+    params: { text }
+  })
+}

@@ -68,7 +68,8 @@ const notifyStore = useNotificationStore()
 const qStore = useQuestionsStore()
 
 // 记单词流程（/word/*）显示虚拟人陪练
-const showPetTutor = computed(() => route.path.startsWith('/word/'))
+// 虚拟人出现在 记单词 与 分层阅读 两个英语模块（阅读页用它的查词/解句/朗读入口）
+const showPetTutor = computed(() => route.path.startsWith('/word/') || route.path.startsWith('/reading/'))
 
 // 开局动画只在首次进入时展示
 const showSplash = ref(true)

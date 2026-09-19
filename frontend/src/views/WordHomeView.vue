@@ -20,7 +20,7 @@
 
       <!-- 两宫格大入口 -->
       <div class="entry-grid">
-        <div class="entry-card" @click="comingSoon('分层阅读练习')">
+        <div class="entry-card" @click="$router.push('/reading/home')">
           <div class="entry-icon">📚</div>
           <div class="entry-name">分层阅读练习</div>
           <div class="entry-desc">分级阅读训练</div>
