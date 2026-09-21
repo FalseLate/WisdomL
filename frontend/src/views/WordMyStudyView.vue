@@ -27,6 +27,9 @@
         <div class="cell-item" @click="$router.push('/wrong-questions')">
           <span class="cell-icon">❌</span><span class="cell-name">错题本</span><span class="cell-arrow">›</span>
         </div>
+        <div class="cell-item" @click="$router.push('/word/english-wrong')">
+          <span class="cell-icon">📝</span><span class="cell-name">英语错题复习</span><span class="cell-arrow">›</span>
+        </div>
         <div class="cell-item" @click="$router.push({ path: '/word/plan', query: { level: planLevel } })" v-if="plan">
           <span class="cell-icon">📖</span><span class="cell-name">背词设置</span><span class="cell-arrow">›</span>
         </div>

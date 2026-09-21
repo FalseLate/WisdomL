@@ -56,6 +56,12 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/word/english-wrong',
+    name: 'EnglishWrongReview',
+    component: () => import('../views/EnglishWrongReviewView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/reading/home',
     name: 'ReadingHome',
     component: () => import('../views/ReadingHomeView.vue'),

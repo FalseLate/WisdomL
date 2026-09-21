@@ -69,6 +69,42 @@ public class WordController {
         return map;
     }
 
+    // 今日待复习生词（间隔重复：新词 + 到期词）
+    @GetMapping("/review/due")
+    public Map<String, Object> reviewDue(@RequestParam Long userId) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("code", 200);
+        map.put("data", userWordService.getDueWords(userId));
+        return map;
+    }
+
+    // 复习结果回写：results = [{wordId, correct}]
+    @PostMapping("/review/finish")
+    public Map<String, Object> reviewFinish(@RequestBody Map<String, Object> body) {
+        Map<String, Object> map = new HashMap<>();
+        try {
+            Long userId = Long.valueOf(body.get("userId").toString());
+            Object rs = body.get("results");
+            int updated = 0;
+            if (rs instanceof List<?> list) {
+                for (Object o : list) {
+                    if (o instanceof Map<?, ?> m && m.get("wordId") != null && m.get("correct") != null) {
+                        userWordService.recordReviewResult(userId,
+                                Long.valueOf(m.get("wordId").toString()),
+                                Boolean.parseBoolean(m.get("correct").toString()));
+                        updated++;
+                    }
+                }
+            }
+            map.put("code", 200);
+            map.put("updated", updated);
+        } catch (Exception e) {
+            map.put("code", 500);
+            map.put("msg", "复习结果回写失败");
+        }
+        return map;
+    }
+
     // 取消收藏生词
     @PostMapping("/unCollect")
     public Map<String, Object> unCollect(@RequestBody Map<String, Long> param) {

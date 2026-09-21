@@ -3,7 +3,7 @@
     <!-- 桌宠层：只装人物，拖动/滚轮缩放；滚轮挂在 pet-holder 上不影响对话框文字 -->
     <div class="pet-combo" ref="comboRef" :style="comboStyle">
       <div class="pet-holder" ref="holderRef" :style="petScale" @wheel.prevent="onWheelZoom">
-        <VirtualHuman ref="avatarRef" :model-url="modelUrl" @clicked="onAvatarClicked" @drag-move="onPetDrag" />
+        <VirtualHuman ref="avatarRef" :model-url="modelUrl" @clicked="onAvatarClicked" @drag-move="onPetDrag" @ready="onPetReady" />
       </div>
     </div>
 
@@ -67,11 +67,20 @@
         </button>
       </div>
     </Teleport>
+
+    <!-- 入学提示气泡：像鱼吐泡泡——头顶先冒两只小椭圆，随后提示气泡弹出，5s 后整组淡出；纯提醒不可点 -->
+    <transition name="pet-tip">
+      <div v-if="tip.show" class="pet-tip-group" :style="{ left: tip.hx + 'px', top: tip.hy + 'px' }">
+        <span class="tip-mini m1"></span>
+        <span class="tip-mini m2"></span>
+        <div class="pet-tip-bubble" :style="{ left: tip.dx + 'px' }">{{ tip.text }}</div>
+      </div>
+    </transition>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { showToast } from 'vant'
 import { createWLipSyncNode } from 'wlipsync'
 import VirtualHuman from './components/VirtualHuman.vue'
@@ -207,6 +216,85 @@ function pickFeature(m) {
   nextTick(() => inputRef.value?.focus())
 }
 
+// ========== 入学提示气泡：从智复习主页进入英语学习时，虚拟人就绪后提示错题/生词数 ==========
+const tip = reactive({ show: false, text: '', hx: 0, hy: 0, dx: 0 })
+let petReady = false
+let tipTimer = null
+let tipRaf = 0
+
+function onPetReady() {
+  petReady = true
+  maybeShowEntryTip()
+}
+
+async function maybeShowEntryTip() {
+  if (tip.show || tipTimer) return
+  try {
+    // vue-router 跳转时会把来源路径写进 history.state.back：
+    // 只有 back === '/'（从智复习主页点进来）才弹，内部页面切换/刷新一律不弹
+    if (window.history.state?.back !== '/') return
+  } catch (e) { return }
+  const token = localStorage.getItem('token')
+  if (!token) return
+
+  // 错题数（现成 count 接口）
+  let wrongCount = 0
+  try {
+    const r = await fetch(`${props.apiBase}/api/wrong-questions/count`, { headers: { Authorization: `Bearer ${token}` } })
+    wrongCount = (await r.json())?.count || 0
+  } catch (e) { /* 拉不到就按 0 处理 */ }
+
+  // 生词数（myCollect 需要 userId，老会话可能只存了 token，兜底拉一次 profile）
+  let wordCount = 0
+  try {
+    let uid = null
+    try { uid = JSON.parse(localStorage.getItem('user') || 'null')?.id || null } catch (e) { /* 忽略 */ }
+    if (!uid) {
+      const pr = await fetch(`${props.apiBase}/api/user/profile`, { headers: { Authorization: `Bearer ${token}` } })
+      uid = (await pr.json())?.user?.id || null
+    }
+    if (uid) {
+      const wr = await fetch(`${props.apiBase}/api/word/myCollect?userId=${uid}`, { headers: { Authorization: `Bearer ${token}` } })
+      wordCount = ((await wr.json())?.data || []).length
+    }
+  } catch (e) { /* 拉不到就按 0 处理 */ }
+
+  // 文案分级：有错题优先提错题，其次生词，全 0 给鼓励文案
+  if (wrongCount > 0) {
+    tip.text = wordCount > 0 ? `你有 ${wrongCount} 道错题、${wordCount} 个生词待复习` : `你有 ${wrongCount} 道错题待复习`
+  } else if (wordCount > 0) {
+    tip.text = `生词本里有 ${wordCount} 个词等你复习`
+  } else {
+    tip.text = '今日错题清零、生词清零，太棒了 🎉'
+  }
+
+  // 气泡锚定在虚拟人头部（画布高约 45% 处≈发顶），显示期间每帧跟随角色（拖动也粘在身上）
+  tip.show = true
+  trackTip()
+  // 前 0.95s 是泡泡上浮动画，多留约 1s 保证气泡完整可见 5s
+  tipTimer = setTimeout(hideEntryTip, 5900)
+}
+
+// 显示期间逐帧取画布位置，气泡始终钉在角色头上（拖动/缩放都不掉队）
+function trackTip() {
+  if (!tip.show) return
+  const canvas = document.querySelector('.pet-holder canvas')
+  const rect = canvas?.getBoundingClientRect()
+  if (rect) {
+    tip.hx = rect.left + rect.width / 2
+    tip.hy = Math.max(60, rect.top + rect.height * 0.45)
+    // 提示气泡本体水平钳制在屏幕内（dx 为相对头部锚点的偏移）
+    tip.dx = Math.min(Math.max(tip.hx - 160, 8), window.innerWidth - 328) - tip.hx
+  }
+  tipRaf = requestAnimationFrame(trackTip)
+}
+
+function hideEntryTip() {
+  tip.show = false
+  if (tipTimer) { clearTimeout(tipTimer); tipTimer = null }
+  if (tipRaf) { cancelAnimationFrame(tipRaf); tipRaf = null }
+}
+
 // ========== 纯 TTS 朗读：阅读页通过 pet-speak 事件让虚拟人读指定句子 ==========
 async function speakText(text, rate) {
   if (!text) return
@@ -234,7 +322,10 @@ function onPetSpeak(e) {
   speakText(e.detail?.text, e.detail?.rate)
 }
 window.addEventListener('pet-speak', onPetSpeak)
-onUnmounted(() => window.removeEventListener('pet-speak', onPetSpeak))
+onUnmounted(() => {
+  window.removeEventListener('pet-speak', onPetSpeak)
+  hideEntryTip() // 离开英语学习页时清掉气泡定时器和跟随循环
+})
 
 // ========== 桌宠层：拖拽移动 / 滚轮缩放 / 位置记忆（localStorage） ==========
 const chatOpen = ref(false)   // 进页面只出人物；点角色菜单「打开聊天面板」才弹出
@@ -606,6 +697,62 @@ async function scrollBottom() {
   border-radius: 6px; cursor: pointer; color: #333;
 }
 .menu-item:hover { background: #eef2fb; }
+
+/* ===== 入学提示气泡：像鱼吐泡泡——头顶先冒两只小椭圆，随后提示气泡弹出 ===== */
+/* 锚点组：零尺寸定在头顶，子元素绝对定位；整组不拦截点击，气泡本体单独开 */
+.pet-tip-group {
+  position: fixed;
+  z-index: 2500;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+/* 小泡泡：小椭圆上浮消失，两只错开出现（先小后大） */
+.tip-mini {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 30%, rgba(210, 230, 255, 0.9), rgba(130, 170, 255, 0.25) 72%);
+  border: 1.5px solid rgba(170, 200, 255, 0.85);
+  box-shadow: 0 0 10px rgba(150, 185, 255, 0.55);
+  opacity: 0;
+  animation: tipFloat 0.9s ease-out forwards;
+}
+
+.tip-mini.m1 { width: 17px; height: 12px; left: -18px; animation-delay: 0s; }
+.tip-mini.m2 { width: 25px; height: 18px; left: 4px; animation-delay: 0.38s; }
+
+@keyframes tipFloat {
+  0%   { transform: translateY(0) scale(0.4); opacity: 0; }
+  30%  { opacity: 1; }
+  100% { transform: translateY(-52px) scale(1.1); opacity: 0; }
+}
+
+/* 提示气泡本体：横排一行铺开，悬在人物头顶；纯提醒，不拦截任何点击 */
+.pet-tip-bubble {
+  position: absolute;
+  bottom: 40px;
+  width: max-content;
+  max-width: 320px;
+  padding: 11px 14px;
+  border-radius: 12px 12px 12px 3px; /* 左下小尖角指向人物头部 */
+  background: rgba(18, 24, 38, 0.94);
+  border: 1px solid rgba(79, 124, 255, 0.45);
+  color: #e8ecf7;
+  font-size: 13px;
+  line-height: 1.6;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  animation: tipPop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) 0.95s backwards;
+}
+
+@keyframes tipPop {
+  from { opacity: 0; transform: scale(0.5) translateY(12px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* 整组淡出 */
+.pet-tip-leave-active { transition: opacity 0.35s; }
+.pet-tip-leave-to { opacity: 0; }
 h2 { text-align: center; }
 .chat-box {
   flex: 1;

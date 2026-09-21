@@ -34,7 +34,7 @@
                 v-if="w.isWord"
                 class="word"
                 :data-gi="w.gi"
-                :class="{ sel: selected.has(w.gi), pickable: mode !== 'none' }"
+                :class="{ sel: selected.has(w.gi), pickable: mode !== 'none', 'in-vocab': inMyVocab(w.text) }"
                 @pointerdown.stop="handleWordPointerDown(w, $event)"
                 @click.stop="onWordClick(w, $event)"
               >{{ w.text }}</span><span v-else class="sp">{{ w.text }}</span>
@@ -66,7 +66,7 @@
 
       <!-- 已完成标记（题目隐藏后给一行提示，方便回错题本复习） -->
       <div class="quiz-done-tip" v-if="questions.length && quizDone">
-        ✅ 本篇阅读已完成<template v-if="allAnswered">（得分 {{ quizScore }} / {{ questions.length }}）</template> · 答错的题在<a class="done-link" @click="router.push('/wrong-questions')">错题本</a>里复习
+        ✅ 本篇阅读已完成<template v-if="allAnswered">（得分 {{ quizScore }} / {{ questions.length }}）</template> · 答错的题去<a class="done-link" @click="router.push('/word/english-wrong')">英语错题复习</a>重做攻克
       </div>
     </div>
 
@@ -141,7 +141,7 @@ import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showSuccessToast, showFailToast } from 'vant'
 import { getReadingArticle, analyzeSentence, getReadingDone, finishReadingQuiz } from '../api/reading'
-import { queryWord, addWordCollect } from '../api/word'
+import { queryWord, addWordCollect, getMyCollectList } from '../api/word'
 import { authState } from '../utils/auth.js'
 import request from '../utils/request'
 
@@ -218,6 +218,34 @@ async function ensureUserId() {
 
 function cleanToken(t) {
   return (t.replace(/[^A-Za-z'’-]/g, '') || '').toLowerCase()
+}
+
+// ===== 生词本高亮：阅读正文里命中生词本的词标黄（含常见词形变化） =====
+const myVocab = ref(new Set())
+
+function inMyVocab(token) {
+  const t = cleanToken(token)
+  if (!t || !myVocab.value.size) return false
+  if (myVocab.value.has(t)) return true
+  // 简单词形还原：collects→collect、lived→live、studying→study（还原后词根≥3字母才比对）
+  for (const suf of ['s', 'es', 'ed', 'ing', "'s"]) {
+    if (t.endsWith(suf)) {
+      const base = t.slice(0, -suf.length)
+      if (base.length >= 3 && myVocab.value.has(base)) return true
+    }
+  }
+  return false
+}
+
+async function loadMyVocab() {
+  try {
+    const uid = await ensureUserId()
+    if (!uid) return
+    const res = await getMyCollectList(uid)
+    if (res.code === 200 && Array.isArray(res.data)) {
+      myVocab.value = new Set(res.data.map(w => (w.word || '').toLowerCase()))
+    }
+  } catch (e) { /* 生词本加载失败不影响正文展示 */ }
 }
 
 async function onWordClick(w, e) {
@@ -418,6 +446,7 @@ const quizScore = computed(() => questions.value.filter(q => q._picked === q.ans
 onMounted(async () => {
   window.addEventListener('reading-mode', onReadingModeEvent)
   window.addEventListener('pointerup', onWindowPointerUp)
+  loadMyVocab()
   try {
     const id = route.query.id
     const res = await getReadingArticle(id)
@@ -547,6 +576,13 @@ onUnmounted(() => {
 .word.sel {
   background: rgba(79, 124, 255, 0.35);
   color: #fff;
+}
+
+/* 生词本命中词：标黄 + 虚线下划线，与划词选中色区分 */
+.word.in-vocab {
+  background: rgba(255, 193, 7, 0.28);
+  box-shadow: inset 0 -2px 0 rgba(255, 152, 0, 0.55);
+  border-radius: 3px;
 }
 
 /* 读后理解题 */

@@ -51,6 +51,16 @@
 
     <!-- 列表模式 -->
     <div v-else class="page-container">
+      <!-- 今日待复习横幅（间隔重复到期的词） -->
+      <div v-if="dueWords.length" class="due-banner" @click="startReview(dueWords)">
+        <div class="due-info">
+          <div class="due-title">今日待复习 {{ dueWords.length }} 词</div>
+          <div class="due-sub">间隔重复到期的生词，趁热打铁记得牢</div>
+        </div>
+        <van-button size="small" round type="primary">立即复习</van-button>
+      </div>
+      <div v-else-if="words.length" class="due-done-tip">今日生词复习已完成 ✓ 明天再来</div>
+
       <!-- 顶部统计 + 复习入口 -->
       <div class="stats-card">
         <div class="sc-left">
@@ -108,7 +118,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { showSuccessToast, showFailToast, showConfirmDialog } from 'vant'
-import { removeWordCollect, getMyCollectList } from '../api/word'
+import { removeWordCollect, getMyCollectList, getReviewDue, finishReview } from '../api/word'
 import { authState } from '../utils/auth.js'
 import request from '../utils/request'
 
@@ -159,6 +169,7 @@ async function load() {
     const res = await getMyCollectList(userId)
     if (res.code === 200) {
       words.value = (res.data || []).map(w => ({ ...w, _open: false }))
+      loadDue()
     } else {
       showFailToast(res.msg || '加载生词本失败')
     }
@@ -167,6 +178,20 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+// ===== 今日待复习（间隔重复调度） =====
+const dueIds = ref(new Set())
+
+const dueWords = computed(() => words.value.filter(w => dueIds.value.has(w.id)))
+
+async function loadDue() {
+  try {
+    const res = await getReviewDue(userId)
+    if (res.code === 200) {
+      dueIds.value = new Set((res.data || []).map(r => r.wordId))
+    }
+  } catch (e) { /* 调度接口失败时仅隐藏今日复习横幅，不影响其他功能 */ }
 }
 
 async function confirmRemove(w) {
@@ -205,6 +230,8 @@ const reviewed = ref(false)
 const pickedMean = ref('')
 const reviewFinished = ref(false)
 const reviewWrongWords = ref([])
+// 本次复习会话的作答记录（wordId → 是否答对），复习完回写后端做间隔重复调度
+const sessionResults = ref({})
 
 const currentReview = computed(() => reviewWords.value[reviewIndex.value] || null)
 const reviewPct = computed(() =>
@@ -226,6 +253,7 @@ function startReview(list) {
   pickedMean.value = ''
   reviewFinished.value = false
   reviewWrongWords.value = []
+  sessionResults.value = {}
   reviewing.value = true
   genReviewOptions()
 }
@@ -251,7 +279,9 @@ function pickReview(opt) {
   if (reviewed.value) return
   reviewed.value = true
   pickedMean.value = opt
-  if (opt === currentReview.value.cnMean) {
+  const correct = opt === currentReview.value.cnMean
+  sessionResults.value[currentReview.value.id] = correct
+  if (correct) {
     reviewCorrect.value += 1
   } else if (!reviewWrongWords.value.some(w => w.id === currentReview.value.id)) {
     reviewWrongWords.value.push(currentReview.value)
@@ -270,12 +300,23 @@ function nextReview() {
   if (reviewIndex.value >= reviewWords.value.length - 1) {
     // 只标记完成，保持 reviewing=true 让结果块在复习容器内显示
     reviewFinished.value = true
+    reportSession()
     return
   }
   reviewIndex.value += 1
   reviewed.value = false
   pickedMean.value = ''
   genReviewOptions()
+}
+
+// 复习结束回写调度结果（答对间隔×2，答错重置1天），并刷新今日到期列表
+async function reportSession() {
+  const results = Object.entries(sessionResults.value).map(([wordId, correct]) => ({ wordId: Number(wordId), correct }))
+  if (!results.length) return
+  try {
+    await finishReview({ userId, results })
+    loadDue()
+  } catch (e) { /* 回写失败不影响本地结果展示 */ }
 }
 
 function exitReview() {
@@ -302,6 +343,42 @@ function exitReview() {
   .page-container {
     padding-bottom: 400px;
   }
+}
+
+/* 今日待复习横幅 */
+.due-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, rgba(52, 211, 153, 0.16), rgba(79, 124, 255, 0.12));
+  border: 1px solid rgba(52, 211, 153, 0.5);
+  border-radius: 16px;
+  cursor: pointer;
+}
+
+.due-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.due-sub {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.due-done-tip {
+  margin-bottom: 12px;
+  padding: 10px 16px;
+  border: 1px dashed var(--accent-border);
+  border-radius: 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-align: center;
 }
 
 /* 顶部统计卡 */
