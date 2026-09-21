@@ -55,8 +55,9 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import request from '../utils/request.js'
+import { loadFavoriteMap } from '../utils/favoriteStore.js'
 import { showFailToast, showSuccessToast } from 'vant'
 import { classify } from '../utils/questionType.js'
 import { CyberButton, CyberTag } from './cyber'
@@ -82,6 +83,14 @@ const selected = ref(isSingle.value && props.initialAnswer ? props.initialAnswer
 const multiSelected = ref(!isSingle.value && props.initialAnswer ? props.initialAnswer.split('') : [])
 const showExp = ref(false)
 const isFav = ref(false)
+// 收藏表主键（取消收藏时用），favBusy 防止请求过程中重复点击
+let favId = null
+const favBusy = ref(false)
+onMounted(async () => {
+  const map = await loadFavoriteMap()
+  const existId = map.get(String(qId.value))
+  if (existId != null) { favId = existId; isFav.value = true }
+})
 const retrying = ref(false)
 
 const isAnswerMissing = computed(() => {
@@ -144,7 +153,36 @@ function submit() {
   emit('submit', { questionId: qId.value, userAnswer: ans })
 }
 
-async function toggleFav() { isFav.value = !isFav.value }
+async function toggleFav() {
+  if (favBusy.value) return
+  favBusy.value = true
+  try {
+    if (isFav.value && favId != null) {
+      // 已收藏 -> 取消
+      await request.delete('/collection/' + favId)
+      isFav.value = false
+      favId = null
+      const map = await loadFavoriteMap()
+      map.delete(String(qId.value))
+    } else {
+      // 未收藏 -> 新增（后端对同一用户+相同题目做幂等，重复点不会插多条）
+      const res = await request.post('/collection', {
+        questionJson: JSON.stringify(q.value),
+        questionType: qType.value.type || 'single'
+      })
+      favId = res?.id ?? null
+      isFav.value = true
+      if (favId != null) {
+        const map = await loadFavoriteMap()
+        map.set(String(qId.value), favId)
+      }
+    }
+  } catch (e) {
+    showFailToast(e.message || '收藏操作失败')
+  } finally {
+    favBusy.value = false
+  }
+}
 
 async function retryGenerateAnswer() {
   retrying.value = true

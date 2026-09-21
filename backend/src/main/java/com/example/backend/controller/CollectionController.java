@@ -32,6 +32,18 @@ public class CollectionController {
 
         Long userId = getCurrentUserId();
 
+        Favorite exist = favoriteMapper.selectOne(
+            new LambdaQueryWrapper<Favorite>()
+                .eq(Favorite::getUserId, userId)
+                .eq(Favorite::getQuestionJson, questionJson)
+                .last("LIMIT 1"));
+        if (exist != null) {
+            Map<String, Object> dup = new HashMap<>();
+            dup.put("id", exist.getId());
+            dup.put("success", true);
+            dup.put("favorited", true);
+            return dup;
+        }
         Favorite fav = new Favorite();
         fav.setUserId(userId);
         fav.setQuestionJson(questionJson);
@@ -42,7 +54,13 @@ public class CollectionController {
 
     @DeleteMapping("/collection/{id}")
     public Map<String, Object> remove(@PathVariable Long id) {
-        if (favoriteMapper != null) favoriteMapper.deleteById(id);
+        if (favoriteMapper == null) return Map.of("success", false);
+        Long userId = getCurrentUserId();
+        Favorite fav = favoriteMapper.selectById(id);
+        if (fav == null || !userId.equals(fav.getUserId())) {
+            return Map.of("success", false, "error", "记录不存在或无权删除");
+        }
+        favoriteMapper.deleteById(id);
         return Map.of("success", true);
     }
 

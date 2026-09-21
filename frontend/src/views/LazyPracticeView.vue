@@ -181,6 +181,12 @@
             </div>
           </div>
 
+          <!-- 慢题提示 -->
+          <div v-if="currentResult?.isSlow" class="lp-slow-tip">🐢 慢题：用时超过同题型平均的 1.5 倍，注意提速</div>
+
+          <!-- 错因内联标注（仅错题，结果页逐题标注） -->
+          <ErrorTypeTagger v-if="!isCurrentCorrect && currentQuestion?.id" :question-id="currentQuestion.id" />
+
           <!-- 解析 -->
           <div class="lp-explanation" :class="{ expanded: expExpanded }">
             <div class="exp-header" @click="expExpanded = !expExpanded">
@@ -269,6 +275,7 @@ import { classify } from '../utils/questionType.js'
 import { loadDraftStore, writeDraftAnswers, clearDraftStore } from '../utils/practiceDraft.js'
 import { ParticleBackground } from '../components/cyber'
 import GestureHUD from '../components/cyber/GestureHUD.vue'
+import ErrorTypeTagger from '../components/ErrorTypeTagger.vue'
 
 const router = useRouter()
 const qStore = useQuestionsStore()
@@ -290,6 +297,22 @@ const showTutorial = ref(false)
 
 // 答题结果
 const results = ref({})
+
+// 每题活跃作答计时（毫秒）：切到该题开始累计，切走暂停，整卷提交时换算成秒随答案上报，用于慢题判定
+const questionTimes = ref({})
+let enterAt = 0
+function settleTimer(idx) {
+  if (!enterAt || idx == null) return
+  const q = questions.value[idx]
+  if (!q) return
+  const qid = getQid(q, idx)
+  questionTimes.value[qid] = (questionTimes.value[qid] || 0) + (Date.now() - enterAt)
+  enterAt = 0
+}
+function startTimer(idx) {
+  if (idx == null || !questions.value[idx]) return
+  enterAt = Date.now()
+}
 
 // 未提交草稿：与试卷模式共享统一草稿层（practice_draft_{sectionId}），刷新不丢、双模式互通；
 // 判分结果 results 只留内存、不持久化、不锁结果页，因此同一套题仍可无限重复整卷提交。
@@ -374,6 +397,12 @@ function isCorrectOption(key) {
   return currentQuestion.value.answer.includes(key)
 }
 
+// 题面是否缺标准答案（与题卡 isAnswerMissing 同口径）
+function isQAnswerMissing(q) {
+  const a = q?.answer
+  return !a || typeof a !== 'string' || a === '参考答案未提供' || a === '未提供' || a.trim() === ''
+}
+
 function isWrongSelected(key) {
   return isOptionSelected(key) && !isCorrectOption(key)
 }
@@ -406,8 +435,12 @@ function saveSubjectiveDraft() {
   drafts.value[qid] = { answer: subjectiveAnswer.value, type: 'subjective', timestamp: Date.now() }
 }
 
-// 切换题目时恢复主观题答案
-watch(currentIndex, () => {
+// 切换题目时恢复主观题答案 + 结算上一题/启动当前题计时（结果页浏览不计作答时间）
+watch(currentIndex, (n, old) => {
+  if (!showResult.value) {
+    settleTimer(old)
+    startTimer(n)
+  }
   if (isSubjective.value) {
     subjectiveAnswer.value = drafts.value[currentQid.value]?.answer || ''
   }
@@ -482,6 +515,9 @@ function triggerCardAnim() {
 async function handleSubmit() {
   if (submitting.value) return
 
+  // 结算当前题的活跃作答时间（提交后不再计时）
+  settleTimer(currentIndex.value)
+
   // 收集已作答的题目
   const answers = []
   questions.value.forEach((q, idx) => {
@@ -493,12 +529,14 @@ async function handleSubmit() {
     } else {
       if (!draft.answer || draft.answer.length === 0) return
     }
+    const usedMs = questionTimes.value[getQid(q, idx)] || 0
     answers.push({
       question: q,
       userAnswer: draft.answer,
       questionType: classify(q).type,
       questionIndex: idx,
-      recordId: qStore.recordId
+      recordId: qStore.recordId,
+      answerTime: Math.max(1, Math.round(usedMs / 1000))
     })
   })
 
@@ -510,7 +548,25 @@ async function handleSubmit() {
   submitting.value = true
 
   try {
-    // 调用批量判分
+    // 关键时序：先把缺标准答案的题补齐，再用“最终题目”判分。
+    // 否则判分用的是旧/空答案、页面标色用补全后的答案，会出现颜色对、对错结论却错。
+    const needGen = answers.filter(a => isQAnswerMissing(a.question))
+    if (needGen.length > 0) {
+      await Promise.all(needGen.map(a =>
+        request.post('/generate-answer', {
+          question: a.question.question,
+          type: a.questionType,
+          category: a.question.category || '',
+          options: a.question.options || null,
+          answer: a.question.answer || ''
+        }).then(res => {
+          if (res.answer) a.question.answer = res.answer
+          if (res.explanation) a.question.explanation = res.explanation
+        }).catch(() => {})
+      ))
+    }
+
+    // 答案补齐后再批量判分（对错结论与题面正确答案同源）
     const res = await request.post('/check-batch', { answers })
 
     // 保存结果
@@ -525,32 +581,26 @@ async function handleSubmit() {
       }
     })
 
-    // 批量生成缺失解析（只处理已提交的题目）
+    // 兜底：仍缺解析的再补（只补解析展示，不再影响对错）
     const missingExps = answers.filter(a => {
-      const qid = getQid(a.question, a.questionIndex)
-      const r = results.value[qid]
-      const exp = r?.explanation || a.question.explanation
+      const exp = a.question.explanation
       return !exp || typeof exp !== 'string' || exp === '未提供' || exp === '解析未提供' || exp === '解析生成失败' || exp.trim() === ''
     })
-
     if (missingExps.length > 0) {
-      let genOk = 0
-      const genTasks = missingExps.map(a => {
-        return request.post('/generate-answer', {
+      await Promise.all(missingExps.map(a =>
+        request.post('/generate-answer', {
           question: a.question.question,
           type: a.questionType,
           category: a.question.category || ''
         }).then(res => {
-          genOk++
           const qid = getQid(a.question, a.questionIndex)
-          if (res.answer) a.question.answer = res.answer
+          if (res.answer && isQAnswerMissing(a.question)) a.question.answer = res.answer
           if (res.explanation) {
             a.question.explanation = res.explanation
             if (results.value[qid]) results.value[qid].explanation = res.explanation
           }
         }).catch(() => {})
-      })
-      await Promise.all(genTasks)
+      ))
     }
 
     // 注意：提交后【不能】清空 drafts —— 结果页的错误数/正确率统计、选项回显、
@@ -614,6 +664,8 @@ function resetPractice() {
     try { localStorage.removeItem('subj_ans_' + getQid(q, i)) } catch (e) { /* 忽略 */ }
   })
   results.value = {}
+  questionTimes.value = {}
+  enterAt = 0
   clearDrafts() // 先清内存（watch 会回写一次空草稿），随后删掉存储键，避免残留空壳
   clearDraftStore(draftSectionId.value)
   subjectiveAnswer.value = ''
@@ -622,6 +674,7 @@ function resetPractice() {
   currentIndex.value = 0
   navExpanded.value = false
   triggerCardAnim()
+  startTimer(0)
 }
 
 function toggleGesture() {
@@ -668,6 +721,8 @@ function onTouchEnd(e) {
 onMounted(() => {
   // 恢复未提交草稿（刷新不丢、与试卷模式互通）；判分结果不恢复，故不会被锁进结果页
   restoreDrafts()
+  // 启动首题作答计时
+  startTimer(0)
   // 添加触摸滑动监听
   document.addEventListener('touchstart', onTouchStart, { passive: true })
   document.addEventListener('touchend', onTouchEnd, { passive: true })
@@ -911,6 +966,16 @@ onUnmounted(() => {
 }
 .lp-answer-compare .ac-ok { color: var(--success); }
 .lp-answer-compare .ac-bad { color: var(--danger); }
+
+.lp-slow-tip {
+  margin-top: 12px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #ff8c00;
+  background: rgba(255, 140, 0, 0.1);
+  border: 1px solid rgba(255, 140, 0, 0.3);
+  border-radius: var(--radius-sm);
+}
 
 /* 主观题 */
 .lp-subjective {

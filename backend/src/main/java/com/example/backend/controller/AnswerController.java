@@ -26,6 +26,11 @@ public class AnswerController {
     private static final Logger log = LoggerFactory.getLogger(AnswerController.class);
     private static final ObjectMapper mapper = new ObjectMapper();
 
+    /** 慢题判定：同题型历史用时样本最小数量，不足不判定（避免冷启动误判） */
+    private static final int SLOW_SAMPLE_MIN = 3;
+    /** 慢题倍数：本次用时 > 同题型平均用时 × 1.5 即慢题 */
+    private static final double SLOW_FACTOR = 1.5;
+
     @Autowired(required = false)
     private AnswerRecordMapper answerRecordMapper;
 
@@ -54,7 +59,7 @@ public class AnswerController {
         restTemplate.setRequestFactory(factory);
     }
 
-    private static String asStr(Object o) { return o == null ? "" : String.valueOf(o); }
+    private static String asStr(Object o) { return o == null ? "" : String.valueOf(o).trim(); }
 
     @PostMapping("/check")
     public ResponseEntity<Map<String, Object>> checkAnswer(@RequestBody Map<String, Object> request) {
@@ -81,6 +86,12 @@ public class AnswerController {
         result.put("explanation", explanation.isEmpty() ? "" : explanation);
         result.put("userAnswer", userAnswer);
 
+        Integer answerTime = request.get("answerTime") instanceof Number ?
+                ((Number) request.get("answerTime")).intValue() : null;
+        String qType = asStr(question.getOrDefault("type", "single"));
+        boolean slow = isSlowAnswer(qType, answerTime);
+        result.put("isSlow", slow);
+
         try {
             if (answerRecordMapper != null) {
                 Integer recordId = request.get("recordId") instanceof Number ?
@@ -94,7 +105,8 @@ public class AnswerController {
                 ar.setUserAnswer(userAnswer);
                 ar.setIsCorrect(correct ? 1 : 0);
                 ar.setQuestionContent(mapper.writeValueAsString(question));
-                ar.setQuestionType(asStr(question.getOrDefault("type", "single")));
+                ar.setQuestionType(qType);
+                ar.setAnswerTime(answerTime);
                 answerRecordMapper.insert(ar);
                 log.info("答题记录已保存：{}", ar.getId());
             }
@@ -103,7 +115,10 @@ public class AnswerController {
         }
 
         if (!correct) {
-            saveWrongQuestion(userId, question, userAnswer, correctAnswer, explanation);
+            saveWrongQuestion(userId, question, userAnswer, correctAnswer, explanation, null, answerTime, slow, false);
+        } else if (slow) {
+            // 做对但慢：慢题同样进入复习队列
+            saveWrongQuestion(userId, question, userAnswer, correctAnswer, explanation, null, answerTime, true, true);
         }
 
         return ResponseEntity.ok(result);
@@ -125,6 +140,10 @@ public class AnswerController {
             return ResponseEntity.status(404).body(Map.of("error", "题目不存在"));
         }
 
+        Integer answerTime = request.get("answerTime") instanceof Number ?
+                ((Number) request.get("answerTime")).intValue() : null;
+        boolean slow = isSlowAnswer("subjective", answerTime);
+
         String referenceAnswer = asStr(question.get("answer"));
         String explanation = asStr(question.get("explanation"));
 
@@ -136,10 +155,13 @@ public class AnswerController {
         result.put("score", score);
         result.put("referenceAnswer", referenceAnswer);
         result.put("explanation", explanation.isEmpty() ? "" : explanation);
+        result.put("isSlow", slow);
 
-        // 分数低于3分（满分5分，60%以下）自动入错题
+        // 分数低于3分（满分5分，60%以下）自动入错题；及格但属于慢题也进入复习队列
         if (score < 3) {
-            saveWrongQuestion(userId, question, userAnswer, referenceAnswer, explanation, score);
+            saveWrongQuestion(userId, question, userAnswer, referenceAnswer, explanation, score, answerTime, slow, false);
+        } else if (slow) {
+            saveWrongQuestion(userId, question, userAnswer, referenceAnswer, explanation, score, answerTime, true, true);
         }
 
         try {
@@ -156,6 +178,7 @@ public class AnswerController {
                 ar.setIsCorrect(score >= 3 ? 1 : 0);
                 ar.setQuestionContent(mapper.writeValueAsString(question));
                 ar.setQuestionType("subjective");
+                ar.setAnswerTime(answerTime);
                 answerRecordMapper.insert(ar);
                 log.info("主观题答题记录已保存：{}", ar.getId());
             }
@@ -193,6 +216,8 @@ public class AnswerController {
                     ((Number) item.get("questionIndex")).intValue() : null;
             Integer recordId = item.get("recordId") instanceof Number ?
                     ((Number) item.get("recordId")).intValue() : null;
+            final Integer answerTime = item.get("answerTime") instanceof Number ?
+                    ((Number) item.get("answerTime")).intValue() : null;
 
             int idx = i;
             if ("subjective".equals(questionType) && question != null) {
@@ -203,6 +228,7 @@ public class AnswerController {
                         Map<String, Object> evalResult = callAiForEvaluation(userAnswer, referenceAnswer, explanation);
                         String evaluation = asStr(evalResult.getOrDefault("evaluation", ""));
                         int score = evalResult.get("score") instanceof Number ? ((Number) evalResult.get("score")).intValue() : 0;
+                        boolean slow = isSlowAnswer("subjective", answerTime);
                         Map<String, Object> sr = new HashMap<>();
                         sr.put("evaluation", evaluation);
                         sr.put("score", score);
@@ -210,11 +236,14 @@ public class AnswerController {
                         sr.put("explanation", explanation.isEmpty() ? "" : explanation);
                         sr.put("correct", score >= 3);
                         sr.put("userAnswer", userAnswer);
+                        sr.put("isSlow", slow);
                         synchronized (correctCount) {
                             if (score >= 3) correctCount[0]++;
                         }
                         if (score < 3) {
-                            saveWrongQuestion(userId, question, userAnswer, referenceAnswer, explanation, score);
+                            saveWrongQuestion(userId, question, userAnswer, referenceAnswer, explanation, score, answerTime, slow, false);
+                        } else if (slow) {
+                            saveWrongQuestion(userId, question, userAnswer, referenceAnswer, explanation, score, answerTime, true, true);
                         }
                         results[idx] = sr;
                     } catch (Exception e) {
@@ -234,14 +263,18 @@ public class AnswerController {
                 String correctAnswer = asStr(question.get("answer"));
                 String explanation = asStr(question.get("explanation"));
                 boolean correct = normalizeAnswer(userAnswer).equals(normalizeAnswer(correctAnswer));
+                boolean slow = isSlowAnswer(questionType, answerTime);
                 Map<String, Object> sr = new HashMap<>();
                 sr.put("correct", correct);
                 sr.put("correctAnswer", correctAnswer);
                 sr.put("explanation", explanation.isEmpty() ? "" : explanation);
                 sr.put("userAnswer", userAnswer);
+                sr.put("isSlow", slow);
                 if (correct) correctCount[0]++;
                 if (!correct) {
-                    saveWrongQuestion(userId, question, userAnswer, correctAnswer, explanation);
+                    saveWrongQuestion(userId, question, userAnswer, correctAnswer, explanation, null, answerTime, slow, false);
+                } else if (slow) {
+                    saveWrongQuestion(userId, question, userAnswer, correctAnswer, explanation, null, answerTime, true, true);
                 }
                 results[idx] = sr;
             } else {
@@ -270,6 +303,8 @@ public class AnswerController {
             Integer recordId = item.get("recordId") instanceof Number ?
                     ((Number) item.get("recordId")).intValue() : null;
             String userAnswer = asStr(item.get("userAnswer"));
+            Integer itemAnswerTime = item.get("answerTime") instanceof Number ?
+                    ((Number) item.get("answerTime")).intValue() : null;
             try {
                 if (answerRecordMapper != null) {
                     AnswerRecord ar = new AnswerRecord();
@@ -279,6 +314,7 @@ public class AnswerController {
                     ar.setIsCorrect(Boolean.TRUE.equals(results[i].get("correct")) ? 1 : 0);
                     ar.setQuestionContent(mapper.writeValueAsString(question));
                     ar.setQuestionType(questionType);
+                    ar.setAnswerTime(itemAnswerTime);
                     answerRecordMapper.insert(ar);
                 }
             } catch (Exception e) {
@@ -306,7 +342,40 @@ public class AnswerController {
         return ResponseEntity.ok(result);
     }
 
-    private void saveWrongQuestion(Long userId, Map<String, Object> question, String userAnswer, String correctAnswer, String explanation, Integer score) {
+    /**
+     * 慢题判定：本次用时 > 同题型最近样本平均用时 × 1.5。
+     * 样本不足 SLOW_SAMPLE_MIN 条时不判定（冷启动保护）。answer_record 无 user_id，题型均值取全局样本。
+     */
+    private boolean isSlowAnswer(String questionType, Integer answerTime) {
+        if (answerTime == null || answerTime <= 0 || answerRecordMapper == null) return false;
+        try {
+            List<AnswerRecord> hist = answerRecordMapper.selectList(
+                new LambdaQueryWrapper<AnswerRecord>()
+                    .eq(AnswerRecord::getQuestionType, questionType)
+                    .isNotNull(AnswerRecord::getAnswerTime)
+                    .select(AnswerRecord::getAnswerTime)
+                    .last("ORDER BY id DESC LIMIT 200"));
+            if (hist.size() < SLOW_SAMPLE_MIN) return false;
+            double avg = hist.stream()
+                    .filter(a -> a.getAnswerTime() != null)
+                    .mapToInt(AnswerRecord::getAnswerTime)
+                    .average().orElse(0);
+            return avg > 0 && answerTime > avg * SLOW_FACTOR;
+        } catch (Exception e) {
+            log.warn("慢题判定失败：{}", e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * 保存错题 / 慢题。
+     * @param answerTime      本次作答用时（秒），可空
+     * @param isSlow          是否慢题
+     * @param answeredCorrect 本次是否答对（答对但慢也要进复习队列，此时不计错误次数）
+     */
+    private void saveWrongQuestion(Long userId, Map<String, Object> question, String userAnswer,
+                                   String correctAnswer, String explanation, Integer score,
+                                   Integer answerTime, boolean isSlow, boolean answeredCorrect) {
         try {
             if (wrongQuestionMapper != null) {
                 String questionId = asStr(question.getOrDefault("id", UUID.randomUUID().toString()));
@@ -319,9 +388,11 @@ public class AnswerController {
                                 .eq(UserWrongQuestion::getIsRemoved, 0));
 
                 if (existing != null) {
-                    existing.setWrongCount(existing.getWrongCount() + 1);
+                    if (!answeredCorrect) existing.setWrongCount(existing.getWrongCount() + 1);
                     existing.setUserAnswer(userAnswer);
                     if (score != null) existing.setScore(score);
+                    if (answerTime != null) existing.setAnswerTime(answerTime);
+                    if (isSlow) existing.setIsSlow(1);
                     wrongQuestionMapper.updateById(existing);
                 } else {
                     UserWrongQuestion wq = new UserWrongQuestion();
@@ -333,8 +404,20 @@ public class AnswerController {
                     wq.setCorrectAnswer(correctAnswer != null && correctAnswer.length() > 500 ? correctAnswer.substring(0, 500) : correctAnswer);
                     wq.setExplanation(explanation);
                     wq.setScore(score);
-                    wq.setWrongCount(1);
+                    wq.setAnswerTime(answerTime);
+                    wq.setIsSlow(isSlow ? 1 : 0);
                     wq.setIsRemoved(0);
+                    if (answeredCorrect) {
+                        // 做对但慢：不计错误次数，直接进入复习队列（1天后首次复习）
+                        wq.setWrongCount(0);
+                        wq.setStatus(2);
+                        wq.setCorrectStreak(1);
+                        wq.setReviewCount(0);
+                        wq.setNextReviewTime(java.time.LocalDateTime.now().plusDays(1));
+                    } else {
+                        wq.setWrongCount(1);
+                        wq.setStatus(0);
+                    }
                     wrongQuestionMapper.insert(wq);
                 }
             }
@@ -343,8 +426,12 @@ public class AnswerController {
         }
     }
 
+    private void saveWrongQuestion(Long userId, Map<String, Object> question, String userAnswer, String correctAnswer, String explanation, Integer score) {
+        saveWrongQuestion(userId, question, userAnswer, correctAnswer, explanation, score, null, false, false);
+    }
+
     private void saveWrongQuestion(Long userId, Map<String, Object> question, String userAnswer, String correctAnswer, String explanation) {
-        saveWrongQuestion(userId, question, userAnswer, correctAnswer, explanation, null);
+        saveWrongQuestion(userId, question, userAnswer, correctAnswer, explanation, null, null, false, false);
     }
 
     private Long getCurrentUserId() {
@@ -422,9 +509,36 @@ public class AnswerController {
         }
     }
 
+    /**
+     * 客观题答案规范化（判分唯一口径）：提取 A-E 字母去重排序；
+     * 兼容 "B."、"答案：B"、判断题"正确/错误/对/错/√/×/T/F" 等脏格式，避免对错误判。
+     */
     private String normalizeAnswer(String answer) {
         if (answer == null) return "";
-        String normalized = answer.replaceAll("[\\s,，、]+", "").toUpperCase();
+        String s = answer.trim();
+        if (s.isEmpty()) return "";
+        // 1) 优先提取 A-E 字母（去重、排序、大写），兜住带标点/中文前缀的答案
+        java.util.TreeSet<Character> letters = new java.util.TreeSet<>();
+        for (char c : s.toCharArray()) {
+            if ((c >= 'A' && c <= 'E') || (c >= 'a' && c <= 'e')) letters.add(Character.toUpperCase(c));
+        }
+        if (!letters.isEmpty()) {
+            StringBuilder sb = new StringBuilder();
+            for (Character c : letters) sb.append(c);
+            return sb.toString();
+        }
+        // 2) 无字母：判断题中文/符号。先判“错/否定”再判“对”，避免“不正确/不对”被当成对
+        String low = s.toLowerCase();
+        if (s.contains("错") || s.contains("不") || s.contains("非") || s.contains("否")
+                || s.contains("×") || s.contains("✗") || low.equals("f") || low.equals("false") || low.equals("no")) {
+            return "B";
+        }
+        if (s.contains("正确") || s.contains("对") || s.contains("是") || s.contains("√") || s.contains("✓")
+                || low.equals("t") || low.equals("true") || low.equals("yes")) {
+            return "A";
+        }
+        // 3) 兜底：去常见分隔符后大写排序
+        String normalized = s.replaceAll("[\\s,，、.。:：;；()（）]+", "").toUpperCase();
         char[] chars = normalized.toCharArray();
         Arrays.sort(chars);
         return new String(chars);

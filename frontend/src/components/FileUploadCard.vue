@@ -29,21 +29,6 @@
 
     <div class="file-count" v-if="uploadedFiles.length>0">已选 {{ uploadedFiles.length }} 个文件</div>
 
-    <div class="type-selector">
-      <span class="type-label">出题类型：</span>
-      <div class="radio-group">
-        <label class="radio-item" :class="{ checked: questionType === 'all' }" @click="questionType='all'">
-          <span class="radio-dot"></span>📝 全部
-        </label>
-        <label class="radio-item" :class="{ checked: questionType === 'objective' }" @click="questionType='objective'">
-          <span class="radio-dot"></span>📖 客观
-        </label>
-        <label class="radio-item" :class="{ checked: questionType === 'subjective' }" @click="questionType='subjective'">
-          <span class="radio-dot"></span>✍️ 主观
-        </label>
-      </div>
-    </div>
-
     <CyberButton
       variant="primary"
       block
@@ -71,6 +56,7 @@ const emit = defineEmits(['upload'])
 
 const fileInput = ref(null)
 const uploadedFiles = ref([])
+// 出题类型由外层统一控制（fileQT），卡内不再提供重复单选；固定 all 以保持 emit 结构不变
 const questionType = ref('all')
 
 function triggerUpload() {
@@ -223,72 +209,6 @@ function doUpload() {
   color: var(--accent);
   margin: 8px 0;
   font-weight: 600;
-}
-
-/* 题型选择 */
-.type-selector {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 12px 0;
-  flex-wrap: wrap;
-}
-
-.type-label {
-  color: var(--text-secondary);
-  white-space: nowrap;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.radio-group {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.radio-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--accent-border);
-  border-radius: 8px;
-  font-size: 12px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.radio-item.checked {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-weight: 600;
-}
-
-.radio-dot {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 2px solid var(--accent-border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.radio-item.checked .radio-dot {
-  border-color: var(--accent);
-}
-
-.radio-item.checked .radio-dot::after {
-  content: '';
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
 }
 
 .upload-btn {

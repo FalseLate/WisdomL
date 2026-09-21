@@ -13,9 +13,11 @@ const routes = [
   { path: '/history', name: 'history', component: () => import('../views/HistoryView.vue'), meta: { requiresAuth: true } },
   { path: '/question-bank', name: 'question-bank', component: () => import('../views/QuestionBankView.vue'), meta: { requiresAuth: true } },
   { path: '/wrong-questions', name: 'wrong-questions', component: () => import('../views/WrongQuestionsView.vue'), meta: { requiresAuth: true } },
+  { path: '/review-today', name: 'review-today', component: () => import('../views/ReviewView.vue'), meta: { requiresAuth: true } },
+  { path: '/error-stats', name: 'error-stats', component: () => import('../views/ErrorStatsView.vue'), meta: { requiresAuth: true } },
   { path: '/collections', name: 'collections', component: () => import('../views/CollectionsView.vue'), meta: { requiresAuth: true } },
-  { path: '/user-center', name: 'user-center', component: () => import('../views/UserCenter.vue') },
-  { path: '/favorites', name: 'favorites', component: () => import('../views/FavoritesView.vue'), meta: { requiresAuth: true } },
+  // /user-center 已废弃，统一使用 /profile（ProfileView 新版个人中心）
+  // /favorites 已废弃，统一使用 /collections（CollectionsView）
   {
     path: '/word-quiz',
     name: 'WordQuiz',
