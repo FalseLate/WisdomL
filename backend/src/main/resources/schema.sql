@@ -33,11 +33,12 @@ CREATE TABLE IF NOT EXISTS answer_record (
     is_correct TINYINT(1) DEFAULT 0 COMMENT '是否正确',
     question_content TEXT COMMENT '题目内容JSON',
     question_type VARCHAR(20) DEFAULT 'single' COMMENT '题目类型',
+    answer_time INT DEFAULT NULL COMMENT '作答用时（秒），慢题判定数据源',
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '答题时间',
     FOREIGN KEY (record_id) REFERENCES question_record(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='答题记录';
 
--- 用户错题表
+-- 用户错题表（PDCA 错题闭环：错因标注 / 查看订正 / 动手重做 / 简化SM-2复习调度）
 CREATE TABLE IF NOT EXISTS user_wrong_question (
     id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
     user_id BIGINT NOT NULL COMMENT '用户ID',
@@ -48,10 +49,22 @@ CREATE TABLE IF NOT EXISTS user_wrong_question (
     correct_answer VARCHAR(255) COMMENT '正确答案',
     explanation TEXT COMMENT '解析',
     wrong_count INT DEFAULT 1 COMMENT '错误次数',
-    is_removed TINYINT(1) DEFAULT 0 COMMENT '是否已移除',
+    is_removed TINYINT(1) DEFAULT 0 COMMENT '是否已移除（软删除）',
+    error_types VARCHAR(100) DEFAULT NULL COMMENT '错因编码逗号分隔：audit审题/knowledge知识/math数学/strategy策略/habit习惯',
+    error_note VARCHAR(1000) DEFAULT NULL COMMENT '错因反思文字（自我小结）',
+    is_slow TINYINT(1) DEFAULT 0 COMMENT '是否慢题：0否 1是',
+    answer_time INT DEFAULT NULL COMMENT '本次作答用时（秒）',
+    status TINYINT DEFAULT 0 COMMENT '订正状态：0未订正 1看过解析未重做 2重做答对(复习中) 3已掌握',
+    review_count INT DEFAULT 0 COMMENT '累计重做/复习次数',
+    correct_streak INT DEFAULT 0 COMMENT '连续重做答对次数，答错清零，达到3则status=3已掌握',
+    last_review_time DATETIME DEFAULT NULL COMMENT '最近一次重做时间',
+    next_review_time DATETIME DEFAULT NULL COMMENT '简化SM-2下次复习时间（间隔1/3/7天）',
+    knowledge_points VARCHAR(500) DEFAULT NULL COMMENT '知识点标签，一期留空',
+    score INT DEFAULT NULL COMMENT '主观题AI评分0-5',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    INDEX idx_user_id (user_id)
+    INDEX idx_user_id (user_id),
+    INDEX idx_user_next_review (user_id, next_review_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户错题';
 
 -- 收藏表
@@ -83,5 +96,3 @@ CREATE TABLE `user_word` (
                              `master` TINYINT DEFAULT 0 COMMENT '0未掌握 1已掌握',
                              UNIQUE KEY uk_uid_wid(user_id,word_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-

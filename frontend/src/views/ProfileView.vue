@@ -10,7 +10,10 @@
 
       <!-- 用户信息卡片 -->
       <div class="user-card">
-        <img :src="avatarUrl" class="avatar" />
+        <div class="avatar-wrap" @click="changeAvatar">
+          <img :src="avatarUrl" class="avatar" />
+          <div class="avatar-overlay">更换</div>
+        </div>
         <div class="user-name">{{ userInfo?.nickname || userInfo?.username || '加载中...' }}</div>
         <div class="user-id" v-if="userInfo">@{{ userInfo.username }}</div>
       </div>
@@ -49,7 +52,20 @@
           <span class="menu-title">错题分析</span>
           <span class="menu-arrow">›</span>
         </div>
-        <div class="menu-item" @click="$router.push('/favorites')">
+        <div class="menu-item" @click="$router.push('/review-today')">
+          <span class="menu-icon">🔁</span>
+          <span class="menu-title">今日复习</span>
+          <span class="menu-value" :class="{ 'review-badge': reviewDue > 0 }">
+            {{ reviewDue > 0 ? reviewDue + ' 题待复习' : '已完成' }}
+          </span>
+          <span class="menu-arrow">›</span>
+        </div>
+        <div class="menu-item" @click="$router.push('/error-stats')">
+          <span class="menu-icon">📊</span>
+          <span class="menu-title">错因统计</span>
+          <span class="menu-arrow">›</span>
+        </div>
+        <div class="menu-item" @click="$router.push('/collections')">
           <span class="menu-icon">⭐</span>
           <span class="menu-title">我的收藏</span>
           <span class="menu-value">{{ stats?.favCount ? stats.favCount + '道' : '0道' }}</span>
@@ -76,12 +92,14 @@ import { useRouter } from 'vue-router'
 import { logout } from '../utils/auth.js'
 import request from '../utils/request.js'
 import { CyberNavbar, CyberButton } from '../components/cyber'
+import { showFailToast, showSuccessToast } from 'vant'
 
 const router = useRouter()
 const userInfo = ref(null)
 const stats = ref(null)
 const loading = ref(true)
 const loadError = ref(false)
+const reviewDue = ref(0)
 
 const avatarUrl = computed(() =>
   userInfo.value?.avatar || '/images/1203220_236.jpg'
@@ -98,12 +116,43 @@ async function loadProfile() {
     const res = await request.get('/user/profile')
     userInfo.value = res.user || null
     stats.value = res.stats || null
+    loadReviewDue()
   } catch (err) {
     loadError.value = true
     console.error('Profile load failed:', err)
   } finally {
     loading.value = false
   }
+}
+
+async function loadReviewDue() {
+  try {
+    const r = await request.get('/wrong-questions/review-today')
+    reviewDue.value = r?.count || 0
+  } catch (e) {
+    reviewDue.value = 0
+  }
+}
+
+function changeAvatar() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = 'image/*'
+  input.onchange = (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    const fd = new FormData()
+    fd.append('file', file)
+    request.post('/user/avatar', fd)
+      .then(r => {
+        if (r.url && userInfo.value) {
+          userInfo.value.avatar = r.url
+          showSuccessToast('头像已更新')
+        }
+      })
+      .catch(() => showFailToast('上传失败'))
+  }
+  input.click()
 }
 
 function handleLogout() {
@@ -168,6 +217,27 @@ function handleLogout() {
   padding: 2px;
   object-fit: cover;
   box-shadow: 0 0 20px var(--accent-soft);
+}
+
+.avatar-wrap {
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+}
+
+.avatar-overlay {
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 10px;
+  padding: 1px 10px;
+  text-align: center;
+  border-radius: 0 0 36px 36px;
 }
 
 .user-name {
@@ -276,6 +346,12 @@ function handleLogout() {
 .menu-value {
   font-size: 12px;
   color: var(--text-secondary);
+}
+
+.menu-value.review-badge {
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 700;
 }
 
 .menu-arrow {

@@ -65,6 +65,13 @@ public class AsyncGenerateService {
         try {
             // ★ 核心：复用已有的同步出题逻辑，不重复写 ★
             QuestionDTO dto = questionService.generateParallel(text, questionType);
+            int gotObj = dto.getObjectiveQuestions() != null ? dto.getObjectiveQuestions().size() : 0;
+            int gotSub = dto.getSubjectiveQuestions() != null ? dto.getSubjectiveQuestions().size() : 0;
+            if (gotObj + gotSub == 0) {
+                task.setStatus(GenerateTask.Status.FAILED);
+                task.setErrorMessage("未生成有效题目，请缩短资料或稍后重试");
+                return;
+            }
 
             // 把结果写回任务对象
             task.setObjectiveQuestions(dto.getObjectiveQuestions());
@@ -111,7 +118,14 @@ public class AsyncGenerateService {
                 String t = sectionTexts.get(id);
                 if (t == null || t.trim().isEmpty()) continue;
 
-                QuestionDTO dto = questionService.generateParallel(t, questionType);
+                QuestionDTO dto;
+                try {
+                    dto = questionService.generateParallel(t, questionType);
+                } catch (Exception secEx) {
+                    log.warn("[异步出题] 单个章节出题为空/失败，跳过该章节 id={}: {}", id, secEx.getMessage());
+                    continue;
+                }
+                if (dto == null) continue;
 
                 // 给每道题打上章节标签
                 String chapterName = extractChapterName(t);
@@ -130,6 +144,11 @@ public class AsyncGenerateService {
                 totalSub += dto.getSubjectiveCount();
             }
 
+            if (allObj.isEmpty() && allSub.isEmpty()) {
+                task.setStatus(GenerateTask.Status.FAILED);
+                task.setErrorMessage("所有章节均未生成有效题目，请稍后重试");
+                return;
+            }
             task.setObjectiveQuestions(allObj);
             task.setSubjectiveQuestions(allSub);
             task.setObjectiveCount(totalObj);
