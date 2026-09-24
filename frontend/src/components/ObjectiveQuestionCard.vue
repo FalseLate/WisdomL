@@ -55,8 +55,9 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import request from '../utils/request.js'
+import { loadFavoriteMap } from '../utils/favoriteStore.js'
 import { showFailToast, showSuccessToast } from 'vant'
 import { classify } from '../utils/questionType.js'
 import { CyberButton, CyberTag } from './cyber'
@@ -64,7 +65,9 @@ import { CyberButton, CyberTag } from './cyber'
 const props = defineProps({
   question: { type: Object, required: true },
   result: { type: Object, default: null },
-  index: { type: Number, default: 0 }
+  index: { type: Number, default: 0 },
+  // 来自另一模式/刷新恢复的未提交答案，用于回显选中态（已提交结果仍以 result 为准）
+  initialAnswer: { type: String, default: null }
 })
 const emit = defineEmits(['submit', 'change', 'update-answer'])
 
@@ -75,10 +78,19 @@ const qId = computed(() => q.value.id || q.value._id || props.index)
 const barColor = computed(() => qType.value.color)
 const label = computed(() => qType.value.label)
 
-const selected = ref(null)
-const multiSelected = ref([])
+// 初始选中态：优先外部恢复的未提交答案（result 的回显由下方 watch 负责）
+const selected = ref(isSingle.value && props.initialAnswer ? props.initialAnswer : null)
+const multiSelected = ref(!isSingle.value && props.initialAnswer ? props.initialAnswer.split('') : [])
 const showExp = ref(false)
 const isFav = ref(false)
+// 收藏表主键（取消收藏时用），favBusy 防止请求过程中重复点击
+let favId = null
+const favBusy = ref(false)
+onMounted(async () => {
+  const map = await loadFavoriteMap()
+  const existId = map.get(String(qId.value))
+  if (existId != null) { favId = existId; isFav.value = true }
+})
 const retrying = ref(false)
 
 const isAnswerMissing = computed(() => {
@@ -141,7 +153,36 @@ function submit() {
   emit('submit', { questionId: qId.value, userAnswer: ans })
 }
 
-async function toggleFav() { isFav.value = !isFav.value }
+async function toggleFav() {
+  if (favBusy.value) return
+  favBusy.value = true
+  try {
+    if (isFav.value && favId != null) {
+      // 已收藏 -> 取消
+      await request.delete('/collection/' + favId)
+      isFav.value = false
+      favId = null
+      const map = await loadFavoriteMap()
+      map.delete(String(qId.value))
+    } else {
+      // 未收藏 -> 新增（后端对同一用户+相同题目做幂等，重复点不会插多条）
+      const res = await request.post('/collection', {
+        questionJson: JSON.stringify(q.value),
+        questionType: qType.value.type || 'single'
+      })
+      favId = res?.id ?? null
+      isFav.value = true
+      if (favId != null) {
+        const map = await loadFavoriteMap()
+        map.set(String(qId.value), favId)
+      }
+    }
+  } catch (e) {
+    showFailToast(e.message || '收藏操作失败')
+  } finally {
+    favBusy.value = false
+  }
+}
 
 async function retryGenerateAnswer() {
   retrying.value = true

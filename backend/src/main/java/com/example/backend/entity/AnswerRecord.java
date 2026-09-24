@@ -13,6 +13,8 @@ public class AnswerRecord {
     private Integer isCorrect;
     private String questionContent;
     private String questionType;
+    /** 作答用时（秒），慢题判定数据源，可空 */
+    private Integer answerTime;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
@@ -31,6 +33,8 @@ public class AnswerRecord {
     public void setQuestionContent(String questionContent) { this.questionContent = questionContent; }
     public String getQuestionType() { return questionType; }
     public void setQuestionType(String questionType) { this.questionType = questionType; }
+    public Integer getAnswerTime() { return answerTime; }
+    public void setAnswerTime(Integer answerTime) { this.answerTime = answerTime; }
     public LocalDateTime getCreateTime() { return createTime; }
     public void setCreateTime(LocalDateTime createTime) { this.createTime = createTime; }
 }

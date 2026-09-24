@@ -74,10 +74,11 @@ const props = defineProps({
   index: { type: Number, default: 0 }
 })
 
-const emit = defineEmits(['submit', 'update-answer'])
+const emit = defineEmits(['submit', 'update-answer', 'change'])
 
 const q = computed(() => props.question)
 const storageKey = computed(() => 'subj_ans_' + (q.value.id || q.value._id || props.index))
+const qIdValue = () => q.value.id || q.value._id || props.index
 
 const userAnswer = ref(localStorage.getItem(storageKey.value) || '')
 const showReference = ref(false)
@@ -129,6 +130,8 @@ watch(userAnswer, (val) => {
   if (val && val.trim()) {
     localStorage.setItem(storageKey.value, val)
   }
+  // 同步给父级写入双模式统一草稿（切到懒人模式也能看到未提交的主观题）
+  emit('change', { questionId: qIdValue(), userAnswer: val })
 })
 
 async function toggleFav() { isFav.value = !isFav.value }
@@ -162,7 +165,7 @@ async function retryGenerateAnswer() {
       q.value.explanation = res.explanation
     }
     showSuccessToast('解析已生成')
-    emit('update-answer', { questionId: q.value.id || q.value._id || props.index, answer: res.answer, explanation: res.explanation })
+    emit('update-answer', { questionId: qIdValue(), answer: res.answer, explanation: res.explanation })
   } catch (e) {
     showFailToast(e.message || '解析生成失败')
   } finally {
@@ -178,7 +181,7 @@ async function submitAnswer() {
   if (isLocked.value) return
 
   submitting.value = true
-  const qId = q.value.id || q.value._id || props.index
+  const qId = qIdValue()
   try {
     const res = await request.post('/check-subjective', {
       questionId: qId,

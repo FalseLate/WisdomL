@@ -1,5 +1,6 @@
 package com.example.backend.service;
 
+
 import com.example.backend.config.PromptBuilder;
 import com.example.backend.config.QuestionConfig;
 import com.example.backend.dto.QuestionDTO;
@@ -64,6 +65,15 @@ public class QuestionService {
         String rawResponse = callAiWithRetry(prompts.get("system"), prompts.get("user"));
 
         parseQuestions(rawResponse, dto);
+        // 以实际解析题数回写计数，避免目标count>0但题目数组为空的假成功；全空抛异常交由上层置FAILED
+        int realObj = dto.getObjectiveQuestions() != null ? dto.getObjectiveQuestions().size() : 0;
+        int realSub = dto.getSubjectiveQuestions() != null ? dto.getSubjectiveQuestions().size() : 0;
+        dto.setObjectiveCount(realObj);
+        dto.setSubjectiveCount(realSub);
+        dto.setTotalCount(realObj + realSub);
+        if (realObj + realSub == 0) {
+            throw new RuntimeException("AI返回内容解析为空（可能被截断），请缩短资料或稍后重试");
+        }
 
         // 不再同步补全答案和解析，前端可逐个触发重新生成
         return dto;
@@ -94,8 +104,16 @@ public class QuestionService {
         boolean noAnswers = len > 1500;
         if (len <= 1500) {
             Map<String, String> prompts = PromptBuilder.buildPrompts(cleanText, questionType);
-            String raw = callAi(prompts.get("system"), prompts.get("user"), 4096);
+            String raw = callAi(prompts.get("system"), prompts.get("user"), 8192);
             parseQuestions(raw, dto);
+            int realObj = dto.getObjectiveQuestions() != null ? dto.getObjectiveQuestions().size() : 0;
+            int realSub = dto.getSubjectiveQuestions() != null ? dto.getSubjectiveQuestions().size() : 0;
+            dto.setObjectiveCount(realObj);
+            dto.setSubjectiveCount(realSub);
+            dto.setTotalCount(realObj + realSub);
+            if (realObj + realSub == 0) {
+                throw new RuntimeException("AI返回内容解析为空（可能被截断），请缩短资料或稍后重试");
+            }
             return dto;
         }
 
@@ -204,6 +222,12 @@ public class QuestionService {
         if (allSub.size() > subNum) allSub = new ArrayList<>(allSub.subList(0, subNum));
         dto.setObjectiveQuestions(allObj);
         dto.setSubjectiveQuestions(allSub);
+        dto.setObjectiveCount(allObj.size());
+        dto.setSubjectiveCount(allSub.size());
+        dto.setTotalCount(allObj.size() + allSub.size());
+        if (allObj.isEmpty() && allSub.isEmpty()) {
+            throw new RuntimeException("所有分片均未解析出有效题目，请缩短资料或稍后重试");
+        }
         return dto;
     }
 
@@ -331,6 +355,12 @@ public class QuestionService {
             finalObj.addAll(reclassified);
         }
 
+        // 源头规范化客观题答案：统一成 A-E 字母集合，避免 "B."/"答案：B"/判断题中文 造成判分对错不一致
+        for (Map<String, Object> q : finalObj) {
+            Object a = q.get("answer");
+            if (a != null) q.put("answer", canonicalObjective(String.valueOf(a)));
+        }
+
         dto.setObjectiveQuestions(finalObj);
         dto.setSubjectiveQuestions(finalSub);
     }
@@ -339,6 +369,27 @@ public class QuestionService {
      * 确保题目列表中的每道题都有 answer 和 explanation。
      * 缺失时调用 AI 单独补全。
      */
+    private String canonicalObjective(String raw) {
+        if (raw == null) return "";
+        String s = raw.trim();
+        if (s.isEmpty()) return "";
+        java.util.TreeSet<Character> letters = new java.util.TreeSet<>();
+        for (char c : s.toCharArray()) {
+            if ((c >= 'A' && c <= 'E') || (c >= 'a' && c <= 'e')) letters.add(Character.toUpperCase(c));
+        }
+        if (!letters.isEmpty()) {
+            StringBuilder sb = new StringBuilder();
+            for (Character c : letters) sb.append(c);
+            return sb.toString();
+        }
+        String low = s.toLowerCase();
+        if (s.contains("错") || s.contains("不") || s.contains("非") || s.contains("否")
+                || s.contains("×") || s.contains("✗") || low.equals("f") || low.equals("false")) return "B";
+        if (s.contains("正确") || s.contains("对") || s.contains("是") || s.contains("√") || s.contains("✓")
+                || low.equals("t") || low.equals("true")) return "A";
+        return s;
+    }
+
     public void ensureAnswersAndExplanations(List<Map<String, Object>> questions) {
         if (questions == null || questions.isEmpty()) return;
         List<java.util.concurrent.CompletableFuture<Void>> futures = new ArrayList<>();

@@ -43,31 +43,44 @@
         <template v-if="chapterGroups.length > 0">
           <template v-for="g in chapterGroups" :key="g.name">
             <div v-if="g.questions.some(q=>q.type!=='subjective')" class="chapter-header">{{ g.name }}</div>
-            <ObjectiveQuestionCard
+            <template
               v-for="(q,i) in g.questions.filter(q=>q.type!=='subjective')"
               :key="getQid(q,i)"
+            >
+              <ObjectiveQuestionCard
+                :question="q"
+                :result="results[getQid(q,i)]||null"
+                :index="i"
+                :initial-answer="getDraftAnswer(getQid(q,i))"
+                ref="objCardRefs"
+                @submit="(e)=>handleSubmitObjective(e,getQid(q,i),q)"
+                @change="(e)=>handleSelectionChange(e)"
+                @update-answer="(e)=>handleUpdateAnswer(e,q)"
+              />
+              <ErrorTypeTagger
+                v-if="q.id && results[getQid(q,i)] && results[getQid(q,i)].correct===false"
+                :question-id="q.id"
+              />
+            </template>
+          </template>
+        </template>
+        <template v-else>
+          <template v-for="(q,i) in objQ" :key="getQid(q,i)">
+            <ObjectiveQuestionCard
               :question="q"
               :result="results[getQid(q,i)]||null"
               :index="i"
+              :initial-answer="getDraftAnswer(getQid(q,i))"
               ref="objCardRefs"
               @submit="(e)=>handleSubmitObjective(e,getQid(q,i),q)"
               @change="(e)=>handleSelectionChange(e)"
               @update-answer="(e)=>handleUpdateAnswer(e,q)"
             />
+            <ErrorTypeTagger
+              v-if="q.id && results[getQid(q,i)] && results[getQid(q,i)].correct===false"
+              :question-id="q.id"
+            />
           </template>
-        </template>
-        <template v-else>
-          <ObjectiveQuestionCard
-            v-for="(q,i) in objQ"
-            :key="getQid(q,i)"
-            :question="q"
-            :result="results[getQid(q,i)]||null"
-            :index="i"
-            ref="objCardRefs"
-            @submit="(e)=>handleSubmitObjective(e,getQid(q,i),q)"
-            @change="(e)=>handleSelectionChange(e)"
-            @update-answer="(e)=>handleUpdateAnswer(e,q)"
-          />
         </template>
       </div>
 
@@ -76,29 +89,42 @@
         <template v-if="chapterGroups.length > 0">
           <template v-for="g in chapterGroups" :key="g.name">
             <div v-if="g.questions.some(q=>q.type==='subjective')" class="chapter-header">{{ g.name }}</div>
-            <SubjectiveQuestionCard
+            <template
               v-for="(q,i) in g.questions.filter(q=>q.type==='subjective')"
               :key="getQid(q,i)"
+            >
+              <SubjectiveQuestionCard
+                :question="q"
+                :result="results[getQid(q,i)]||null"
+                :index="i"
+                ref="subCardRefs"
+                @submit="(e)=>handleSubmitSubjective(e,getQid(q,i))"
+                @change="(e)=>handleSubjectiveDraft(e)"
+                @update-answer="(e)=>handleUpdateAnswer(e,q)"
+              />
+              <ErrorTypeTagger
+                v-if="q.id && results[getQid(q,i)] && results[getQid(q,i)].correct===false"
+                :question-id="q.id"
+              />
+            </template>
+          </template>
+        </template>
+        <template v-else>
+          <template v-for="(q,i) in subQ" :key="getQid(q,i)">
+            <SubjectiveQuestionCard
               :question="q"
               :result="results[getQid(q,i)]||null"
               :index="i"
               ref="subCardRefs"
               @submit="(e)=>handleSubmitSubjective(e,getQid(q,i))"
+              @change="(e)=>handleSubjectiveDraft(e)"
               @update-answer="(e)=>handleUpdateAnswer(e,q)"
             />
+            <ErrorTypeTagger
+              v-if="q.id && results[getQid(q,i)] && results[getQid(q,i)].correct===false"
+              :question-id="q.id"
+            />
           </template>
-        </template>
-        <template v-else>
-          <SubjectiveQuestionCard
-            v-for="(q,i) in subQ"
-            :key="getQid(q,i)"
-            :question="q"
-            :result="results[getQid(q,i)]||null"
-            :index="i"
-            ref="subCardRefs"
-            @submit="(e)=>handleSubmitSubjective(e,getQid(q,i))"
-            @update-answer="(e)=>handleUpdateAnswer(e,q)"
-          />
         </template>
       </div>
 
@@ -153,8 +179,11 @@ import { useQuestionsStore } from '../stores/questions'
 import { usePracticeStore } from '../stores/practice'
 import { showSuccessToast, showFailToast } from 'vant'
 import request from '../utils/request.js'
+import { classify } from '../utils/questionType.js'
+import { loadDraftStore, saveDraftAnswer, removeDraftAnswer } from '../utils/practiceDraft.js'
 import ObjectiveQuestionCard from '../components/ObjectiveQuestionCard.vue'
 import SubjectiveQuestionCard from '../components/SubjectiveQuestionCard.vue'
+import ErrorTypeTagger from '../components/ErrorTypeTagger.vue'
 import { CyberNavbar, CyberButton, CyberProgress } from '../components/cyber'
 
 const router = useRouter()
@@ -167,11 +196,34 @@ const batchSubmitting = ref(false)
 const objCardRefs = ref([])
 const subCardRefs = ref([])
 
+// 每题作答计时：记录首次作答时间，提交时换算成秒上报（慢题判定）
+const pageMountAt = Date.now()
+const firstTouchAt = {}
+function markTouch(qid) {
+  if (qid == null) return
+  if (!firstTouchAt[qid]) firstTouchAt[qid] = Date.now()
+}
+function calcAnswerTime(qid) {
+  const start = firstTouchAt[qid] || pageMountAt
+  return Math.max(1, Math.round((Date.now() - start) / 1000))
+}
+// 题面是否缺标准答案（判分前先补齐，避免对错与标色不一致）
+function isQAnswerMissing(q) {
+  const a = q?.answer
+  return !a || typeof a !== 'string' || a === '参考答案未提供' || a === '未提供' || a.trim() === ''
+}
+
 /** 统一题目 ID 提取：id → _id → 数组索引 */
 function getQid(q, idx) { return q?.id || q?._id || idx }
 
 // 暂存用户选择但未提交的答案
 const pendingAnswers = reactive(new Map())
+// 双模式共享的未提交草稿缓存（供客观题卡片 initial-answer 回显）
+const draftCache = reactive({})
+function getDraftAnswer(qid) { return draftCache[qid]?.answer || null }
+function findQIndex(qid) {
+  return allQuestions.value.findIndex((q, i) => getQid(q, i) === qid)
+}
 
 const allQuestions = computed(() => qStore.questions || [])
 const objQ = computed(() => allQuestions.value.filter(q => q.type !== 'subjective'))
@@ -225,6 +277,25 @@ const encouragements = [
 ]
 const encouragement = computed(() => encouragements[Math.floor(Math.random() * encouragements.length)])
 
+// setup 阶段立即恢复共享草稿：必须早于子组件 setup（主观卡挂载即读 subj_ans localStorage）
+;(function restoreDraftOnSetup() {
+  const sectionId = pStore.currentSectionId
+  if (!sectionId) return
+  const validQids = (qStore.questions || []).map((q, i) => getQid(q, i))
+  const store = loadDraftStore(sectionId, validQids)
+  // recordId 不被 questions store 持久化，刷新后回填，保证提交仍关联套题
+  if (qStore.recordId == null && store.recordId != null) qStore.recordId = store.recordId
+  Object.entries(store.answers || {}).forEach(([qid, item]) => {
+    draftCache[qid] = item
+    if (item.type === 'subjective') {
+      // 主观卡挂载时直接从该 key 读取，必须在其 setup 前写好
+      try { localStorage.setItem('subj_ans_' + qid, item.answer) } catch (e) { /* 忽略 */ }
+    } else {
+      pendingAnswers.set(qid, item.answer)
+    }
+  })
+})()
+
 onMounted(() => {
   initFromStore()
 })
@@ -233,19 +304,51 @@ function initFromStore() {
   const sectionId = pStore.currentSectionId
   if (!sectionId) return
   Object.keys(results).forEach(k => delete results[k])
-  pendingAnswers.clear()
   pStore.initSection(sectionId, allQuestions.value.length, '刷题练习', 'practice')
   const saved = pStore.getSectionAnswers(sectionId)
-  Object.keys(saved).forEach(k => { results[k] = saved[k] })
+  Object.keys(saved).forEach(k => {
+    results[k] = saved[k]
+    // 已提交结果优先：清掉对应未提交草稿，避免卡片回显旧选择、待提交数虚高
+    if (draftCache[k]) { delete draftCache[k]; pendingAnswers.delete(k) }
+  })
 }
 
 function handleSelectionChange(e) {
   if (results[e.questionId]) return
+  const secId = pStore.currentSectionId
+  const qi = findQIndex(e.questionId)
+  const type = qi >= 0 ? classify(allQuestions.value[qi]).type : ''
   if (e.userAnswer) {
+    markTouch(e.questionId)
     pendingAnswers.set(e.questionId, e.userAnswer)
+    draftCache[e.questionId] = { answer: e.userAnswer, type, ts: Date.now() }
+    saveDraftAnswer(secId, e.questionId, e.userAnswer, type)
   } else {
     pendingAnswers.delete(e.questionId)
+    delete draftCache[e.questionId]
+    removeDraftAnswer(secId, e.questionId)
   }
+}
+
+// 主观题输入同步到共享草稿（subj_ans 镜像仍由子组件自己维护）
+function handleSubjectiveDraft(e) {
+  if (results[e.questionId]) return
+  const secId = pStore.currentSectionId
+  const val = (e.userAnswer || '').trim()
+  if (val) {
+    markTouch(e.questionId)
+    draftCache[e.questionId] = { answer: e.userAnswer, type: 'subjective', ts: Date.now() }
+    saveDraftAnswer(secId, e.questionId, e.userAnswer, 'subjective')
+  } else {
+    delete draftCache[e.questionId]
+    removeDraftAnswer(secId, e.questionId)
+  }
+}
+
+// 已提交：从共享草稿移除（结果归 pinia 持久化），并清本地缓存
+function dropDraft(questionId) {
+  delete draftCache[questionId]
+  removeDraftAnswer(pStore.currentSectionId, questionId)
 }
 
 async function handleSubmitObjective(e, questionId, question) {
@@ -253,17 +356,33 @@ async function handleSubmitObjective(e, questionId, question) {
   if (!question) { results[questionId] = e; return }
 
   try {
+    // 先补缺失标准答案再判分，保证“对错结论”和“题面标色”同源
+    if (isQAnswerMissing(question)) {
+      try {
+        const g = await request.post('/generate-answer', {
+          question: question.question,
+          type: question.type || 'single',
+          category: question.category || '',
+          options: question.options || null,
+          answer: question.answer || ''
+        })
+        if (g.answer) question.answer = g.answer
+        if (g.explanation) question.explanation = g.explanation
+      } catch (genErr) { /* 补答案失败仍继续尝试判分 */ }
+    }
     // 修复：单题提交必须带 recordId，打通后端进度链路
     const r = await request.post("/check", {
       questionId,
       userAnswer: e.userAnswer,
       question,
       questionType: question.type,
-      recordId: qStore.recordId || null
+      recordId: qStore.recordId || null,
+      answerTime: calcAnswerTime(questionId)
     })
     r.userAnswer = e.userAnswer
     results[questionId] = r
     pendingAnswers.delete(questionId)
+    dropDraft(questionId)
     const secId = pStore.currentSectionId
     if (!secId) return
     pStore.recordAnswer(secId, r?.correct === true)
@@ -278,6 +397,7 @@ function handleSubmitSubjective(e, questionId) {
   if (results[questionId]) return
   results[questionId] = { correct: e.isCorrect === true, evaluation: e.evaluation || '', score: e.score || 0 }
   pendingAnswers.delete(questionId)
+  dropDraft(questionId)
   const secId = pStore.currentSectionId
   if (!secId) return
   pStore.recordAnswer(secId, e.isCorrect === true)
@@ -311,7 +431,8 @@ async function batchSubmit() {
           userAnswer: userAnswer,
           questionType: q.type || 'single',
           questionIndex: idx,
-          recordId: qStore.recordId
+          recordId: qStore.recordId,
+          answerTime: calcAnswerTime(questionId)
         })
       }
     }
@@ -329,7 +450,8 @@ async function batchSubmit() {
             userAnswer: userAnswer,
             questionType: 'subjective',
             questionIndex: allQuestions.value.indexOf(q),
-            recordId: qStore.recordId
+            recordId: qStore.recordId,
+            answerTime: calcAnswerTime(qId)
           })
         }
       }
@@ -341,6 +463,23 @@ async function batchSubmit() {
       return
     }
 
+    // 先补缺失标准答案再判分，避免对错结论与题面标色不一致
+    const needGenAns = answers.filter(a => isQAnswerMissing(a.question))
+    if (needGenAns.length > 0) {
+      await Promise.all(needGenAns.map(a =>
+        request.post('/generate-answer', {
+          question: a.question.question,
+          type: a.questionType,
+          category: a.question.category || '',
+          options: a.question.options || null,
+          answer: a.question.answer || ''
+        }).then(g => {
+          if (g.answer) a.question.answer = g.answer
+          if (g.explanation) a.question.explanation = g.explanation
+        }).catch(() => {})
+      ))
+    }
+
     const res = await request.post('/check-batch', { answers })
 
     res.results.forEach((r, idx) => {
@@ -348,6 +487,7 @@ async function batchSubmit() {
       if (results[qId]) return
       results[qId] = r
       pendingAnswers.delete(qId)
+      dropDraft(qId)
       const secId = pStore.currentSectionId
       if (!secId) return
       pStore.recordAnswer(secId, r?.correct === true)
