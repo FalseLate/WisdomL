@@ -19,9 +19,74 @@ const routes = [
   // /user-center 已废弃，统一使用 /profile（ProfileView 新版个人中心）
   // /favorites 已废弃，统一使用 /collections（CollectionsView）
   {
+    path: '/word/book',
+    name: 'WordBook',
+    component: () => import('../views/WordBookView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/word/plan',
+    name: 'WordPlan',
+    component: () => import('../views/WordPlanView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/word/study',
+    name: 'WordStudy',
+    component: () => import('../components/WordStudy.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/word-quiz',
-    name: 'WordQuiz',
-    component: () => import('../components/WordStudy.vue')
+    redirect: '/word/home'
+  },
+  {
+    path: '/word/home',
+    name: 'WordHome',
+    component: () => import('../views/WordHomeView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/word/my',
+    name: 'WordMyStudy',
+    component: () => import('../views/WordMyStudyView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/word/notebook',
+    name: 'VocabNotebook',
+    component: () => import('../views/VocabNotebookView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/word/english-wrong',
+    name: 'EnglishWrongReview',
+    component: () => import('../views/EnglishWrongReviewView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/wiki/mine',
+    name: 'MyWiki',
+    component: () => import('../views/MyWikiView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/study-map',
+    name: 'StudyMap',
+    component: () => import('../views/StudyMapView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/reading/home',
+    name: 'ReadingHome',
+    component: () => import('../views/ReadingHomeView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/reading/article',
+    name: 'ReadingArticle',
+    component: () => import('../views/ReadingArticleView.vue'),
+    meta: { requiresAuth: true }
   },
   { path: '/:pathMatch(.*)*', redirect: '/' }
 ]

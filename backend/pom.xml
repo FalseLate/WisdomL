@@ -4,6 +4,12 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
+    <!-- =========新增阿里云Maven镜像仓库，解决下载超时========= -->
+
+
+
+    
+
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
@@ -19,6 +25,7 @@
 
     <properties>
         <java.version>17</java.version>
+
     </properties>
 
     <dependencies>
@@ -107,7 +114,28 @@
             <artifactId>easyexcel</artifactId>
             <version>3.3.2</version>
         </dependency>
+
+        <!-- ===== 口语陪练模块（speaking，源自 ches）依赖 ===== -->
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-harness</artifactId>
+            <version>2.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-model-openai</artifactId>
+            <version>2.0.0</version>
+        </dependency>
+        <!-- webflux：只为让 Controller 能返回 Mono/Flux（SSE 流式），与 servlet web 共存 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+
+
+
     </dependencies>
+
 
     <build>
         <plugins>

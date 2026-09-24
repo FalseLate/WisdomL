@@ -24,6 +24,16 @@ public class WordController {
     @Resource
     private UserWordService userWordService;
 
+    // 阅读划词查词：先查词库，查不到时 GLM 兜底出音标释义并动态入库（level=ext），下次命中词库
+    @GetMapping("/query")
+    public Map<String, Object> queryWord(@RequestParam String text) {
+        Map<String, Object> res = new HashMap<>();
+        Word word = wordService.findByTextOrFetch(text);
+        res.put("code", 200);
+        res.put("data", word); // GLM 也查不到（非单词/调用失败）时 data 为 null，前端据此提示未收录
+        return res;
+    }
+
     // 随机单词（拼写模式）
     @GetMapping("/random")
     public Map<String, Object> getRandom(@RequestParam(required = false) String level) {
@@ -56,6 +66,42 @@ public class WordController {
         Map<String, Object> map = new HashMap<>();
         map.put("code", 200);
         map.put("data", list);
+        return map;
+    }
+
+    // 今日待复习生词（间隔重复：新词 + 到期词）
+    @GetMapping("/review/due")
+    public Map<String, Object> reviewDue(@RequestParam Long userId) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("code", 200);
+        map.put("data", userWordService.getDueWords(userId));
+        return map;
+    }
+
+    // 复习结果回写：results = [{wordId, correct}]
+    @PostMapping("/review/finish")
+    public Map<String, Object> reviewFinish(@RequestBody Map<String, Object> body) {
+        Map<String, Object> map = new HashMap<>();
+        try {
+            Long userId = Long.valueOf(body.get("userId").toString());
+            Object rs = body.get("results");
+            int updated = 0;
+            if (rs instanceof List<?> list) {
+                for (Object o : list) {
+                    if (o instanceof Map<?, ?> m && m.get("wordId") != null && m.get("correct") != null) {
+                        userWordService.recordReviewResult(userId,
+                                Long.valueOf(m.get("wordId").toString()),
+                                Boolean.parseBoolean(m.get("correct").toString()));
+                        updated++;
+                    }
+                }
+            }
+            map.put("code", 200);
+            map.put("updated", updated);
+        } catch (Exception e) {
+            map.put("code", 500);
+            map.put("msg", "复习结果回写失败");
+        }
         return map;
     }
 
@@ -106,6 +152,8 @@ public class WordController {
         long count = userWordService.count(wrapper);
 
         Map<String, Object> map = new HashMap<>();
+
+
         if (count > 0) {
             map.put("code", 400);
             map.put("msg", "该单词已加入生词本");

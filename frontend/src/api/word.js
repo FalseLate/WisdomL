@@ -62,3 +62,30 @@ export function getMyCollectList(userId) {
     params: { userId }
   })
 }
+
+// 今日待复习生词（间隔重复：新词 + 到期词），返回 user_word 行（含 wordId/reviewCount/intervalDays/nextReviewAt）
+export function getReviewDue(userId) {
+  return request({
+    url: '/word/review/due',
+    method: 'GET',
+    params: { userId }
+  })
+}
+
+// 复习结果回写：results = [{ wordId, correct }]
+export function finishReview(data) {
+  return request({
+    url: '/word/review/finish',
+    method: 'POST',
+    data
+  })
+}
+
+// 阅读划词：按单词文本精确查询
+export function queryWord(text) {
+  return request({
+    url: '/word/query',
+    method: 'GET',
+    params: { text }
+  })
+}

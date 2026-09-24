@@ -72,8 +72,8 @@
               @click="goWordQuiz">
               <div class="func-tag tag-new">NEW</div>
               <div class="func-icon">📖</div>
-              <div class="func-name">WORD</div>
-              <div class="func-desc">单词记忆智能刷题</div>
+              <div class="func-name">英语学习</div>
+              <div class="func-desc">词书计划 · 刷题拼写 · 断点续学</div>
             </div>
 
             <!-- PHOTO -->
@@ -99,7 +99,7 @@
               <div class="func-tag tag-new">NEW</div>
               <div class="func-icon">🧠</div>
               <div class="func-name">AI MIND</div>
-              <div class="func-desc">知识图谱智能分析</div>
+              <div class="func-desc">学习图谱 · 知识点总结与周报</div>
             </div>
           </div>
         </section>
@@ -279,7 +279,7 @@
         <div class="bottom-entries">
           <div class="entry-item" @click="$router.push('/question-bank')">📎 我的题库</div>
           <div class="entry-item" @click="$router.push('/history')">📚 历史记录</div>
-          <div class="entry-item" @click="goWordQuiz">📖 单词刷题</div>
+          <div class="entry-item" @click="goWordQuiz">📖 英语学习</div>
         </div>
       </div>
     </div>
@@ -439,12 +439,13 @@ function goNotifications() {
   showSuccessToast('暂无新通知')
 }
 
+// 数据分析 / AI 知识图谱 → 学习图谱页（知识点思维导图 + 学习周报）
 function goAnalysis() {
   if (!isLoggedIn()) { showLoginDialog.value = true; return } else { router.push('/error-stats') }
 }
 
 function openAiMind() {
-  showSuccessToast('AI 知识图谱功能开发中')
+  router.push('/study-map')
 }
 
 // ===== 原来的出题逻辑（完整保留） =====

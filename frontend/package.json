@@ -9,6 +9,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@pixiv/three-vrm": "^3.5.5",
+    "@pixiv/three-vrm-animation": "^3.5.5",
     "@mediapipe/camera_utils": "^0.3.1675466862",
     "@mediapipe/hands": "^0.4.1675469240",
     "axios": "^1.18.1",
@@ -16,9 +18,11 @@
     "echarts": "^6.1.0",
     "pinia": "^4.0.2",
     "pinia-plugin-persistedstate": "^4.7.1",
+    "three": "^0.186.0",
     "vant": "^4.10.0",
     "vue": "^3.5.39",
-    "vue-router": "^4.6.4"
+    "vue-router": "^4.6.4",
+    "wlipsync": "^1.3.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

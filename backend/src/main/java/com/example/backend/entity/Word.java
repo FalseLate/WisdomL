@@ -16,6 +16,7 @@ public class Word {
     private String phonetic;
     private String cnMean;
     private String sentence;
+
     private String level;
     private LocalDateTime createTime;
 }
