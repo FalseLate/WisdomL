@@ -61,6 +61,34 @@
       </div>
       <div v-else-if="words.length" class="due-done-tip">今日生词复习已完成 ✓ 明天再来</div>
 
+      <!-- AI 挖空抽查（阶段2）：入口 + 出题卡，结果回写间隔重复调度 -->
+      <div v-if="!quiz.show && dueWords.length" class="quiz-entry" @click="loadQuiz">
+        🤖 AI 挖空抽查 — 让 AI 用你的生词出题考你
+      </div>
+      <div v-if="quiz.show" class="quiz-card">
+        <div class="quiz-head">
+          <span class="quiz-badge">🤖 AI 挖空抽查</span>
+          <span class="quiz-close" @click="quiz.show = false">收起</span>
+        </div>
+        <div class="quiz-loading" v-if="quiz.loading">AI 正在出题…</div>
+        <template v-else-if="quiz.sentence">
+          <div class="quiz-sentence" @click="speak(quiz.word)">{{ quiz.sentence }}</div>
+          <div class="quiz-q">根据句意选出空缺的单词：</div>
+          <button
+            v-for="opt in quiz.options"
+            :key="opt"
+            class="option-btn"
+            :class="quizBtnClass(opt)"
+            :disabled="!!quiz.picked"
+            @click="pickQuiz(opt)"
+          >{{ opt }}</button>
+          <div class="quiz-next" v-if="quiz.picked">
+            <van-button size="small" round plain @click="quiz.show = false">先到这</van-button>
+            <van-button size="small" round type="primary" @click="loadQuiz">下一题</van-button>
+          </div>
+        </template>
+      </div>
+
       <!-- 顶部统计 + 复习入口 -->
       <div class="stats-card">
         <div class="sc-left">
@@ -115,10 +143,11 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { showSuccessToast, showFailToast, showConfirmDialog } from 'vant'
 import { removeWordCollect, getMyCollectList, getReviewDue, finishReview } from '../api/word'
+import { getBlankQuiz } from '../api/englishAgent'
 import { authState } from '../utils/auth.js'
 import request from '../utils/request'
 
@@ -323,6 +352,57 @@ function exitReview() {
   reviewing.value = false
   reviewFinished.value = false
 }
+
+// ===== AI 挖空抽查（阶段2）：Agent 用到期生词造句挖空，作答立即回写间隔重复调度 =====
+const quiz = reactive({
+  show: false, loading: false,
+  sentence: '', options: [],
+  wordId: null, word: '',
+  picked: '', pickedCorrect: false
+})
+
+async function loadQuiz() {
+  quiz.show = true
+  quiz.loading = true
+  quiz.sentence = ''
+  quiz.picked = ''
+  try {
+    await ensureUserId()
+    const res = await getBlankQuiz()
+    const d = res.code === 200 ? res.data : null
+    if (!d) {
+      quiz.show = false
+      showFailToast('今日没有到期生词，先去背几个新词吧')
+      return
+    }
+    quiz.sentence = d.sentence
+    quiz.options = d.options
+    quiz.wordId = d.wordId
+    quiz.word = d.word
+  } catch (e) {
+    quiz.show = false
+    showFailToast('AI 出题失败，请稍后再试')
+  } finally {
+    quiz.loading = false
+  }
+}
+
+function pickQuiz(opt) {
+  if (quiz.picked) return
+  quiz.picked = opt
+  quiz.pickedCorrect = opt === quiz.word
+  // 单词作答立即回写（答对间隔×2、答错重置1天），顺带刷新到期横幅
+  finishReview({ userId, results: [{ wordId: quiz.wordId, correct: quiz.pickedCorrect }] })
+    .then(loadDue)
+    .catch(() => { /* 回写失败不影响本地判题展示 */ })
+}
+
+function quizBtnClass(opt) {
+  if (!quiz.picked) return ''
+  if (opt === quiz.word) return 'correct'
+  if (opt === quiz.picked) return 'wrong'
+  return ''
+}
 </script>
 
 <style scoped>
@@ -379,6 +459,80 @@ function exitReview() {
   font-size: 13px;
   color: var(--text-secondary);
   text-align: center;
+}
+
+/* AI 挖空抽查 */
+.quiz-entry {
+  margin-bottom: 12px;
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border: 1px dashed rgba(124, 58, 237, 0.5);
+  border-radius: 14px;
+  font-size: 14px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.quiz-entry:hover {
+  border-color: #a78bfa;
+}
+
+.quiz-card {
+  margin-bottom: 12px;
+  padding: 16px;
+  background: var(--bg-card);
+  border: 1px solid rgba(124, 58, 237, 0.45);
+  border-radius: 16px;
+}
+
+.quiz-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.quiz-badge {
+  font-size: 13px;
+  font-weight: 700;
+  color: #a78bfa;
+}
+
+.quiz-close {
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.quiz-sentence {
+  margin-top: 10px;
+  padding: 12px 14px;
+  background: var(--bg-elevated);
+  border-radius: 12px;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.quiz-q {
+  margin: 12px 0 4px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.quiz-loading {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.quiz-next {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 6px;
 }
 
 /* 顶部统计卡 */

@@ -21,6 +21,8 @@ public class EnglishWrongExt {
     private Integer redoCount;     // 重做次数
     private Integer backflowFlag;  // 1回流下一轮PDCA 0已攻克
     private LocalDateTime lastRedoAt;
+    private Long absorbedWikiId;   // 该错题已沉淀的私人 Wiki 条目 id（同题去重用）
+    private Integer lastRedoCorrect;  // 最近一次原题重做对错（1对0错，攻克判定用）
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -36,4 +38,8 @@ public class EnglishWrongExt {
     public void setBackflowFlag(Integer backflowFlag) { this.backflowFlag = backflowFlag; }
     public LocalDateTime getLastRedoAt() { return lastRedoAt; }
     public void setLastRedoAt(LocalDateTime lastRedoAt) { this.lastRedoAt = lastRedoAt; }
+    public Long getAbsorbedWikiId() { return absorbedWikiId; }
+    public void setAbsorbedWikiId(Long absorbedWikiId) { this.absorbedWikiId = absorbedWikiId; }
+    public Integer getLastRedoCorrect() { return lastRedoCorrect; }
+    public void setLastRedoCorrect(Integer lastRedoCorrect) { this.lastRedoCorrect = lastRedoCorrect; }
 }

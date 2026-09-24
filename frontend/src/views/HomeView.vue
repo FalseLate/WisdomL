@@ -99,7 +99,7 @@
               <div class="func-tag tag-new">NEW</div>
               <div class="func-icon">🧠</div>
               <div class="func-name">AI MIND</div>
-              <div class="func-desc">知识图谱智能分析</div>
+              <div class="func-desc">学习图谱 · 知识点总结与周报</div>
             </div>
           </div>
         </section>
@@ -435,12 +435,13 @@ function goNotifications() {
   showSuccessToast('暂无新通知')
 }
 
+// 数据分析 / AI 知识图谱 → 学习图谱页（知识点思维导图 + 学习周报）
 function goAnalysis() {
-  showSuccessToast('数据分析功能开发中')
+  router.push('/study-map')
 }
 
 function openAiMind() {
-  showSuccessToast('AI 知识图谱功能开发中')
+  router.push('/study-map')
 }
 
 // ===== 原来的出题逻辑（完整保留） =====

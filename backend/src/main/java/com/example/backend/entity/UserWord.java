@@ -20,5 +20,8 @@ public class UserWord {
     private Integer reviewCount;
     private Integer intervalDays;
     private LocalDateTime nextReviewAt;   // NULL=新词，立即待复习
+    private LocalDateTime createTime;     // 收录时间（周报统计本周新词）
     private LocalDateTime lastReviewAt;
+    public LocalDateTime getCreateTime() { return createTime; }
+    public void setCreateTime(LocalDateTime createTime) { this.createTime = createTime; }
 }

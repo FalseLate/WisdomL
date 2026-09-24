@@ -4,6 +4,16 @@
 
     <!-- 内容压过全局粒子画布，否则点击被吃掉 -->
     <div class="page-container">
+      <!-- AI 个性化阅读（阶段2）：用我的薄弱生词定制一篇短文+理解题，做完进既有错题本链路 -->
+      <div class="ai-gen-card" @click="genArticle">
+        <div class="ag-left">
+          <div class="ag-title">✨ AI 定制阅读</div>
+          <div class="ag-sub">用你的薄弱生词现场生成一篇短文 + 3 道理解题</div>
+        </div>
+        <span class="ag-go" v-if="!generating">生成</span>
+        <span class="ag-go loading" v-else>生成中…</span>
+      </div>
+
       <!-- 难度筛选 -->
       <div class="level-row">
         <div
@@ -35,7 +45,9 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { showFailToast, showLoadingToast, closeToast } from 'vant'
 import { getReadingArticles } from '../api/reading'
+import { generateReading } from '../api/englishAgent'
 
 const router = useRouter()
 
@@ -56,7 +68,30 @@ function levelName(lv) {
 }
 
 function genreName(g) {
-  return { story: '故事', news: '新闻', science: '科普', essay: '议论文' }[g] || '阅读'
+  return { story: '故事', news: '新闻', science: '科普', essay: '议论文', ai: 'AI 定制' }[g] || '阅读'
+}
+
+// AI 个性化阅读生成：后端用我的到期生词现场写一篇并入库，成功后直接跳去做题
+const generating = ref(false)
+
+async function genArticle() {
+  if (generating.value) return
+  generating.value = true
+  showLoadingToast({ message: 'AI 正在为你写文章…', duration: 0, forbidClick: true })
+  try {
+    const res = await generateReading()
+    closeToast()
+    if (res.code === 200 && res.id) {
+      router.push({ path: '/reading/article', query: { id: res.id } })
+    } else {
+      showFailToast(res.msg || '生成失败，请稍后再试')
+    }
+  } catch (e) {
+    closeToast()
+    showFailToast('生成失败，请稍后再试')
+  } finally {
+    generating.value = false
+  }
 }
 
 async function load() {
@@ -129,6 +164,48 @@ onMounted(load)
   margin: 10px 0 4px;
   font-size: 12px;
   color: var(--text-secondary);
+}
+
+/* AI 定制阅读入口卡 */
+.ai-gen-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.18), rgba(79, 124, 255, 0.12));
+  border: 1px solid rgba(167, 139, 250, 0.55);
+  border-radius: 16px;
+  cursor: pointer;
+}
+
+.ag-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.ag-sub {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.ag-go {
+  flex-shrink: 0;
+  padding: 6px 16px;
+  border-radius: 999px;
+  background: rgba(167, 139, 250, 0.2);
+  border: 1px solid rgba(167, 139, 250, 0.6);
+  color: #c4b5fd;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ag-go.loading {
+  opacity: 0.7;
+  cursor: default;
 }
 
 /* 文章卡片 */

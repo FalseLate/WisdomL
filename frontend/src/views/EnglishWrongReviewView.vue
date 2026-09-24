@@ -43,7 +43,8 @@
 
         <!-- 重做结果 -->
         <div class="wc-redo-result" v-if="item._redoPicked">
-          <template v-if="item._redoPicked === item.correctAnswer">🎉 重做正确，本题已攻克，退出回流！</template>
+          <template v-if="item._redoPicked === item.correctAnswer && item._needVariant">✅ 重做正确！再做一道 AI 变式题验证掌握，才算真正攻克 👇</template>
+          <template v-else-if="item._redoPicked === item.correctAnswer">🎉 重做正确，本题已攻克，退出回流！</template>
           <template v-else>❌ 重做错误，正确答案 {{ item.correctAnswer }}，留在复习池下轮再来</template>
         </div>
 
@@ -54,7 +55,7 @@
         </div>
         <div class="wc-explain" v-if="item.explanation">{{ item.explanation }}</div>
 
-        <!-- 错因标记 -->
+        <!-- 错因标记（手动 + AI 自动识别，识别后仍可手动覆盖） -->
         <div class="etype-row">
           <span class="etype-label">错因：</span>
           <span
@@ -64,11 +65,39 @@
             :class="{ active: hasErrorType(item, t.id) }"
             @click="toggleErrorType(item, t.id)"
           >{{ t.name }}</span>
+          <span class="etype-pill ai-tag" :class="{ busy: item._aiBusy }" @click="aiTag(item)">
+            {{ item._aiBusy ? '识别中…' : '🤖 AI 识别' }}
+          </span>
+          <span class="etype-pill ai-tag" :class="{ busy: item._absorbBusy }" @click="absorb(item)">
+            {{ item._absorbBusy ? '提炼中…' : item._absorbed ? '📌 已入我的Wiki' : '📌 提炼笔记' }}
+          </span>
+        </div>
+        <div class="wc-ai-reason" v-if="item._aiReason">AI 分析：{{ item._aiReason }}</div>
+        <div class="wc-ai-reason absorb" v-if="item._absorbedTitle">已沉淀笔记：{{ item._absorbedTitle }}（在我的Wiki里可查看）</div>
+
+        <!-- AI 变式挑战（阶段3）：同考点换考法，变式答对 + 原题重做对 = 攻克 -->
+        <div class="variant-box" v-if="item._varBusy || (item._variants && item._variants.length)">
+          <div class="vb-title">🎯 AI 变式挑战 · 同考点换考法，答对一题即可验证掌握</div>
+          <div v-for="v in item._variants" :key="v.id" class="vb-item">
+            <div class="vb-q">{{ v.question?.question }}</div>
+            <div class="vb-opts">
+              <div
+                v-for="(val, k) in (v.question?.options || {})"
+                :key="k"
+                class="wc-opt"
+                :class="vOptClass(v, k)"
+                @click="pickVariant(item, v, k)"
+              >{{ k }}. {{ val }}</div>
+            </div>
+            <div class="vb-explain" v-if="v._picked !== null">解析：{{ v.question?.explain }}</div>
+          </div>
+          <div class="vb-done" v-if="item._variantConquered">🎉 变式通过，本题已彻底攻克，退出回流！</div>
         </div>
 
         <!-- 操作 -->
-        <div class="wc-actions" v-if="item.backflowFlag !== 0 && !item._redoMode">
+        <div class="wc-actions" v-if="item.backflowFlag !== 0 && (!item._redoMode || item._needVariant)">
           <van-button size="small" round plain type="primary" @click="startRedo(item)">重做此题</van-button>
+          <van-button size="small" round plain type="warning" :loading="item._varBusy" @click="startVariant(item)">🎯 AI 变式挑战</van-button>
         </div>
       </div>
 
@@ -84,6 +113,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { showSuccessToast, showFailToast } from 'vant'
 import { getEnglishWrongList, saveErrorTypes, submitRedo } from '../api/englishWrong'
+import { autoTagError, absorbWiki, generateVariants, answerVariant } from '../api/englishAgent'
 
 const router = useRouter()
 const list = ref([])
@@ -131,7 +161,7 @@ async function load() {
       list.value = (res.data || []).map(item => {
         let q = null
         try { q = JSON.parse(item.questionContent) } catch (e) { /* 内容解析失败按无题处理 */ }
-        return { ...item, _q: q, _redoMode: false, _redoPicked: null }
+        return { ...item, _q: q, _redoMode: false, _redoPicked: null, _aiBusy: false, _aiReason: null, _absorbBusy: false, _absorbed: false, _absorbedTitle: '', _varBusy: false, _variants: null, _variantConquered: false, _needVariant: false }
       })
     } else {
       showFailToast(res.msg || '加载失败')
@@ -160,6 +190,89 @@ async function toggleErrorType(item, tid) {
   }
 }
 
+// ===== AI 自动错因识别（阶段2）：结果落扩展表，识别后仍可手动覆盖 =====
+async function aiTag(item) {
+  if (item._aiBusy) return
+  item._aiBusy = true
+  try {
+    const res = await autoTagError(item.questionId)
+    if (res.code === 200) {
+      item.errorTypeIds = res.errorTypeIds
+      item._aiReason = res.reason
+      showSuccessToast('AI 已标记错因，可手动调整')
+      absorb(item)   // Act 闭环：识别完错因自动提炼知识笔记，失败不影响错因展示
+    } else {
+      showFailToast(res.msg || 'AI 识别失败')
+    }
+  } catch (e) {
+    showFailToast('AI 识别失败，可手动勾选')
+  } finally {
+    item._aiBusy = false
+  }
+}
+
+// ===== Act 沉淀：把错题知识缺口提炼成私人 Wiki 条目（同题去重，已沉淀的题不重复写） =====
+async function absorb(item) {
+  if (item._absorbBusy || item._absorbed) return
+  item._absorbBusy = true
+  try {
+    const res = await absorbWiki(item.questionId)
+    if (res.code === 200) {
+      item._absorbed = true
+      item._absorbedTitle = res.title
+      showSuccessToast('已沉淀到我的 Wiki')
+    } else {
+      showFailToast(res.msg || '提炼失败')
+    }
+  } catch (e) {
+    showFailToast('AI 提炼失败，可稍后再试')
+  } finally {
+    item._absorbBusy = false
+  }
+}
+
+// ===== AI 变式挑战（阶段3）：同题只生成一次，答对 + 原题重做对 = 攻克 =====
+async function startVariant(item) {
+  if (item._varBusy) return
+  item._varBusy = true
+  try {
+    const res = await generateVariants(item.questionId)
+    if (res.code === 200) {
+      item._variants = (res.variants || []).map(v => ({ ...v, _picked: null }))
+    } else {
+      showFailToast(res.msg || 'AI 出题失败')
+    }
+  } catch (e) {
+    showFailToast('AI 出题失败，可稍后再试')
+  } finally {
+    item._varBusy = false
+  }
+}
+
+function vOptClass(v, k) {
+  return {
+    pickable: v._picked === null,
+    correct: v._picked !== null && k === v.question?.answer,
+    wrong: v._picked === k && k !== v.question?.answer
+  }
+}
+
+async function pickVariant(item, v, k) {
+  if (v._picked !== null) return
+  v._picked = k
+  const correct = k === v.question?.answer
+  try {
+    const res = await answerVariant(v.id, correct)
+    if (res.code === 200 && res.conquered) {
+      item.backflowFlag = 0
+      item._variantConquered = true
+      showSuccessToast('变式通过，已攻克 🎉')
+    } else if (res.code === 200 && correct) {
+      showSuccessToast('变式答对了！原题重做也答对即可攻克')
+    }
+  } catch (e) { /* 回写失败不阻断本地判题展示 */ }
+}
+
 // ===== 重做 =====
 function startRedo(item) {
   item._redoMode = true
@@ -183,7 +296,8 @@ async function pickRedo(item, k) {
     if (res.code === 200) {
       item.redoCount = res.redoCount
       item.backflowFlag = res.backflowFlag
-      if (correct) showSuccessToast('已攻克，退出回流 🎉')
+      item._needVariant = !!res.needVariant
+      if (correct && !res.needVariant) showSuccessToast('已攻克，退出回流 🎉')
     } else {
       showFailToast(res.msg || '回写失败')
     }
@@ -388,10 +502,92 @@ async function pickRedo(item, k) {
   font-weight: 600;
 }
 
+.etype-pill.ai-tag {
+  border-style: dashed;
+  border-color: rgba(167, 139, 250, 0.6);
+  color: #a78bfa;
+}
+
+.etype-pill.ai-tag.busy {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.wc-ai-reason {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #a78bfa;
+  background: rgba(124, 58, 237, 0.1);
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+
+.wc-ai-reason.absorb {
+  color: #86efac;
+  background: rgba(52, 211, 153, 0.1);
+}
+
 .wc-actions {
   margin-top: 10px;
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
+}
+
+/* AI 变式挑战 */
+.variant-box {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px dashed rgba(251, 146, 60, 0.5);
+  border-radius: 10px;
+  background: rgba(251, 146, 60, 0.06);
+}
+
+.vb-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fb923c;
+  margin-bottom: 10px;
+}
+
+.vb-item {
+  margin-bottom: 12px;
+}
+
+.vb-item:last-child {
+  margin-bottom: 0;
+}
+
+.vb-q {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+
+.vb-opts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.vb-explain {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+
+.vb-done {
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--success, #34d399);
 }
 
 .loading-center {

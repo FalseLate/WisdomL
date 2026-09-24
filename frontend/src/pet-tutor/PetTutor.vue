@@ -4,6 +4,18 @@
     <div class="pet-combo" ref="comboRef" :style="comboStyle">
       <div class="pet-holder" ref="holderRef" :style="petScale" @wheel.prevent="onWheelZoom">
         <VirtualHuman ref="avatarRef" :model-url="modelUrl" @clicked="onAvatarClicked" @drag-move="onPetDrag" @ready="onPetReady" />
+        <!-- 迷你功能栏：吸附人物左手边，在缩放层内 → 随人物拖动/缩放一起动 -->
+        <div v-if="menu.show" class="pet-rail">
+          <button v-for="m in RAIL_ITEMS" :key="m.key"
+                  class="rail-btn" :class="{ 'rail-close': m.key === 'close', recording: m.key === 'mic' && recording }"
+                  @pointerdown.prevent="m.key === 'mic' ? railMicDown() : null"
+                  @pointerup.prevent="m.key === 'mic' ? micUp() : null"
+                  @pointerleave="m.key === 'mic' ? micUp() : null"
+                  @click="m.key === 'close' ? (menu.show = false) : (m.key !== 'mic' ? pickFeature(m.key) : null)">
+            <span class="rail-icon">{{ m.key === 'mic' && transcribing ? '✍️' : m.icon }}</span>
+            <span class="rail-tip">{{ m.label }}</span>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -45,10 +57,6 @@
       </button>
     </div>
     <div class="debug-bar">
-      <label>
-        <input type="checkbox" v-model="mockMode" />
-        Mock 模式（跳过大模型，调试链路）
-      </label>
       <select v-model="characterId" class="char-select" title="角色音色">
         <option v-for="v in voices" :key="v.id" :value="v.id">{{ v.label }}</option>
         <option v-if="voices.length === 0" value="jenny">（音色列表未加载）</option>
@@ -57,15 +65,9 @@
       </div>
     </transition>
 
-    <!-- 点击角色 → 功能菜单（Teleport 到 body，fixed 定位跟随点击处） -->
+    <!-- 点空白处收起功能栏（遮罩层在人物之下：不挡角色点击，可再点角色重新唤出） -->
     <Teleport to="body">
       <div v-if="menu.show" class="menu-backdrop" @click="menu.show = false"></div>
-      <div v-if="menu.show" class="feature-menu" :style="{ left: menu.x + 'px', top: menu.y + 'px' }">
-        <div class="menu-title">想让我帮点什么？</div>
-        <button v-for="m in MENU_ITEMS" :key="m.key" class="menu-item" @click="pickFeature(m)">
-          {{ m.icon }} {{ m.label }}
-        </button>
-      </div>
     </Teleport>
 
     <!-- 入学提示气泡：像鱼吐泡泡——头顶先冒两只小椭圆，随后提示气泡弹出，5s 后整组淡出；纯提醒不可点 -->
@@ -106,7 +108,6 @@ const emit = defineEmits(['chat-sent', 'reply-done'])
 const messages = ref([])
 const inputText = ref('')
 const loading = ref(false)
-const mockMode = ref(false)
 // 功能模式：chat=口语陪练（默认，带语音），translate=纯翻译（只出文字，不朗读）
 const mode = ref('chat')
 const chatBoxRef = ref(null)
@@ -179,40 +180,38 @@ async function uploadSpeech(blob) {
   }
 }
 
-// ========== 点击角色 → 功能菜单（快捷填入提问模板；translate 切独立模式） ==========
-const MENU_ITEMS = [
-  { key: 'translate', icon: '🔤', label: '帮我翻译这句', tip: '' },
-  { key: 'practice',  icon: '🗣️', label: '陪我练口语',   tip: '' },
-  { key: 'story',     icon: '📖', label: '讲个短故事',    tip: 'Tell me a short English story. ' },
-  { key: 'lookup-word',    icon: '🔍', label: '查单词（阅读页）' },
+// ========== 点击角色 → 迷你功能栏（吸附人物左手边，深色玻璃圆钮，悬停出文字） ==========
+const RAIL_ITEMS = [
+  { key: 'mic',              icon: '🎤', label: '按住说话' },
+  { key: 'translate',        icon: '🔤', label: '帮我翻译' },
+  { key: 'story',            icon: '📖', label: '讲个短故事', tip: 'Tell me a short English story. ' },
+  { key: 'lookup-word',      icon: '🔍', label: '查单词（阅读页）' },
   { key: 'analyze-sentence', icon: '🧩', label: '解句子（阅读页）' },
-  { key: 'chat',      icon: '🗨️', label: '打开聊天面板' }
+  { key: 'close',            icon: '✕',  label: '收起' }
 ]
-const menu = ref({ show: false, x: 0, y: 0 })
+const menu = ref({ show: false })
 const inputRef = ref(null)
-function onAvatarClicked(e) {
-  menu.value = {
-    show: true,
-    x: Math.min(e.clientX, window.innerWidth - 210),
-    y: Math.min(e.clientY, window.innerHeight - 200)
-  }
+function onAvatarClicked() {
+  menu.value.show = true
 }
-function pickFeature(m) {
+function railMicDown() {
+  chatOpen.value = true   // 识别结果落在输入框，先展开面板让用户看得见
+  micDown()
+}
+function pickFeature(key) {
   menu.value.show = false
-  if (m.key === 'chat') {
-    chatOpen.value = true
-    nextTick(() => inputRef.value?.focus())
-    return
-  }
   // 阅读页联动：广播模式事件，阅读页自行切换 查词/解句 状态
-  if (m.key === 'lookup-word' || m.key === 'analyze-sentence') {
-    window.dispatchEvent(new CustomEvent('reading-mode', { detail: { mode: m.key === 'lookup-word' ? 'word' : 'sentence' } }))
-    showToast(m.key === 'lookup-word' ? '已进入查词模式，去点文章里的单词吧' : '已进入解句模式，去选文章里的句子吧')
+  if (key === 'lookup-word' || key === 'analyze-sentence') {
+    window.dispatchEvent(new CustomEvent('reading-mode', { detail: { mode: key === 'lookup-word' ? 'word' : 'sentence' } }))
+    showToast(key === 'lookup-word' ? '已进入查词模式，去点文章里的单词吧' : '已进入解句模式，去选文章里的句子吧')
     return
   }
+  // 翻译/故事都要落到输入框，先展开面板再填入
+  chatOpen.value = true
   // 翻译走独立 mode（后端换翻译提示词、关闭 TTS），其余功能仍在 chat 模式
-  mode.value = m.key === 'translate' ? 'translate' : 'chat'
-  inputText.value = m.tip
+  mode.value = key === 'translate' ? 'translate' : 'chat'
+  const item = RAIL_ITEMS.find(i => i.key === key)
+  inputText.value = item?.tip || ''
   nextTick(() => inputRef.value?.focus())
 }
 
@@ -259,8 +258,36 @@ async function maybeShowEntryTip() {
     }
   } catch (e) { /* 拉不到就按 0 处理 */ }
 
-  // 文案分级：有错题优先提错题，其次生词，全 0 给鼓励文案
-  if (wrongCount > 0) {
+  // 英语 PDCA 闭环任务（阶段2 播报升级）：到期生词数 + 未攻克英语错题数；拉不到就退回旧文案
+  let dueWords = -1, wrongOpen = -1
+  try {
+    let uid = null
+    try { uid = JSON.parse(localStorage.getItem('user') || 'null')?.id || null } catch (e) { /* 忽略 */ }
+    if (!uid) {
+      const pr = await fetch(`${props.apiBase}/api/user/profile`, { headers: { Authorization: `Bearer ${token}` } })
+      uid = (await pr.json())?.user?.id || null
+    }
+    if (uid) {
+      const pr2 = await fetch(`${props.apiBase}/api/english/plan/today`, { headers: { Authorization: `Bearer ${token}` } })
+      const pj = await pr2.json()
+      if (pj?.code === 200) { dueWords = pj.dueWords || 0; wrongOpen = pj.wrongOpen || 0 }
+    }
+  } catch (e) { /* 降级走旧文案 */ }
+
+  // 文案分级：优先播报英语闭环任务，拉不到（-1）退回旧文案，全 0 给鼓励文案
+  if (dueWords >= 0) {
+    if (dueWords > 0 && wrongOpen > 0) {
+      tip.text = `今日任务：${dueWords} 个生词待复习、${wrongOpen} 道英语错题待攻克`
+    } else if (dueWords > 0) {
+      tip.text = `今日任务：${dueWords} 个生词到了复习期，去生词本打卡吧`
+    } else if (wrongOpen > 0) {
+      tip.text = `今日任务：${wrongOpen} 道英语错题还没攻克，去错题复习重做一遍`
+    } else if (wrongCount > 0 || wordCount > 0) {
+      tip.text = wordCount > 0 ? `你有 ${wordCount} 个生词、${wrongCount} 道错题可学习` : `你有 ${wrongCount} 道错题可学习`
+    } else {
+      tip.text = '今日任务已完成，去阅读里再收集几个新词吧 🎉'
+    }
+  } else if (wrongCount > 0) {
     tip.text = wordCount > 0 ? `你有 ${wrongCount} 道错题、${wordCount} 个生词待复习` : `你有 ${wrongCount} 道错题待复习`
   } else if (wordCount > 0) {
     tip.text = `生词本里有 ${wordCount} 个词等你复习`
@@ -344,7 +371,8 @@ function initPetLayout() {
   const baseH = small ? 500 : 600
   const scale = small ? 0.75 : 1
   petPos.value = {
-    x: Math.max(16, window.innerWidth - baseW * scale - 24),
+    // 左缘至少留 68px：给吸附在人物左手边的迷你功能栏（宽约 58px）留位
+    x: Math.max(68, window.innerWidth - baseW * scale - 24),
     y: Math.max(16, window.innerHeight - baseH * scale - 24),
     scale
   }
@@ -576,7 +604,6 @@ async function sendChat() {
       body: JSON.stringify({
         sessionId: props.sessionId,
         userInput: userSay,
-        mockMode: mockMode.value,
         characterId: characterId.value,
         mode: mode.value          // translate=纯翻译（后端关 TTS），其余=chat
       })
@@ -683,20 +710,69 @@ async function scrollBottom() {
   .pet-combo { width: 300px; height: 500px; }
   .pet-holder { width: 300px; height: 500px; top: auto; bottom: 0; }
 }
-/* ===== 点击角色的功能菜单 ===== */
-.menu-backdrop { position: fixed; inset: 0; z-index: 6000; }
-.feature-menu {
-  position: fixed; z-index: 6001; min-width: 180px;
-  background: #fff; border-radius: 10px; padding: 6px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
+/* ===== 点击角色的迷你功能栏：吸附人物左手边（pet-holder 内 → 随拖动/缩放联动） ===== */
+/* 遮罩压到 pet-world(2000) 之下：点页面空白可收起；人物在上层仍可点击重新唤出 */
+.menu-backdrop { position: fixed; inset: 0; z-index: 1500; }
+.pet-rail {
+  position: absolute;
+  left: -58px;
+  top: 30px;
+  z-index: 5;   /* 同层内压过人物 canvas */
+  pointer-events: auto;   /* pet-world 是 pe:none，必须显式恢复，否则按钮收不到点击 */
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 10px 8px;
+  background: rgba(18, 18, 28, 0.88);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 245, 255, 0.22);
+  border-radius: 999px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4), 0 0 18px rgba(0, 245, 255, 0.08);
 }
-.menu-title { font-size: 12px; color: #8a93a6; padding: 6px 10px 4px; }
-.menu-item {
-  display: block; width: 100%; text-align: left;
-  padding: 8px 10px; font-size: 14px; border: none; background: none;
-  border-radius: 6px; cursor: pointer; color: #333;
+.rail-btn {
+  position: relative;
+  width: 42px; height: 42px;
+  display: flex; align-items: center; justify-content: center;
+  border: none; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  transition: all 0.2s;
 }
-.menu-item:hover { background: #eef2fb; }
+.rail-btn:hover {
+  background: rgba(0, 245, 255, 0.15);
+  box-shadow: 0 0 10px rgba(0, 245, 255, 0.4);
+  transform: scale(1.1);
+}
+.rail-icon { font-size: 18px; line-height: 1; }
+/* 收起钮弱化 */
+.rail-btn.rail-close { background: transparent; }
+.rail-btn.rail-close .rail-icon { color: #8a8a9a; font-size: 14px; }
+/* 录音中：红色脉冲 */
+.rail-btn.recording {
+  background: rgba(255, 68, 68, 0.2);
+  box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.5);
+  animation: rail-mic-pulse 1s infinite;
+}
+@keyframes rail-mic-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.5); }
+  50% { box-shadow: 0 0 0 10px rgba(255, 68, 68, 0); }
+}
+/* 悬停文字提示：圆钮左侧弹出 */
+.rail-tip {
+  position: absolute;
+  right: 52px;
+  top: 50%;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  font-size: 12px;
+  color: #e8e8f0;
+  background: rgba(18, 18, 28, 0.95);
+  border: 1px solid rgba(0, 245, 255, 0.25);
+  padding: 4px 10px;
+  border-radius: 6px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+.rail-btn:hover .rail-tip { opacity: 1; }
 
 /* ===== 入学提示气泡：像鱼吐泡泡——头顶先冒两只小椭圆，随后提示气泡弹出 ===== */
 /* 锚点组：零尺寸定在头顶，子元素绝对定位；整组不拦截点击，气泡本体单独开 */

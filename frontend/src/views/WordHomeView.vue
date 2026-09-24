@@ -32,19 +32,11 @@
         </div>
       </div>
 
-      <!-- 小图标入口行（位置预留，点击提示开发中） -->
-      <div class="mini-row">
-        <div class="mini-item" v-for="m in miniItems" :key="m.label" @click="comingSoon(m.label)">
-          <div class="mini-icon">{{ m.icon }}</div>
-          <div class="mini-label">{{ m.label }}</div>
-        </div>
-      </div>
-
-      <!-- 学习中心（位置预留） -->
+      <!-- 学习中心 -->
       <section class="home-section">
         <div class="section-name"><span class="bar"></span>学习中心</div>
         <div class="quick-grid">
-          <div class="quick-item" v-for="q in quickItems" :key="q.label" @click="q.to ? $router.push(q.to) : comingSoon(q.label)">
+          <div class="quick-item" v-for="q in quickItems" :key="q.label" @click="$router.push(q.to)">
             <div class="quick-icon">{{ q.icon }}</div>
             <div class="quick-label">{{ q.label }}</div>
           </div>
@@ -87,20 +79,12 @@ const router = useRouter()
 const plan = ref(null)
 
 // 位置预留：等后续加功能时替换
-const miniItems = [
-  { icon: '🥊', label: '单词PK' },
-  { icon: '📄', label: '备考干货' },
-  { icon: '🎧', label: '听力训练' },
-  { icon: '✍️', label: '情景写作' },
-  { icon: '🔥', label: '打卡挑战' }
-]
-
-// to 有值的是已开放功能，没值的点击提示开发中
+// 学习中心入口（全部为已开放功能）
 const quickItems = [
   { icon: '🔤', label: '生词本', to: '/word/notebook' },
-  { icon: '📅', label: '学习日历' },
-  { icon: '🏆', label: '成就徽章' },
-  { icon: '📈', label: '学习报告' }
+  { icon: '📝', label: '英语错题', to: '/word/english-wrong' },
+  { icon: '🌱', label: '我的Wiki', to: '/wiki/mine' },
+  { icon: '📈', label: '学习图谱', to: '/study-map' }
 ]
 
 const planLevel = computed(() => plan.value?.plan?.level || '4')
@@ -119,10 +103,6 @@ function goContinue() {
   } else {
     router.push('/word/book')
   }
-}
-
-function comingSoon(name) {
-  showSuccessToast(`${name}功能开发中，敬请期待`)
 }
 </script>
 
@@ -148,7 +128,7 @@ function comingSoon(name) {
   }
 }
 
-/* 顶部词书状态条 */
+/* 顶部词书状态条：玻璃卡 + 霓虹呼吸 */
 .top-bar {
   display: flex;
   align-items: center;
@@ -156,14 +136,16 @@ function comingSoon(name) {
   gap: 12px;
   padding: 12px 16px;
   background: var(--bg-card);
+  backdrop-filter: blur(8px);
   border: 1px solid var(--accent-border);
   border-radius: 14px;
   cursor: pointer;
-  transition: border-color 0.2s;
+  transition: all var(--transition-fast);
 }
 
 .top-bar:hover {
   border-color: var(--accent);
+  box-shadow: var(--accent-glow);
 }
 
 .book-name {
@@ -176,55 +158,87 @@ function comingSoon(name) {
   margin-top: 4px;
   font-size: 12px;
   color: var(--text-secondary);
+  letter-spacing: 0.5px;
 }
 
 .top-arrow {
-  color: var(--text-muted);
+  color: var(--accent);
   font-size: 20px;
+  text-shadow: 0 0 8px rgba(0, 245, 255, 0.6);
 }
 
-/* Banner 占位 */
+/* Banner：深空玻璃 + 网格底纹 + 青→品红渐变标题 */
 .banner-card {
   position: relative;
   margin-top: 14px;
-  padding: 20px 18px;
+  padding: 22px 18px;
   border-radius: 16px;
-  background: linear-gradient(120deg, #4f7cff 0%, #7c3aed 100%);
+  background:
+    linear-gradient(135deg, rgba(0, 245, 255, 0.08), rgba(255, 0, 255, 0.06)),
+    var(--bg-card);
+  border: 1px solid rgba(0, 245, 255, 0.35);
   color: #fff;
   overflow: hidden;
+  box-shadow: inset 0 0 30px rgba(0, 245, 255, 0.05), 0 0 24px rgba(0, 245, 255, 0.08);
+}
+
+/* 卡内叠加一层迷你网格，呼应全局背景 */
+.banner-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0, 245, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 245, 255, 0.05) 1px, transparent 1px);
+  background-size: 24px 24px;
+  pointer-events: none;
 }
 
 .banner-card::after {
   content: '';
   position: absolute;
-  right: -30px;
-  top: -30px;
-  width: 120px;
-  height: 120px;
+  right: -40px;
+  top: -40px;
+  width: 150px;
+  height: 150px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.12);
+  background: radial-gradient(circle, rgba(0, 245, 255, 0.22), transparent 70%);
 }
 
 .banner-title {
-  font-size: 18px;
+  position: relative;
+  z-index: 1;
+  font-family: var(--font-display);
+  font-size: 17px;
   font-weight: 800;
+  letter-spacing: 2px;
+  background: linear-gradient(90deg, #00f5ff, #ff00ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .banner-sub {
-  margin-top: 6px;
+  position: relative;
+  z-index: 1;
+  margin-top: 8px;
   font-size: 13px;
-  opacity: 0.85;
+  color: rgba(232, 232, 240, 0.72);
+  letter-spacing: 1px;
 }
 
 .banner-page {
   position: absolute;
   right: 14px;
   bottom: 12px;
-  font-size: 12px;
-  opacity: 0.8;
+  z-index: 1;
+  font-family: var(--font-display);
+  font-size: 11px;
+  color: rgba(0, 245, 255, 0.6);
+  letter-spacing: 1px;
 }
 
-/* 两宫格大入口 */
+/* 两宫格大入口：赛博角标 + hover 发光 */
 .entry-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -233,26 +247,82 @@ function comingSoon(name) {
 }
 
 .entry-card {
+  position: relative;
   padding: 20px 16px;
   background: var(--bg-card);
   border: 1px solid var(--accent-border);
-  border-radius: 16px;
+  border-radius: 12px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--transition-fast);
+  overflow: hidden;
+}
+
+/* 左上/右下 cyber 角线 */
+.entry-card::before,
+.entry-card::after {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(0, 245, 255, 0.55);
+  transition: all var(--transition-fast);
+}
+
+.entry-card::before {
+  top: 7px;
+  left: 7px;
+  border-right: none;
+  border-bottom: none;
+}
+
+.entry-card::after {
+  bottom: 7px;
+  right: 7px;
+  border-left: none;
+  border-top: none;
 }
 
 .entry-card:hover {
   border-color: var(--accent);
-  transform: translateY(-2px);
+  transform: translateY(-3px);
+  box-shadow: var(--accent-glow);
 }
 
+.entry-card:hover::before,
+.entry-card:hover::after {
+  width: 20px;
+  height: 20px;
+  border-color: var(--accent);
+}
+
+/* 第二张卡用品红系，与青色形成撞色 */
 .entry-card.accent {
-  background: linear-gradient(135deg, rgba(79, 124, 255, 0.16), rgba(124, 58, 237, 0.1));
-  border-color: rgba(79, 124, 255, 0.45);
+  background: linear-gradient(135deg, rgba(255, 0, 255, 0.07), rgba(0, 245, 255, 0.05));
+  border-color: var(--secondary-border);
+}
+
+.entry-card.accent::before,
+.entry-card.accent::after {
+  border-color: rgba(255, 0, 255, 0.55);
+}
+
+.entry-card.accent:hover {
+  border-color: var(--secondary);
+  box-shadow: 0 0 12px rgba(255, 0, 255, 0.35), 0 0 32px rgba(255, 0, 255, 0.12);
+}
+
+.entry-card.accent:hover::before,
+.entry-card.accent:hover::after {
+  border-color: var(--secondary);
 }
 
 .entry-icon {
   font-size: 30px;
+  filter: drop-shadow(0 0 10px rgba(0, 245, 255, 0.5));
+}
+
+.entry-card.accent .entry-icon {
+  filter: drop-shadow(0 0 10px rgba(255, 0, 255, 0.5));
 }
 
 .entry-name {
@@ -268,40 +338,6 @@ function comingSoon(name) {
   color: var(--text-secondary);
 }
 
-/* 小图标入口行 */
-.mini-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  margin-top: 16px;
-  padding: 14px 8px;
-  background: var(--bg-card);
-  border: 1px solid var(--accent-border);
-  border-radius: 16px;
-}
-
-.mini-item {
-  flex: 1;
-  text-align: center;
-  cursor: pointer;
-  transition: transform 0.15s;
-}
-
-.mini-item:active {
-  transform: scale(0.92);
-}
-
-.mini-icon {
-  font-size: 22px;
-}
-
-.mini-label {
-  margin-top: 6px;
-  font-size: 11px;
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-
 /* 学习中心 */
 .home-section {
   margin-top: 20px;
@@ -314,13 +350,15 @@ function comingSoon(name) {
   font-size: 15px;
   font-weight: 700;
   color: var(--text-primary);
+  letter-spacing: 1px;
 }
 
 .section-name .bar {
   width: 4px;
   height: 16px;
   border-radius: 2px;
-  background: var(--accent);
+  background: linear-gradient(180deg, var(--accent), var(--secondary));
+  box-shadow: 0 0 8px rgba(0, 245, 255, 0.6);
 }
 
 .quick-grid {
@@ -337,15 +375,18 @@ function comingSoon(name) {
   border: 1px solid var(--accent-border);
   border-radius: 12px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--transition-fast);
 }
 
 .quick-item:hover {
   border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: var(--accent-glow);
 }
 
 .quick-icon {
   font-size: 20px;
+  filter: drop-shadow(0 0 6px rgba(0, 245, 255, 0.4));
 }
 
 .quick-label {
@@ -354,13 +395,15 @@ function comingSoon(name) {
   color: var(--text-secondary);
 }
 
-/* 数据统计 */
+/* 数据统计：霓虹发光数字 */
 .stats-bar {
   display: flex;
   justify-content: space-around;
   margin-top: 20px;
   padding: 16px 0;
-  background: var(--bg-card);
+  background:
+    linear-gradient(135deg, rgba(0, 245, 255, 0.04), rgba(255, 0, 255, 0.03)),
+    var(--bg-card);
   border: 1px solid var(--accent-border);
   border-radius: 16px;
 }
@@ -375,9 +418,20 @@ function comingSoon(name) {
   font-family: var(--font-display);
 }
 
-.stat-value.cyan { color: var(--accent); }
-.stat-value.green { color: var(--success, #34d399); }
-.stat-value.magenta { color: #f472b6; }
+.stat-value.cyan {
+  color: var(--accent);
+  text-shadow: 0 0 12px rgba(0, 245, 255, 0.55);
+}
+
+.stat-value.green {
+  color: var(--success, #34d399);
+  text-shadow: 0 0 12px rgba(0, 255, 136, 0.4);
+}
+
+.stat-value.magenta {
+  color: var(--secondary, #ff00ff);
+  text-shadow: 0 0 12px rgba(255, 0, 255, 0.45);
+}
 
 .stat-label {
   margin-top: 4px;
@@ -385,8 +439,26 @@ function comingSoon(name) {
   color: var(--text-secondary);
 }
 
-/* 底部导航（van-tabbar 样式微调） */
+/* 底部导航：深空玻璃 + 霓虹高亮（覆盖 van-tabbar 默认白底） */
+.word-tabbar {
+  --van-tabbar-background: rgba(10, 10, 15, 0.88);
+  background: var(--van-tabbar-background);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--accent-border);
+  box-shadow: 0 -4px 20px rgba(0, 245, 255, 0.06);
+}
+
+.word-tabbar :deep(.van-tabbar-item) {
+  background: transparent;
+  color: var(--text-muted);
+}
+
 .word-tabbar :deep(.van-tabbar-item--active) {
   color: var(--accent);
+  text-shadow: 0 0 10px rgba(0, 245, 255, 0.55);
+}
+
+.word-tabbar :deep(.van-tabbar-item__icon) {
+  font-size: 20px;
 }
 </style>

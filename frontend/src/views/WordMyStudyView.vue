@@ -8,7 +8,7 @@
           <div class="pc-name">{{ plan.book?.name || '当前词书' }}</div>
           <div class="pc-count">已背 {{ plan.learned }} / {{ plan.total }} 词</div>
         </div>
-        <van-progress :percentage="progressPct" stroke-width="8" :show-pivot="false" color="#4F7CFF" track-color="rgba(255,255,255,0.08)" />
+        <van-progress :percentage="progressPct" stroke-width="8" :show-pivot="false" color="linear-gradient(90deg, #00f5ff, #ff00ff)" track-color="rgba(255,255,255,0.08)" />
         <van-button type="primary" round block class="pc-btn" @click="goStudy">
           继续学习
         </van-button>
@@ -30,19 +30,14 @@
         <div class="cell-item" @click="$router.push('/word/english-wrong')">
           <span class="cell-icon">📝</span><span class="cell-name">英语错题复习</span><span class="cell-arrow">›</span>
         </div>
+        <div class="cell-item" @click="$router.push('/wiki/mine')">
+          <span class="cell-icon">🌱</span><span class="cell-name">我的 Wiki</span><span class="cell-arrow">›</span>
+        </div>
         <div class="cell-item" @click="$router.push({ path: '/word/plan', query: { level: planLevel } })" v-if="plan">
           <span class="cell-icon">📖</span><span class="cell-name">背词设置</span><span class="cell-arrow">›</span>
         </div>
-      </div>
-
-      <!-- 敬请期待占位 -->
-      <div class="section-title">更多功能</div>
-      <div class="cell-list">
-        <div class="cell-item disabled" @click="comingSoon('学习报告')">
-          <span class="cell-icon">📈</span><span class="cell-name">学习报告</span><span class="cell-arrow">›</span>
-        </div>
-        <div class="cell-item disabled" @click="comingSoon('打卡日历')">
-          <span class="cell-icon">📅</span><span class="cell-name">打卡日历</span><span class="cell-arrow">›</span>
+        <div class="cell-item" @click="$router.push('/study-map')">
+          <span class="cell-icon">📈</span><span class="cell-name">学习图谱与周报</span><span class="cell-arrow">›</span>
         </div>
       </div>
     </div>
@@ -58,7 +53,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { showSuccessToast } from 'vant'
 import { getMyPlan } from '../api/study'
 
 const router = useRouter()
@@ -84,10 +78,6 @@ onMounted(async () => {
 function goStudy() {
   router.push({ path: '/word/study', query: { level: planLevel.value, mode: 'choice' } })
 }
-
-function comingSoon(name) {
-  showSuccessToast(`${name}功能开发中，敬请期待`)
-}
 </script>
 
 <style scoped>
@@ -112,24 +102,46 @@ function comingSoon(name) {
   }
 }
 
-/* 单词进度卡 */
+/* 单词进度卡：玻璃卡 + 霓虹氛围光 */
 .progress-card {
+  position: relative;
   padding: 18px 16px;
-  background: var(--bg-card);
-  border: 1px solid var(--accent-border);
+  background:
+    linear-gradient(135deg, rgba(0, 245, 255, 0.06), rgba(255, 0, 255, 0.04)),
+    var(--bg-card);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(0, 245, 255, 0.3);
   border-radius: 16px;
+  box-shadow: inset 0 0 24px rgba(0, 245, 255, 0.04), 0 0 20px rgba(0, 245, 255, 0.06);
+  overflow: hidden;
+}
+
+/* 卡内右上角一圈氛围光晕 */
+.progress-card::before {
+  content: '';
+  position: absolute;
+  right: -50px;
+  top: -50px;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0, 245, 255, 0.16), transparent 70%);
+  pointer-events: none;
 }
 
 .progress-card.empty {
   cursor: pointer;
-  transition: border-color 0.2s;
+  transition: all var(--transition-fast);
 }
 
 .progress-card.empty:hover {
   border-color: var(--accent);
+  box-shadow: var(--accent-glow);
 }
 
 .pc-head {
+  position: relative;
+  z-index: 1;
   display: flex;
   justify-content: space-between;
   align-items: baseline;
@@ -145,29 +157,48 @@ function comingSoon(name) {
 .pc-count {
   font-size: 13px;
   color: var(--text-secondary);
+  font-family: var(--font-display);
+  letter-spacing: 0.5px;
 }
 
 .pc-btn {
+  position: relative;
+  z-index: 1;
   margin-top: 16px;
 }
 
-/* 分组标题 */
+/* 分组标题：渐变光条 + 字距 */
 .section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 20px 0 10px;
   font-size: 14px;
   font-weight: 700;
-  color: var(--text-secondary);
+  color: var(--text-primary);
+  letter-spacing: 1px;
 }
 
-/* 单元格列表 */
+.section-title::before {
+  content: '';
+  width: 4px;
+  height: 14px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--accent), var(--secondary));
+  box-shadow: 0 0 8px rgba(0, 245, 255, 0.6);
+}
+
+/* 单元格列表：hover 亮起青色指示条 */
 .cell-list {
   background: var(--bg-card);
+  backdrop-filter: blur(8px);
   border: 1px solid var(--accent-border);
   border-radius: 16px;
   overflow: hidden;
 }
 
 .cell-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -175,11 +206,28 @@ function comingSoon(name) {
   font-size: 15px;
   color: var(--text-primary);
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.2s;
+}
+
+.cell-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 0;
+  background: var(--accent);
+  box-shadow: 0 0 8px rgba(0, 245, 255, 0.8);
+  transition: height 0.2s;
 }
 
 .cell-item:hover {
-  background: var(--bg-elevated);
+  background: var(--bg-hover);
+}
+
+.cell-item:hover::before {
+  height: 60%;
 }
 
 .cell-item + .cell-item {
@@ -190,12 +238,43 @@ function comingSoon(name) {
   color: var(--text-muted);
 }
 
-.cell-icon { font-size: 18px; }
-.cell-name { flex: 1; }
-.cell-arrow { color: var(--text-muted); }
+.cell-icon {
+  font-size: 18px;
+  filter: drop-shadow(0 0 6px rgba(0, 245, 255, 0.35));
+}
 
-/* 底部导航（van-tabbar 样式微调） */
+.cell-name { flex: 1; }
+
+.cell-arrow {
+  color: var(--text-muted);
+  transition: color 0.2s, text-shadow 0.2s;
+}
+
+.cell-item:hover .cell-arrow {
+  color: var(--accent);
+  text-shadow: 0 0 8px rgba(0, 245, 255, 0.6);
+}
+
+/* 底部导航：深空玻璃 + 霓虹高亮（覆盖 van-tabbar 默认白底） */
+.word-tabbar {
+  --van-tabbar-background: rgba(10, 10, 15, 0.88);
+  background: var(--van-tabbar-background);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--accent-border);
+  box-shadow: 0 -4px 20px rgba(0, 245, 255, 0.06);
+}
+
+.word-tabbar :deep(.van-tabbar-item) {
+  background: transparent;
+  color: var(--text-muted);
+}
+
 .word-tabbar :deep(.van-tabbar-item--active) {
   color: var(--accent);
+  text-shadow: 0 0 10px rgba(0, 245, 255, 0.55);
+}
+
+.word-tabbar :deep(.van-tabbar-item__icon) {
+  font-size: 20px;
 }
 </style>

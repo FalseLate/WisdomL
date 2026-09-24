@@ -62,6 +62,18 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/wiki/mine',
+    name: 'MyWiki',
+    component: () => import('../views/MyWikiView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/study-map',
+    name: 'StudyMap',
+    component: () => import('../views/StudyMapView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/reading/home',
     name: 'ReadingHome',
     component: () => import('../views/ReadingHomeView.vue'),
