@@ -436,18 +436,21 @@ function onPetAreaPointerDown(e) {
 }
 
 function startPassThrough(e, combo) {
-  // 拦截并转发给下层
+  combo.style.pointerEvents = 'none'
+  const beneath = document.elementFromPoint(e.clientX, e.clientY)
+  // .pet-rail 自带 pointer-events:auto，父层置 none 也挡不住命中；命中到自家后代时无可穿透对象，
+  // 转发出去会被 pet-world 的 capture 监听器再吃一遍 → 无限递归
+  if (!beneath || combo.contains(beneath)) { combo.style.pointerEvents = ''; return }
+  // 确认要转发才拦截原事件：preventDefault 早退会连带掐掉 rail 自身按钮的 click
   e.stopPropagation()
   e.preventDefault()
-  combo.style.pointerEvents = 'none'
   const opts = {
     bubbles: true, cancelable: true, view: window,
     clientX: e.clientX, clientY: e.clientY,
     pointerId: e.pointerId, pointerType: e.pointerType, isPrimary: e.isPrimary,
     button: e.button, buttons: e.buttons
   }
-  const beneath = document.elementFromPoint(e.clientX, e.clientY)
-  if (beneath) beneath.dispatchEvent(new PointerEvent('pointerdown', opts))
+  beneath.dispatchEvent(new PointerEvent('pointerdown', opts))
   const restore = () => { combo.style.pointerEvents = '' }
   // pointerup 时把 click 补发给当时所在的下层元素（合成事件浏览器不会自动生成 click）
   const onUp = (up) => {

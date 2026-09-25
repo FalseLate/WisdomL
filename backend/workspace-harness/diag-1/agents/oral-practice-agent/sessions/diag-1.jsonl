@@ -1,0 +1,2 @@
+{"type":"message","id":"5c43a8e8-e54e-434c-a2c3-dc5021efdbd3","timestamp":1790320688.676737200,"role":"USER","content":"hello"}
+{"type":"message","id":"2026092515181612adafe9dce14f8b","parentId":"5c43a8e8-e54e-434c-a2c3-dc5021efdbd3","timestamp":1790320688.676737200,"role":"ASSISTANT","content":"Hi there! How are you doing today?"}
