@@ -99,10 +99,10 @@ public class EnglishPracticeController {
             return res;
         }
 
-        // RAG 检索考点上下文，约束新题不跑偏
+        // RAG 检索考点上下文，约束新题不跑偏（带上 userId：我的私人沉淀优先）
         StringBuilder knowledge = new StringBuilder();
         try {
-            for (WikiKnowledgeService.SearchHit hit : wikiKnowledgeService.search(row.getQuestionContent(), null, 3)) {
+            for (WikiKnowledgeService.SearchHit hit : wikiKnowledgeService.search(row.getQuestionContent(), null, 3, userId)) {
                 var k = hit.knowledge();
                 knowledge.append("- ").append(k.getTitle()).append("：")
                         .append(k.getContent() == null ? "" : k.getContent()).append("\n");
