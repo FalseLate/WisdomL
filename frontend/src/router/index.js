@@ -65,6 +65,12 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/word/english-wrong/practice',
+    name: 'EnglishWrongPractice',
+    component: () => import('../views/EnglishWrongPracticeView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/wiki/mine',
     name: 'MyWiki',
     component: () => import('../views/MyWikiView.vue'),

@@ -32,15 +32,20 @@
             <button class="chat-close" title="收起" @pointerdown.stop @click="chatOpen = false">✕</button>
           </div>
         </div>
+    <!-- 功能标签页：对话 / 故事——各自独立的会话消息，互不干扰 -->
+    <div class="chat-tabs">
+      <div class="chat-tab" :class="{ active: activeTab === 'chat' }" @click="activeTab = 'chat'">💬 对话</div>
+      <div class="chat-tab" :class="{ active: activeTab === 'story' }" @click="activeTab = 'story'">📖 故事</div>
+    </div>
     <div class="chat-box" ref="chatBoxRef">
-      <div v-for="(msg, index) in messages" :key="index" :class="['msg', msg.role]">
+      <div v-for="(msg, index) in visibleMessages" :key="index" :class="['msg', msg.role]">
         <span class="role">{{ msg.role === 'user' ? '我' : 'AI' }}</span>
         <span class="content" :class="{ typing: msg.streaming }">{{ msg.text }}</span>
       </div>
     </div>
     <div class="input-area">
-      <!-- 翻译模式标签：显示中点击可切回口语练习 -->
-      <button v-if="mode === 'translate'" class="mode-chip"
+      <!-- 翻译模式标签：显示中点击可切回口语练习（仅对话标签页内有效） -->
+      <button v-if="mode === 'translate' && activeTab === 'chat'" class="mode-chip"
               title="当前为翻译模式，点击切回口语练习"
               @click="mode = 'chat'">
         🔤 翻译 ✕
@@ -51,7 +56,7 @@
               @pointerdown.prevent="micDown" @pointerup.prevent="micUp" @pointerleave="micUp">
         {{ transcribing ? '✍️' : '🎤' }}
       </button>
-      <input ref="inputRef" v-model="inputText" @keyup.enter="sendChat" :placeholder="mode === 'translate' ? '【翻译模式】翻译中英文句子（点左侧标签切回口语练习）' : '输入英文，回车发送...（或按住左边麦克风说话）'" :disabled="loading" />
+      <input ref="inputRef" v-model="inputText" @keyup.enter="sendChat" :placeholder="inputPlaceholder" :disabled="loading" />
       <button @click="sendChat" :disabled="loading">
         {{ loading ? '思考中...' : '发送' }}
       </button>
@@ -64,6 +69,67 @@
     </div>        </div>
       </div>
     </transition>
+
+    <!-- 全局查词/解句：不再只限阅读页，任何页面都能用（Teleport 到 body，不受宿主页布局影响） -->
+    <Teleport to="body">
+      <!-- 模式提示条：点一下退出当前模式 -->
+      <div v-if="toolMode" class="tool-chip" @click="exitToolMode">
+        {{ toolMode === 'word' ? '🔍 查词模式：点页面上的任意单词 · 点此退出' : '🧩 解句模式：划选任意文本后点「解析句子」· 点此退出' }}
+      </div>
+
+      <!-- 查词气泡 -->
+      <div class="lookup-bubble" v-if="bubble.show" :style="{ left: bubble.x + 'px', top: bubble.y + 'px' }">
+        <template v-if="bubble.loading">查询中...</template>
+        <template v-else-if="bubble.word">
+          <div class="lb-head">
+            <span class="lb-word">{{ bubble.word.word }}</span>
+            <span class="lb-phonetic" @click="speakText(bubble.word.word)">🔊 {{ bubble.word.phonetic }}</span>
+          </div>
+          <div class="lb-mean">{{ bubble.word.cnMean }}</div>
+          <button class="lb-add" :disabled="bubble.added" @click="addBubbleWord">
+            {{ bubble.added ? '已加入生词本' : '⭐ 加入生词本' }}
+          </button>
+        </template>
+        <template v-else>
+          <div class="lb-miss">词库未收录该词</div>
+        </template>
+        <div class="lb-close" @click="closeLookupBubble">✕</div>
+      </div>
+
+      <!-- 划选后浮出的「解析句子」按钮 -->
+      <div class="sel-analyze" v-if="selBtn.show" :style="{ left: selBtn.x + 'px', top: selBtn.y + 'px' }"
+           @pointerdown.prevent @click="analyzeSelection">🧩 解析句子</div>
+
+      <!-- 句子解析结果卡 -->
+      <div class="global-analyze" v-if="card.show">
+        <div class="ga-head"><span>🧩 句子解析</span><span class="ga-close" @click="card.show = false">✕</span></div>
+        <div class="ga-text">{{ card.text }}</div>
+        <div v-if="card.loading" class="ga-loading">虚拟人正在解析这个句子...</div>
+        <template v-else-if="card.data">
+          <div class="ga-block" v-if="card.data.translation">
+            <div class="ga-label">翻译</div>
+            <div class="ga-body">{{ card.data.translation }}</div>
+          </div>
+          <div class="ga-block" v-if="card.data.chunks?.length">
+            <div class="ga-label">结构拆解</div>
+            <div class="ga-chunk" v-for="(c, ci) in card.data.chunks" :key="ci">
+              <span class="ga-role">{{ c.role }}</span>
+              <span class="ga-chunk-text">{{ c.text }}</span>
+              <div class="ga-desc" v-if="c.desc">{{ c.desc }}</div>
+            </div>
+          </div>
+          <div class="ga-block" v-else-if="card.data.analysis">
+            <div class="ga-label">语法拆解</div>
+            <div class="ga-body">{{ card.data.analysis }}</div>
+          </div>
+          <div class="ga-block" v-if="card.data.grammar">
+            <div class="ga-label">要点</div>
+            <div class="ga-body">{{ card.data.grammar }}</div>
+          </div>
+          <button class="ga-speak" @click="speakText(card.text)">🔊 虚拟人朗读</button>
+        </template>
+      </div>
+    </Teleport>
 
     <!-- 点空白处收起功能栏（遮罩层在人物之下：不挡角色点击，可再点角色重新唤出） -->
     <Teleport to="body">
@@ -106,10 +172,23 @@ const props = defineProps({
 const emit = defineEmits(['chat-sent', 'reply-done'])
 
 const messages = ref([])
+// 故事标签页独立的会话消息——不和对话共用，互不污染
+const storyMessages = ref([])
+// 当前标签页：chat=口语陪练 / story=讲故事
+const activeTab = ref('chat')
 const inputText = ref('')
 const loading = ref(false)
 // 功能模式：chat=口语陪练（默认，带语音），translate=纯翻译（只出文字，不朗读）
 const mode = ref('chat')
+// 输入框提示文案：故事页提示可以说类型和长度，其余沿用原提示
+const inputPlaceholder = computed(() => {
+  if (activeTab.value === 'story') return '说说想要的英文故事：可指定类型（冒险/童话/科幻/悬疑…）和长度（如 150 词）'
+  return mode.value === 'translate'
+    ? '【翻译模式】翻译中英文句子（点左侧标签切回口语练习）'
+    : '输入英文，回车发送...（或按住左边麦克风说话）'
+})
+// 当前标签页正在展示的消息列表
+const visibleMessages = computed(() => (activeTab.value === 'story' ? storyMessages.value : messages.value))
 const chatBoxRef = ref(null)
 const avatarRef = ref(null)
 
@@ -184,9 +263,9 @@ async function uploadSpeech(blob) {
 const RAIL_ITEMS = [
   { key: 'mic',              icon: '🎤', label: '按住说话' },
   { key: 'translate',        icon: '🔤', label: '帮我翻译' },
-  { key: 'story',            icon: '📖', label: '讲个短故事', tip: 'Tell me a short English story. ' },
-  { key: 'lookup-word',      icon: '🔍', label: '查单词（阅读页）' },
-  { key: 'analyze-sentence', icon: '🧩', label: '解句子（阅读页）' },
+  { key: 'story',            icon: '📖', label: '讲个短故事' },
+  { key: 'lookup-word',      icon: '🔍', label: '查单词' },
+  { key: 'analyze-sentence', icon: '🧩', label: '解句子' },
   { key: 'close',            icon: '✕',  label: '收起' }
 ]
 const menu = ref({ show: false })
@@ -200,15 +279,18 @@ function railMicDown() {
 }
 function pickFeature(key) {
   menu.value.show = false
-  // 阅读页联动：广播模式事件，阅读页自行切换 查词/解句 状态
-  if (key === 'lookup-word' || key === 'analyze-sentence') {
-    window.dispatchEvent(new CustomEvent('reading-mode', { detail: { mode: key === 'lookup-word' ? 'word' : 'sentence' } }))
-    showToast(key === 'lookup-word' ? '已进入查词模式，去点文章里的单词吧' : '已进入解句模式，去选文章里的句子吧')
+  // 查词/解句已是全局能力（挂 document 层，任何页面可用），不再依赖阅读页联动
+  if (key === 'lookup-word') { enterToolMode('word'); return }
+  if (key === 'analyze-sentence') { enterToolMode('sentence'); return }
+  chatOpen.value = true
+  // 故事切到故事标签页；输入框保持空白，由占位提示引导用户说需求（不预填文字）
+  if (key === 'story') {
+    activeTab.value = 'story'
+    mode.value = 'chat'
+    nextTick(() => inputRef.value?.focus())
     return
   }
-  // 翻译/故事都要落到输入框，先展开面板再填入
-  chatOpen.value = true
-  // 翻译走独立 mode（后端换翻译提示词、关闭 TTS），其余功能仍在 chat 模式
+  // 翻译要落到输入框，先展开面板再填入
   mode.value = key === 'translate' ? 'translate' : 'chat'
   const item = RAIL_ITEMS.find(i => i.key === key)
   inputText.value = item?.tip || ''
@@ -371,8 +453,8 @@ function initPetLayout() {
   const baseH = small ? 500 : 600
   const scale = small ? 0.75 : 1
   petPos.value = {
-    // 左缘至少留 68px：给吸附在人物左手边的迷你功能栏（宽约 58px）留位
-    x: Math.max(68, window.innerWidth - baseW * scale - 24),
+    // 功能栏已贴进人物层内部，拖到屏幕左缘也不会被裁掉
+    x: Math.max(0, window.innerWidth - baseW * scale - 24),
     y: Math.max(16, window.innerHeight - baseH * scale - 24),
     scale
   }
@@ -557,12 +639,17 @@ onMounted(() => {
 async function sendChat() {
   if (!inputText.value.trim() || loading.value) return
 
+  // 故事标签页独立走 mode=story（后端故事 Agent + 独立会话记忆），对话/翻译不变
+  const isStory = activeTab.value === 'story'
+  const sendMode = isStory ? 'story' : mode.value
+  const box = isStory ? storyMessages.value : messages.value
+
   const userSay = inputText.value
   menu.value.show = false
-  messages.value.push({ role: 'user', text: userSay })
+  box.push({ role: 'user', text: userSay })
   inputText.value = ''
   loading.value = true
-  emit('chat-sent', { sessionId: props.sessionId, mode: mode.value, text: userSay })
+  emit('chat-sent', { sessionId: props.sessionId, mode: sendMode, text: userSay })
 
   // 必须在点击手势链里同步创建/恢复 AudioContext（浏览器自动播放策略），并开启新一轮播放
   const actx = player.ensureContext()
@@ -570,8 +657,8 @@ async function sendChat() {
   avatarRef.value?.silenceMouth()
 
   // 先插入一条空的 AI 消息占位，delta 到达后逐段追加
-  messages.value.push({ role: 'ai', text: '', streaming: true, audioClips: [] })
-  const aiMsg = messages.value[messages.value.length - 1]
+  box.push({ role: 'ai', text: '', streaming: true, audioClips: [] })
+  const aiMsg = box[box.length - 1]
   await scrollBottom()
 
   // ===== 解析一帧 SSE（event: xxx / data: {...}）并分发 =====
@@ -608,7 +695,7 @@ async function sendChat() {
         sessionId: props.sessionId,
         userInput: userSay,
         characterId: characterId.value,
-        mode: mode.value          // translate=纯翻译（后端关 TTS），其余=chat
+        mode: sendMode            // story=讲故事（独立会话）/ translate=纯翻译（关 TTS）/ 其余=chat
       })
     })
     if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`)
@@ -635,7 +722,7 @@ async function sendChat() {
     loading.value = false
     // 翻译模式保持不变：只有用户主动点标签/菜单切回，才回到口语练习
     await scrollBottom()
-    emit('reply-done', { sessionId: props.sessionId, mode: mode.value, text: aiMsg.text })
+    emit('reply-done', { sessionId: props.sessionId, mode: sendMode, text: aiMsg.text })
   }
 }
 
@@ -645,6 +732,237 @@ async function scrollBottom() {
     chatBoxRef.value.scrollTop = chatBoxRef.value.scrollHeight
   }
 }
+
+// ================================================================
+// 全局查词 / 解句：逻辑挂在 document 层，任何页面都能用（原先只联动阅读页）。
+// word 模式 = capture 阶段拦下点击、caretRangeFromPoint 取词、弹气泡查词；
+// sentence 模式 = 不拦页面，用户划选文本后浮出「解析句子」按钮，结果卡片展示。
+// ================================================================
+const toolMode = ref(null)   // null=未开启 / 'word'=点词查词 / 'sentence'=划选解句
+const bubble = reactive({ show: false, x: 0, y: 0, loading: false, word: null, added: false })
+const selBtn = reactive({ show: false, x: 0, y: 0, text: '' })
+const card = reactive({ show: false, text: '', data: null, loading: false })
+let selTimer = null
+
+// PetTutor 自包含原则：不走宿主 axios，直接 fetch 后端（与 sendChat/入学提示一致）
+async function apiFetch(path, opts = {}) {
+  const token = localStorage.getItem('token')
+  const res = await fetch(props.apiBase + path, {
+    ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(opts.headers || {})
+    }
+  })
+  return res.json()
+}
+
+let cachedUid = null
+async function ensureUserId() {
+  if (cachedUid) return cachedUid
+  try { cachedUid = JSON.parse(localStorage.getItem('user') || 'null')?.id || null } catch { /* 忽略 */ }
+  if (!cachedUid) {
+    try { const res = await apiFetch('/api/user/profile'); cachedUid = res.user?.id || null } catch { /* 未登录 */ }
+  }
+  return cachedUid
+}
+
+function enterToolMode(m) {
+  toolMode.value = m
+  menu.value.show = false
+  showToast(m === 'word' ? '查词模式：点页面上的任意单词' : '解句模式：划选任意文本')
+}
+
+function exitToolMode() {
+  toolMode.value = null
+  bubble.show = false
+  selBtn.show = false
+  card.show = false
+  clearLookupFx()
+}
+
+// ---- 查词模式的视觉反馈：悬停光标变化 + 词高亮（Highlight API 浏览器级绘制，不改页面 DOM）----
+const HL_OK = typeof CSS !== 'undefined' && !!CSS.highlights && typeof window.Highlight === 'function'
+function setHl(name, range) {
+  if (!HL_OK) return
+  try {
+    if (range) CSS.highlights.set(name, new window.Highlight(range))
+    else CSS.highlights.delete(name)
+  } catch { /* 高亮失败不影响查词 */ }
+}
+function setLookupHit(range) {
+  if (HL_OK) { setHl('lookup-hit', range); return }
+  // 老浏览器退化：用原生选区当选中反馈
+  try {
+    const sel = window.getSelection()
+    sel.removeAllRanges()
+    if (range) sel.addRange(range)
+  } catch { /* 忽略 */ }
+}
+function clearLookupFx() {
+  setHl('lookup-hit', null)
+  setHl('lookup-hover', null)
+  document.body.style.cursor = ''
+}
+function closeLookupBubble() {
+  bubble.show = false
+  setHl('lookup-hit', null)
+}
+let lastMoveT = 0
+function onWordModeMove(e) {
+  if (toolMode.value !== 'word') return
+  const now = performance.now()
+  if (now - lastMoveT < 60) return   // 节流：取词检测 60ms 一次足够顺滑
+  lastMoveT = now
+  const hit = e.target?.closest?.(TOOL_UI) ? null : wordAtPoint(e.clientX, e.clientY)
+  document.body.style.cursor = hit ? 'pointer' : ''   // 悬到单词上光标变手型
+  setHl('lookup-hover', hit?.range || null)           // 悬停词浅青色预览
+}
+
+// ---- 查词模式：capture 拦下本次点击（页面不响应），只取词查词 ----
+const TOOL_UI = '.pet-combo, .chat-drawer, .tool-chip, .lookup-bubble, .sel-analyze, .global-analyze'
+function onGlobalClick(e) {
+  if (toolMode.value !== 'word') return
+  if (e.target.closest?.(TOOL_UI)) return   // 自家 UI 正常点击
+  e.stopPropagation()
+  e.preventDefault()
+  const hit = wordAtPoint(e.clientX, e.clientY)
+  if (!hit) return
+  setLookupHit(hit.range)   // 选中反馈：点中的词高亮
+  showLookupBubble(e.clientX, e.clientY, hit.token)
+}
+
+// 光标落点 → 所在英文单词：caretRangeFromPoint 拿文本节点和偏移，再向两侧扩到词边界
+function wordAtPoint(x, y) {
+  let node = null, offset = 0
+  if (document.caretRangeFromPoint) {
+    const r = document.caretRangeFromPoint(x, y)
+    node = r?.startContainer; offset = r?.startOffset ?? 0
+  } else if (document.caretPositionFromPoint) {   // Firefox
+    const p = document.caretPositionFromPoint(x, y)
+    node = p?.offsetNode; offset = p?.offset ?? 0
+  }
+  if (!node || node.nodeType !== Node.TEXT_NODE) return null
+  const text = node.textContent || ''
+  const isWordChar = c => /[A-Za-z'’-]/.test(c)
+  let i = Math.min(offset, text.length - 1)
+  if (i < 0) return null
+  if (!isWordChar(text[i])) {
+    // 落点在分隔符上：优先取右侧紧邻的词，其次左侧
+    if (i + 1 < text.length && isWordChar(text[i + 1])) i++
+    else if (i - 1 >= 0 && isWordChar(text[i - 1])) i--
+    else return null
+  }
+  let s = i, e = i
+  while (s > 0 && isWordChar(text[s - 1])) s--
+  while (e < text.length - 1 && isWordChar(text[e + 1])) e++
+  const token = text.slice(s, e + 1).replace(/[^A-Za-z'’-]/g, '').toLowerCase()
+  if (!token) return null
+  const range = document.createRange()
+  range.setStart(node, s)
+  range.setEnd(node, e + 1)
+  return { token, range }
+}
+
+async function showLookupBubble(x, y, token) {
+  bubble.show = true
+  bubble.loading = true
+  bubble.word = null
+  bubble.added = false
+  bubble.x = Math.min(x + 12, window.innerWidth - 240)
+  bubble.y = Math.min(y + 18, window.innerHeight - 180)
+  try {
+    const res = await apiFetch(`/api/word/query?text=${encodeURIComponent(token)}`)
+    bubble.word = res.code === 200 ? res.data : null
+  } catch {
+    bubble.word = null
+  } finally {
+    bubble.loading = false
+  }
+}
+
+async function addBubbleWord() {
+  if (!bubble.word || bubble.added) return
+  try {
+    const uid = await ensureUserId()
+    const res = await apiFetch('/api/word/collect', {
+      method: 'POST',
+      body: JSON.stringify({ userId: uid, wordId: bubble.word.id })
+    })
+    bubble.added = true   // 后端对重复加入返回 400，也视为已加入
+    showToast(res.code === 200 ? '已加入生词本' : (res.msg || '已在生词本中'))
+  } catch {
+    showToast('加入失败，可稍后再试')
+  }
+}
+
+// ---- 解句模式：监听选区变化，划到含英文的文本就浮出按钮 ----
+function onSelectionChange() {
+  if (toolMode.value !== 'sentence') { selBtn.show = false; return }
+  clearTimeout(selTimer)
+  selTimer = setTimeout(() => {
+    const sel = window.getSelection()
+    const text = (sel?.toString() || '').trim()
+    if (!sel || sel.isCollapsed || !text || !/[A-Za-z]/.test(text) || text.length > 800) {
+      selBtn.show = false
+      return
+    }
+    let rect
+    try { rect = sel.getRangeAt(0).getBoundingClientRect() } catch { return }
+    if (!rect || (rect.width === 0 && rect.height === 0)) { selBtn.show = false; return }
+    selBtn.text = text
+    selBtn.x = Math.max(8, Math.min(rect.left + rect.width / 2 - 54, window.innerWidth - 120))
+    const below = rect.bottom + 8
+    selBtn.y = below + 40 > window.innerHeight ? Math.max(8, rect.top - 44) : below
+    selBtn.show = true
+  }, 250)
+}
+
+async function analyzeSelection() {
+  if (!selBtn.text) return
+  card.text = selBtn.text
+  card.data = null
+  card.loading = true
+  card.show = true
+  selBtn.show = false
+  window.getSelection()?.removeAllRanges()
+  try {
+    const res = await apiFetch('/api/reading/analyze', {
+      method: 'POST',
+      body: JSON.stringify({ text: card.text })
+    })
+    if (res.code === 200) {
+      card.data = res.data
+    } else {
+      card.show = false
+      showToast(res.msg || '解析失败')
+    }
+  } catch {
+    card.show = false
+    showToast('解析失败，可稍后再试')
+  } finally {
+    card.loading = false
+  }
+}
+
+function onGlobalKey(e) {
+  if (e.key === 'Escape' && toolMode.value) exitToolMode()
+}
+
+onMounted(() => {
+  document.addEventListener('click', onGlobalClick, true)   // capture：赶在页面响应前拦下
+  document.addEventListener('selectionchange', onSelectionChange)
+  document.addEventListener('keydown', onGlobalKey)
+  document.addEventListener('mousemove', onWordModeMove)
+})
+onUnmounted(() => {
+  document.removeEventListener('click', onGlobalClick, true)
+  document.removeEventListener('selectionchange', onSelectionChange)
+  document.removeEventListener('keydown', onGlobalKey)
+  document.removeEventListener('mousemove', onWordModeMove)
+  clearLookupFx()
+})
 </script>
 
 <style scoped>
@@ -681,11 +999,12 @@ async function scrollBottom() {
   display: flex; flex-direction: column;
   padding: 16px 20px;
   font-family: sans-serif;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(6px);
-  border: 1px solid #e3e6ef;
+  background: rgba(18, 18, 28, 0.9);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 245, 255, 0.22);
   border-radius: 14px;
-  box-shadow: 0 6px 24px rgba(30, 40, 90, 0.14);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45), 0 0 18px rgba(0, 245, 255, 0.08);
+  color: #e8e8f0;
 }
 .chat-head {
   display: flex; align-items: center; justify-content: space-between;
@@ -699,13 +1018,13 @@ async function scrollBottom() {
   border: none; background: none; font-size: 13px; cursor: pointer;
   color: #8a93a6; padding: 2px 7px; border-radius: 6px;
 }
-.chat-zoom:hover { background: #eef2fb; color: #333; }
-.chat-head h2 { margin: 0; }
+.chat-zoom:hover { background: rgba(255, 255, 255, 0.08); color: #e8e8f0; }
+.chat-head h2 { margin: 0; color: #fff; }
 .chat-close {
   border: none; background: none; font-size: 16px; cursor: pointer;
   color: #8a93a6; padding: 2px 8px; border-radius: 6px;
 }
-.chat-close:hover { background: #eef2fb; color: #333; }
+.chat-close:hover { background: rgba(255, 255, 255, 0.08); color: #e8e8f0; }
 .drawer-enter-active, .drawer-leave-active { transition: transform 0.25s ease, opacity 0.25s ease; }
 .drawer-enter-from, .drawer-leave-to { transform: translateX(24px); opacity: 0; }
 @media (max-width: 900px) {
@@ -718,12 +1037,15 @@ async function scrollBottom() {
 .menu-backdrop { position: fixed; inset: 0; z-index: 1500; }
 .pet-rail {
   position: absolute;
-  left: -58px;
-  top: 30px;
+  /* 人物成像区（手的外缘）约从 18% 宽开始：栏宽 46px + 4px 缝隙 → 右缘正好贴着手、不遮手。
+     用 calc 随人物层宽度联动，大小屏/缩放下贴合距离恒定 */
+  left: calc(18% - 50px);
+  top: 55%;
+  transform: translateY(-50%);   /* 对齐垂手高度（手约在人物纵向 55% 处） */
   z-index: 5;   /* 同层内压过人物 canvas */
   pointer-events: auto;   /* pet-world 是 pe:none，必须显式恢复，否则按钮收不到点击 */
-  display: flex; flex-direction: column; gap: 8px;
-  padding: 10px 8px;
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 8px 6px;
   background: rgba(18, 18, 28, 0.88);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(0, 245, 255, 0.22);
@@ -732,7 +1054,7 @@ async function scrollBottom() {
 }
 .rail-btn {
   position: relative;
-  width: 42px; height: 42px;
+  width: 34px; height: 34px;   /* 默认整体缩小一档（42→34），随人物缩放层继续联动 */
   display: flex; align-items: center; justify-content: center;
   border: none; border-radius: 50%;
   background: rgba(255, 255, 255, 0.06);
@@ -744,10 +1066,10 @@ async function scrollBottom() {
   box-shadow: 0 0 10px rgba(0, 245, 255, 0.4);
   transform: scale(1.1);
 }
-.rail-icon { font-size: 18px; line-height: 1; }
+.rail-icon { font-size: 15px; line-height: 1; }
 /* 收起钮弱化 */
 .rail-btn.rail-close { background: transparent; }
-.rail-btn.rail-close .rail-icon { color: #8a8a9a; font-size: 14px; }
+.rail-btn.rail-close .rail-icon { color: #8a8a9a; font-size: 12px; }
 /* 录音中：红色脉冲 */
 .rail-btn.recording {
   background: rgba(255, 68, 68, 0.2);
@@ -761,21 +1083,129 @@ async function scrollBottom() {
 /* 悬停文字提示：圆钮左侧弹出 */
 .rail-tip {
   position: absolute;
-  right: 52px;
+  right: 42px;   /* 按钮缩小后同步收拢，气泡仍贴按钮左侧弹出 */
   top: 50%;
   transform: translateY(-50%);
   white-space: nowrap;
-  font-size: 12px;
+  font-size: 11px;
   color: #e8e8f0;
   background: rgba(18, 18, 28, 0.95);
   border: 1px solid rgba(0, 245, 255, 0.25);
-  padding: 4px 10px;
+  padding: 3px 8px;
   border-radius: 6px;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.15s;
 }
 .rail-btn:hover .rail-tip { opacity: 1; }
+
+/* ===== 全局查词/解句工具（Teleport 到 body，任何页面可用） ===== */
+/* 模式提示条 */
+.tool-chip {
+  position: fixed;
+  top: 14px; left: 50%;
+  transform: translateX(-50%);
+  z-index: 2600;
+  padding: 7px 16px;
+  border-radius: 999px;
+  background: rgba(18, 18, 28, 0.88);
+  color: #e8e8f0;
+  font-size: 12px;
+  border: 1px solid rgba(0, 245, 255, 0.35);
+  cursor: pointer;
+  user-select: none;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+/* 查词气泡：暗色玻璃风，与解析卡/功能栏同体系 */
+.lookup-bubble {
+  position: fixed;
+  z-index: 2600;
+  width: 220px;
+  background: rgba(18, 18, 28, 0.9);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 245, 255, 0.22);
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45), 0 0 18px rgba(0, 245, 255, 0.08);
+  padding: 12px 14px;
+  font-size: 13px;
+  color: #e8e8f0;
+}
+.lb-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+.lb-word { font-size: 15px; font-weight: 700; color: #fff; }
+.lb-phonetic { font-size: 12px; color: rgba(0, 245, 255, 0.85); cursor: pointer; }
+.lb-phonetic:hover { text-shadow: 0 0 8px rgba(0, 245, 255, 0.5); }
+.lb-mean { font-size: 12px; color: #c6cbd8; line-height: 1.6; margin-bottom: 8px; }
+.lb-add {
+  border: none; background: rgba(0, 245, 255, 0.12); color: rgba(0, 245, 255, 0.9);
+  font-size: 12px; padding: 5px 10px; border-radius: 8px; cursor: pointer;
+}
+.lb-add:hover { background: rgba(0, 245, 255, 0.2); }
+.lb-add:disabled { opacity: 0.6; cursor: default; }
+.lb-miss { font-size: 12px; color: #8a8a9a; }
+.lb-close {
+  position: absolute; top: 6px; right: 8px;
+  font-size: 13px; color: #8a8a9a; cursor: pointer;
+}
+.lb-close:hover { color: #e8e8f0; }
+/* 划选浮出的解析按钮 */
+.sel-analyze {
+  position: fixed;
+  z-index: 2600;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: #4f7cff;
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(79, 124, 255, 0.4);
+  user-select: none;
+}
+/* 解析结果卡（底部居中悬浮）：暗色玻璃风，与功能栏/背景同体系 */
+.global-analyze {
+  position: fixed;
+  left: 50%; bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 2600;
+  width: min(560px, calc(100vw - 24px));
+  max-height: 55dvh;
+  overflow: auto;
+  background: rgba(18, 18, 28, 0.9);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 245, 255, 0.22);
+  border-radius: 14px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45), 0 0 18px rgba(0, 245, 255, 0.08);
+  padding: 14px 18px;
+  font-size: 13px;
+  color: #e8e8f0;
+}
+.ga-head { display: flex; align-items: center; justify-content: space-between; font-weight: 700; margin-bottom: 8px; color: #fff; }
+.ga-close { font-size: 15px; color: #8a8a9a; cursor: pointer; }
+.ga-close:hover { color: #e8e8f0; }
+.ga-text {
+  font-size: 13px; color: #e8e8f0;
+  background: rgba(255, 255, 255, 0.06);
+  border-left: 3px solid rgba(0, 245, 255, 0.55);
+  padding: 8px 12px; border-radius: 8px; line-height: 1.7; margin-bottom: 10px;
+}
+.ga-loading { font-size: 12px; color: #8a8a9a; padding: 12px 0; }
+.ga-block { margin-bottom: 10px; }
+.ga-label { font-size: 12px; font-weight: 700; color: rgba(0, 245, 255, 0.85); margin-bottom: 4px; }
+.ga-body { font-size: 12px; color: #c6cbd8; line-height: 1.7; }
+.ga-chunk { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; margin-bottom: 4px; }
+.ga-role {
+  font-size: 11px; color: rgba(0, 245, 255, 0.95);
+  background: rgba(0, 245, 255, 0.12);
+  border: 1px solid rgba(0, 245, 255, 0.35);
+  border-radius: 4px; padding: 0 6px;
+}
+.ga-chunk-text { font-size: 12px; color: #fff; font-weight: 600; }
+.ga-desc { flex-basis: 100%; font-size: 11px; color: #8a8a9a; }
+.ga-speak {
+  border: 1px solid rgba(0, 245, 255, 0.45); background: none; color: rgba(0, 245, 255, 0.9);
+  font-size: 12px; padding: 6px 12px; border-radius: 999px; cursor: pointer;
+}
+.ga-speak:hover { background: rgba(0, 245, 255, 0.1); }
 
 /* ===== 入学提示气泡：像鱼吐泡泡——头顶先冒两只小椭圆，随后提示气泡弹出 ===== */
 /* 锚点组：零尺寸定在头顶，子元素绝对定位；整组不拦截点击，气泡本体单独开 */
@@ -833,11 +1263,41 @@ async function scrollBottom() {
 .pet-tip-leave-active { transition: opacity 0.35s; }
 .pet-tip-leave-to { opacity: 0; }
 h2 { text-align: center; }
+/* 标签页：对话 / 故事（各自独立会话） */
+.chat-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.chat-tab {
+  flex: 1;
+  text-align: center;
+  padding: 7px 0;
+  font-size: 13px;
+  color: #7a8296;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(0, 245, 255, 0.12);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  user-select: none;
+}
+.chat-tab:hover {
+  color: #b8c2d4;
+  background: rgba(0, 245, 255, 0.08);
+}
+.chat-tab.active {
+  color: #fff;
+  background: rgba(0, 245, 255, 0.22);
+  border-color: rgba(0, 245, 255, 0.55);
+  text-shadow: 0 0 8px rgba(0, 245, 255, 0.4);
+}
 .chat-box {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  border: 1px solid #ddd;
+  border: 1px solid rgba(0, 245, 255, 0.15);
+  background: rgba(255, 255, 255, 0.04);
   padding: 12px;
   border-radius: 8px;
   margin-bottom: 12px;
@@ -851,13 +1311,14 @@ h2 { text-align: center; }
 .msg.user { justify-content: flex-end; }
 .role {
   font-weight: bold;
-  color: #2c7be5;
+  color: rgba(0, 245, 255, 0.85);
   min-width: 30px;
   padding-top: 4px;
 }
-.msg.user .role { color: #e5533c; }
+.msg.user .role { color: #ff9a8a; }
 .content {
-  background: #f0f0f0;
+  background: rgba(255, 255, 255, 0.08);
+  color: #e8e8f0;
   padding: 8px 12px;
   border-radius: 6px;
   max-width: 75%;
@@ -868,57 +1329,66 @@ h2 { text-align: center; }
 /* 打字机光标：流未结束时在文字末尾闪 ▍ */
 .content.typing::after {
   content: '▍';
-  color: #2c7be5;
+  color: rgba(0, 245, 255, 0.9);
   animation: cursor-blink 0.8s infinite;
 }
 @keyframes cursor-blink {
   50% { opacity: 0; }
 }
-.msg.user .content { background: #d4e4fc; }
+.msg.user .content { background: rgba(0, 245, 255, 0.14); color: #fff; }
 .input-area { display: flex; gap: 8px; }
 .input-area input {
   flex: 1;
+  min-width: 0;
   padding: 10px;
-  border: 1px solid #ccc;
+  border: 1px solid rgba(0, 245, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+  color: #e8e8f0;
   border-radius: 6px;
   font-size: 14px;
 }
+.input-area input::placeholder { color: #7a8296; }
 .input-area button {
+  flex: 0 0 auto;
+  white-space: nowrap;   /* 「发送」不再被挤成竖排两行 */
   padding: 10px 20px;
-  background: #2c7be5;
-  color: white;
-  border: none;
+  background: rgba(0, 245, 255, 0.12);
+  color: rgba(0, 245, 255, 0.95);
+  border: 1px solid rgba(0, 245, 255, 0.45);
   border-radius: 6px;
   cursor: pointer;
 }
+.input-area button:hover { background: rgba(0, 245, 255, 0.22); }
 .input-area button:disabled {
-  background: #aaa;
+  background: rgba(255, 255, 255, 0.06);
+  color: #8a8a9a;
+  border-color: rgba(255, 255, 255, 0.1);
   cursor: not-allowed;
 }
 /* ===== 翻译模式标签：翻译中显示，点击切回口语练习 ===== */
 .mode-chip {
   flex: 0 0 auto;
   padding: 0 10px !important;
-  background: #eef6ff !important;
-  color: #2c7be5 !important;
-  border: 1px solid #9cc3f5 !important;
+  background: rgba(0, 245, 255, 0.1) !important;
+  color: rgba(0, 245, 255, 0.9) !important;
+  border: 1px solid rgba(0, 245, 255, 0.4) !important;
   border-radius: 6px;
   font-size: 13px;
   cursor: pointer;
   white-space: nowrap;
 }
-.mode-chip:hover { background: #dcebfc !important; }
+.mode-chip:hover { background: rgba(0, 245, 255, 0.2) !important; }
 /* ===== 按住说话按钮 ===== */
 .mic-btn {
   flex: 0 0 auto;
   width: 44px;
   padding: 10px 0 !important;
-  background: #fff !important;
-  color: #2c7be5 !important;
-  border: 1px solid #cfd6e4 !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: rgba(0, 245, 255, 0.9) !important;
+  border: 1px solid rgba(0, 245, 255, 0.25) !important;
   font-size: 18px;
 }
-.mic-btn:hover { background: #eef2fb !important; }
+.mic-btn:hover { background: rgba(0, 245, 255, 0.12) !important; }
 .mic-btn.recording {
   background: #e5533c !important;
   color: #fff !important;
@@ -936,17 +1406,29 @@ h2 { text-align: center; }
   align-items: center;
   gap: 8px;
   font-size: 13px;
-  color: #666;
+  color: #8a8a9a;
 }
 .char-select {
   flex: 0 1 auto;
   min-width: 0;
   padding: 4px 6px;
   font-size: 13px;
-  border: 1px solid #cfd6e4;
+  border: 1px solid rgba(0, 245, 255, 0.25);
   border-radius: 6px;
-  background: #fff;
-  color: #333;
+  background: rgba(255, 255, 255, 0.06);
+  color: #e8e8f0;
   cursor: pointer;
+}
+</style>
+
+<style>
+/* 全局查词高亮（Highlight API 浏览器级绘制，不改页面 DOM）。
+   必须非 scoped：高亮要作用到宿主页面的文字上 */
+::highlight(lookup-hover) {
+  background-color: rgba(0, 245, 255, 0.18);
+}
+::highlight(lookup-hit) {
+  background-color: rgba(0, 245, 255, 0.4);
+  color: #fff;
 }
 </style>
