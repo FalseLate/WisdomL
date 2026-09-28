@@ -10,9 +10,9 @@
     <router-view v-show="!showSplash" />
   </div>
 
-  <!-- 记单词（/word/*）页面常驻的 AI 口语陪练虚拟人（pet-tutor 模块）：
-       挂在 App 层按路由显隐，词书/计划/学习三页切换时不会重新加载模型 -->
-  <PetTutor v-if="showPetTutor" api-base="http://127.0.0.1:8080" session-id="word-quiz-user" />
+  <!-- 记单词（/word/*）/阅读（/reading/*）/我的Wiki（/wiki/*）页面常驻的 AI 口语陪练虚拟人（pet-tutor 模块）：
+       挂在 App 层按路由显隐，页面切换时不会重新加载模型 -->
+  <PetTutor v-if="showPetTutor" :api-base="petApiBase" session-id="word-quiz-user" />
 
   <!-- 全局生成中浮动条 -->
   <div v-if="notifyStore.isGenerating" class="global-loading-bar">
@@ -69,7 +69,11 @@ const qStore = useQuestionsStore()
 
 // 记单词流程（/word/*）显示虚拟人陪练
 // 虚拟人出现在 记单词 与 分层阅读 两个英语模块（阅读页用它的查词/解句/朗读入口）
-const showPetTutor = computed(() => route.path.startsWith('/word/') || route.path.startsWith('/reading/'))
+const showPetTutor = computed(() => route.path.startsWith('/word/') || route.path.startsWith('/reading/') || route.path.startsWith('/wiki/'))
+
+// 虚拟人接口地址：部署到服务器（生产构建）走同源（Nginx 反代 /unity 和 /api），
+// 本地开发仍直连本机 8080 后端，两边行为都不变
+const petApiBase = import.meta.env.PROD ? '' : 'http://127.0.0.1:8080'
 
 // 开局动画只在首次进入时展示
 const showSplash = ref(true)

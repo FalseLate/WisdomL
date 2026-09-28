@@ -85,3 +85,23 @@ export function answerVariant(variantId, correct) {
     data: { variantId, correct }
   })
 }
+
+// ===== 错题练习（攻克升级）：针对单道错题的强化练习页 =====
+
+// 出题：kind = variant 变式题（加深一层+强干扰选项）/ similar 同类型题（只给答案依据段落）
+export function generatePractice(questionId, kind) {
+  return request({
+    url: '/english/wrong/practice/generate',
+    method: 'POST',
+    data: { questionId, kind }
+  })
+}
+
+// 作答回写：当前一轮变式题 + 同类型题都答对 → 攻克（conquered=true）
+export function answerPractice(itemId, correct) {
+  return request({
+    url: '/english/wrong/practice/answer',
+    method: 'POST',
+    data: { itemId, correct }
+  })
+}

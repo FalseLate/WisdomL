@@ -99,6 +99,9 @@ public class EdgeTtsService {
             ProcessBuilder pb = new ProcessBuilder(command);
             Map<String, String> env = pb.environment();
 
+            // 强制 Python 按 UTF-8 输出：Windows 控制台默认 GBK，Java 按 UTF-8 解码中文报错会乱码
+            env.put("PYTHONIOENCODING", "utf-8");
+
             // 只有 proxy.enable=true 时才注入代理环境变量
             if (proxyEnable) {
                 String proxyUrl = String.format("http://%s:%d", proxyHost, proxyPort);
@@ -133,8 +136,9 @@ public class EdgeTtsService {
             System.out.println(outputStr);
 
             if (process.exitValue() != 0) {
-                throw new RuntimeException("edge-tts 执行失败，退出码=" + process.exitValue()
-                        + "，输出: " + outputStr);
+                // Python 的完整报错栈只进后端日志（上面已 println），给前端的提示保持一句简短原因——
+                // 否则整个 Traceback 会原样返回给前端，被 Toast 全屏渲染盖住页面
+                throw new RuntimeException("语音合成失败（edge-tts 退出码=" + process.exitValue() + "，多为网络/代理波动，请稍后再试）");
             }
 
             // 7. 读取生成的 mp3

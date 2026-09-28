@@ -184,9 +184,9 @@ public class EnglishWrongController {
             return res;
         }
 
-        // RAG 检索错题题干相关知识，给 Agent 提供判错依据
+        // RAG 检索错题题干相关知识，给 Agent 提供判错依据（带上 userId：我的私人沉淀优先）
         StringBuilder knowledge = new StringBuilder();
-        for (WikiKnowledgeService.SearchHit hit : wikiKnowledgeService.search(row.getQuestionContent(), null, 3)) {
+        for (WikiKnowledgeService.SearchHit hit : wikiKnowledgeService.search(row.getQuestionContent(), null, 3, userId)) {
             var k = hit.knowledge();
             knowledge.append("- ").append(k.getTitle()).append("：")
                     .append(k.getContent() == null ? "" : k.getContent()).append("\n");

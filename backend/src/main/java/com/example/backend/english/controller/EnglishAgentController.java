@@ -100,7 +100,7 @@ public class EnglishAgentController {
         // 2. 例句来源：公共Wiki → Agent 造句
         String sentence = null;
         String source = "wiki";
-        List<WikiKnowledgeService.SearchHit> hits = wikiKnowledgeService.search(word.getWord(), null, 3);
+        List<WikiKnowledgeService.SearchHit> hits = wikiKnowledgeService.search(word.getWord(), null, 3, userId);
         for (WikiKnowledgeService.SearchHit hit : hits) {
             String ex = hit.knowledge().getExampleSentence();
             if (ex != null && ex.toLowerCase().contains(word.getWord().toLowerCase())) {
@@ -203,10 +203,10 @@ public class EnglishAgentController {
                     .max(Comparator.comparingInt(l -> switch (l) { case "ky" -> 2; case "6" -> 1; default -> 0; }))
                     .orElse("4");
 
-            // 3. RAG 检索相关知识点注入上下文
+            // 3. RAG 检索相关知识点注入上下文（带上 userId：我的私人沉淀优先）
             String weakTexts = weak.stream().map(Word::getWord).reduce((a, b) -> a + ", " + b).orElse("");
             StringBuilder knowledge = new StringBuilder();
-            for (WikiKnowledgeService.SearchHit hit : wikiKnowledgeService.search(weakTexts, null, 3)) {
+            for (WikiKnowledgeService.SearchHit hit : wikiKnowledgeService.search(weakTexts, null, 3, userId)) {
                 var k = hit.knowledge();
                 knowledge.append("- ").append(k.getTitle()).append("：")
                         .append(k.getContent() == null ? "" : k.getContent()).append("\n");

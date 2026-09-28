@@ -463,7 +463,8 @@ defineExpose({ attachLipSyncNode, silenceMouth, playGesture })
   height: 100%;
   background: transparent;
 }
-.avatar-stage canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+/* touch-action:none：手机上按住人物拖动时，禁止浏览器把触摸抢去当页面滚动（否则拖不动） */
+.avatar-stage canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
 .avatar-status {
   position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
   padding: 4px 12px; border-radius: 999px;

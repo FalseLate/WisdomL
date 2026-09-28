@@ -2,41 +2,22 @@
   <div class="page-wrap">
     <van-nav-bar :title="article.title || '阅读'" left-arrow @click-left="router.back()" />
 
-    <!-- 工具条：查词 / 解句 模式 -->
-    <div class="mode-bar">
-      <div class="mode-btn" :class="{ active: mode === 'word' }" @click="setMode(mode === 'word' ? 'none' : 'word')">
-        🔍 查单词
-      </div>
-      <div class="mode-btn" :class="{ active: mode === 'sentence' }" @click="setMode(mode === 'sentence' ? 'none' : 'sentence')">
-        🧩 解句子
-      </div>
-      <div class="mode-hint" v-if="modeHint">{{ modeHint }}</div>
-    </div>
-
-    <!-- 正文（内容压过全局粒子画布） -->
+    <!-- 正文（内容压过全局粒子画布）；查词/解句已升级为全局能力（虚拟人功能栏，任意页面可用） -->
     <div class="page-container">
-      <div
-        class="article-body"
-        :class="{ 'in-sentence-mode': mode === 'sentence' }"
-        ref="bodyRef"
-        @pointermove="onPointerMove"
-      >
+      <div class="article-body" ref="bodyRef">
         <div class="para" v-for="(p, pi) in paragraphs" :key="pi">
           <span
             v-for="(s, si) in p._sentences"
             :key="si"
             class="sentence"
-            :class="{ long: !!s._long, clickable: mode === 'none' && !!s._long }"
+            :class="{ long: !!s._long, clickable: !!s._long }"
             @click="onSentenceClick(s, $event)"
           >
             <template v-for="(w, wi) in s._tokens" :key="w.gi">
               <span
                 v-if="w.isWord"
                 class="word"
-                :data-gi="w.gi"
-                :class="{ sel: selected.has(w.gi), pickable: mode !== 'none', 'in-vocab': inMyVocab(w.text) }"
-                @pointerdown.stop="handleWordPointerDown(w, $event)"
-                @click.stop="onWordClick(w, $event)"
+                :class="{ 'in-vocab': inMyVocab(w.text) }"
               >{{ w.text }}</span><span v-else class="sp">{{ w.text }}</span>
             </template>
           </span>
@@ -70,33 +51,7 @@
       </div>
     </div>
 
-    <!-- 解句模式：底部已选词条 -->
-    <div class="select-bar" v-if="mode === 'sentence' && selected.size > 0">
-      <span class="sb-count">已选 {{ selected.size }} 词</span>
-      <van-button size="small" round plain @click="clearSelection">清空</van-button>
-      <van-button size="small" round type="primary" :loading="analyzing" @click="analyzeSelected">解析句子</van-button>
-    </div>
-
-    <!-- 查词气泡 -->
-    <div class="word-bubble" v-if="bubble.show" :style="{ left: bubble.x + 'px', top: bubble.y + 'px' }">
-      <template v-if="bubble.loading">查询中...</template>
-      <template v-else-if="bubble.word">
-        <div class="wb-head">
-          <span class="wb-word">{{ bubble.word.word }}</span>
-          <span class="wb-phonetic" @click="petSpeak(bubble.word.word)">🔊 {{ bubble.word.phonetic }}</span>
-        </div>
-        <div class="wb-mean">{{ bubble.word.cnMean }}</div>
-        <button class="wb-add" :disabled="bubble.added" @click="addBubbleWord">
-          {{ bubble.added ? '已加入生词本' : '⭐ 加入生词本' }}
-        </button>
-      </template>
-      <template v-else>
-        <div class="wb-miss">词库未收录该词</div>
-      </template>
-      <div class="wb-close" @click="bubble.show = false">✕</div>
-    </div>
-
-    <!-- 句子解析卡片 -->
+    <!-- 句子解析卡片（长难句点按解析仍在用） -->
     <van-popup v-model:show="card.show" round position="bottom" :z-index="3000" :style="{ background: 'var(--bg-card)' }">
       <div class="analyze-card">
         <div class="ac-text">{{ card.text }}</div>
@@ -137,11 +92,11 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showSuccessToast, showFailToast } from 'vant'
-import { getReadingArticle, analyzeSentence, getReadingDone, finishReadingQuiz } from '../api/reading'
-import { queryWord, addWordCollect, getMyCollectList } from '../api/word'
+import { getReadingArticle, getReadingDone, finishReadingQuiz } from '../api/reading'
+import { getMyCollectList } from '../api/word'
 import { authState } from '../utils/auth.js'
 import request from '../utils/request'
 
@@ -152,29 +107,9 @@ const article = ref({})
 const paragraphs = ref([])
 const questions = ref([])
 
-// ===== 模式：none 普通 / word 点词查词 / sentence 选词解句 =====
-const mode = ref('none')
-const modeHint = computed(() => ({
-  word: '点任意单词，弹出音标和释义',
-  sentence: '点选（或拖选）多个单词，再点底部「解析句子」'
-}[mode.value] || ''))
+// ===== 查词/解句已迁移为虚拟人功能栏的全局能力（PetTutor 内置），本页只保留长难句点按与生词本高亮 =====
 
-function setMode(m) {
-  mode.value = m
-  clearSelection()
-  bubble.show = false
-}
-
-// 虚拟人菜单「查单词/解句子」通过 window 事件联动本页
-function onReadingModeEvent(e) {
-  const m = e.detail?.mode
-  if (m === 'word' || m === 'sentence') {
-    setMode(m)
-    showSuccessToast(m === 'word' ? '查词模式已开启' : '解句模式已开启')
-  }
-}
-
-// ===== 渲染模型：段落 → 句子 → 词元（gi 为全文词序号，供拖选/点选定位） =====
+// ===== 渲染模型：段落 → 句子 → 词元（词级 span 供生词本高亮着色） =====
 function buildRenderModel(content) {
   let gi = 0
   content.paragraphs = content.paragraphs || []
@@ -201,9 +136,6 @@ function buildRenderModel(content) {
 }
 
 const bodyRef = ref(null)
-
-// ===== 查词气泡 =====
-const bubble = reactive({ show: false, x: 0, y: 0, loading: false, word: null, added: false })
 
 // 生词本按 userId 隔离；老会话可能只有 token，兜底再查一次 profile
 let userId = authState.user?.id || null
@@ -248,137 +180,13 @@ async function loadMyVocab() {
   } catch (e) { /* 生词本加载失败不影响正文展示 */ }
 }
 
-async function onWordClick(w, e) {
-  if (mode.value === 'sentence') {
-    // 刚结束一次拖选的 click 不当作点选（避免松手时把拖选结果又反转掉）
-    if (wasDragging()) { dragState = null; return }
-    toggleSelect(w.gi)
-    return
-  }
-  if (mode.value !== 'word') return
-  const token = cleanToken(w.text)
-  if (!token) return
-  bubble.show = true
-  bubble.loading = true
-  bubble.word = null
-  bubble.added = false
-  bubble.x = Math.min(e.clientX + 10, window.innerWidth - 250)
-  bubble.y = Math.min(e.clientY + 16, window.innerHeight - 170)
-  try {
-    const res = await queryWord(token)
-    bubble.word = res.code === 200 ? res.data : null
-  } catch (err) {
-    bubble.word = null
-  } finally {
-    bubble.loading = false
-  }
-}
-
-async function addBubbleWord() {
-  if (!bubble.word || bubble.added) return
-  try {
-    const res = await addWordCollect(await ensureUserId(), bubble.word.id)
-    if (res.code === 200) {
-      bubble.added = true
-      showSuccessToast('已加入生词本')
-    } else {
-      // 后端对重复加入返回 400，也视为已加入
-      bubble.added = true
-      showSuccessToast(res.msg || '已在生词本中')
-    }
-  } catch (err) {
-    showFailToast(err.message || '网络异常')
-  }
-}
-
-// ===== 解句模式：点选 + 拖选 =====
-const selected = ref(new Set())
-const analyzing = ref(false)
-let dragState = null // { startGi, moved }
-
-function toggleSelect(gi) {
-  const s = new Set(selected.value)
-  if (s.has(gi)) s.delete(gi)
-  else s.add(gi)
-  selected.value = s
-}
-
-function clearSelection() {
-  selected.value = new Set()
-  dragState = null
-}
-
-function onPointerMove(e) {
-  if (mode.value !== 'sentence' || !dragState) return
-  if (!(e.buttons & 1) && e.pointerType === 'mouse') { dragState = null; return }
-  const el = document.elementFromPoint(e.clientX, e.clientY)
-  const wordEl = el?.closest?.('.word')
-  if (!wordEl) return
-  const gi = Number(wordEl.dataset ? wordEl.dataset.gi : wordEl.getAttribute('data-gi'))
-  if (Number.isNaN(gi)) return
-  if (gi !== dragState.lastGi) {
-    dragState.lastGi = gi
-    dragState.moved = true
-    const s = new Set()
-    for (let i = Math.min(dragState.startGi, gi); i <= Math.max(dragState.startGi, gi); i++) s.add(i)
-    selected.value = s
-  }
-}
-
-function onWordPointerDown(w, e) {
-  if (mode.value !== 'sentence') return
-  dragState = { startGi: w.gi, lastGi: w.gi, moved: false }
-}
-
-function onWindowPointerUp() {
-  dragState = null
-}
-
-// 点词：解句模式下是点选/拖选入口；查词模式下查词
-function handleWordPointerDown(w, e) {
-  if (mode.value === 'sentence') onWordPointerDown(w, e)
-}
-
-// 拖动结束在别的元素上松手时，把「点一下」和「拖选」区分开：
-// onWordClick 在 click 阶段触发，此时若刚发生拖选（moved）则跳过 toggle
-function wasDragging() {
-  return !!dragState?.moved
-}
-
 const totalWords = ref(0)
 
-async function analyzeSelected() {
-  if (selected.value.size === 0) return
-  const allTokens = []
-  paragraphs.value.forEach(p => p._sentences.forEach(s => s._tokens.forEach(t => { if (t.isWord) allTokens[t.gi] = t.text })))
-  const idx = [...selected.value].sort((a, b) => a - b)
-  const text = idx.map(i => allTokens[i]).join(' ')
-    .replace(/\s+([,.!?;:])/g, '$1')
-    .trim()
-  if (!text) return
-  analyzing.value = true
-  try {
-    const res = await analyzeSentence(text)
-    if (res.code === 200) {
-      card.text = text
-      card.data = res.data
-      card.loading = false
-      card.show = true
-    } else {
-      showFailToast(res.msg || '解析失败')
-    }
-  } catch (err) {
-    showFailToast(err.message || '网络异常')
-  } finally {
-    analyzing.value = false
-  }
-}
-
-// ===== 长难句点击（普通模式下点高亮句）=====
+// ===== 长难句点击（点高亮句弹出解析卡片）=====
 const card = reactive({ show: false, text: '', data: null, loading: false })
 
 function onSentenceClick(s) {
-  if (mode.value !== 'none' || !s._long) return
+  if (!s._long) return
   card.text = s.text
   card.data = { analysis: s._long.analysis }
   card.loading = false
@@ -444,8 +252,6 @@ const quizScore = computed(() => questions.value.filter(q => q._picked === q.ans
 
 // ===== 生命周期 =====
 onMounted(async () => {
-  window.addEventListener('reading-mode', onReadingModeEvent)
-  window.addEventListener('pointerup', onWindowPointerUp)
   loadMyVocab()
   try {
     const id = route.query.id
@@ -469,51 +275,12 @@ onMounted(async () => {
     showFailToast(err.message || '网络异常')
   }
 })
-
-onUnmounted(() => {
-  window.removeEventListener('reading-mode', onReadingModeEvent)
-  window.removeEventListener('pointerup', onWindowPointerUp)
-})
 </script>
 
 <style scoped>
 .page-wrap {
   min-height: 100dvh;
   background: var(--bg-base);
-}
-
-/* 工具条 */
-.mode-bar {
-  position: relative;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
-}
-
-.mode-btn {
-  padding: 7px 16px;
-  border-radius: 999px;
-  border: 1px solid var(--accent-border);
-  background: var(--bg-elevated);
-  color: var(--text-secondary);
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.mode-btn.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-  font-weight: 700;
-}
-
-.mode-hint {
-  font-size: 11px;
-  color: var(--text-secondary);
-  margin-left: auto;
 }
 
 /* 内容压过全局粒子画布（tsParticles fullScreen 的 fixed canvas 在根层级），否则点击被吃掉 */
@@ -541,10 +308,6 @@ onUnmounted(() => {
   color: var(--text-primary);
 }
 
-.article-body.in-sentence-mode {
-  user-select: none;
-}
-
 .para + .para {
   margin-top: 14px;
 }
@@ -565,20 +328,7 @@ onUnmounted(() => {
   transition: background 0.15s;
 }
 
-.word.pickable {
-  cursor: pointer;
-}
-
-.word.pickable:hover {
-  background: var(--accent-soft, rgba(79, 124, 255, 0.15));
-}
-
-.word.sel {
-  background: rgba(79, 124, 255, 0.35);
-  color: #fff;
-}
-
-/* 生词本命中词：标黄 + 虚线下划线，与划词选中色区分 */
+/* 生词本命中词：标黄 + 虚线下划线 */
 .word.in-vocab {
   background: rgba(255, 193, 7, 0.28);
   box-shadow: inset 0 -2px 0 rgba(255, 152, 0, 0.55);
@@ -682,96 +432,6 @@ onUnmounted(() => {
   margin: 0 2px;
 }
 
-/* 解句模式底部操作条 */
-.select-bar {
-  position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: 90px;
-  z-index: 3000;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
-  background: var(--bg-card);
-  border: 1px solid var(--accent-border);
-  border-radius: 999px;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
-}
-
-.sb-count {
-  font-size: 13px;
-  color: var(--text-primary);
-}
-
-/* 查词气泡 */
-.word-bubble {
-  position: fixed;
-  z-index: 4000;
-  width: 240px;
-  padding: 12px 14px;
-  background: var(--bg-card);
-  border: 1px solid var(--accent-border);
-  border-radius: 12px;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
-}
-
-.wb-head {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.wb-word {
-  font-size: 17px;
-  font-weight: 700;
-  color: var(--text-primary);
-  font-family: var(--font-display);
-}
-
-.wb-phonetic {
-  font-size: 12px;
-  color: var(--accent);
-  cursor: pointer;
-}
-
-.wb-mean {
-  margin-top: 6px;
-  font-size: 13px;
-  color: var(--text-secondary);
-  line-height: 1.5;
-}
-
-.wb-add {
-  margin-top: 10px;
-  width: 100%;
-  padding: 7px 0;
-  border-radius: 8px;
-  border: 1px solid var(--accent);
-  background: transparent;
-  color: var(--accent);
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.wb-add:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
-.wb-miss {
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
-.wb-close {
-  position: absolute;
-  right: 8px;
-  top: 6px;
-  font-size: 12px;
-  color: var(--text-muted);
-  cursor: pointer;
-}
 
 /* 解析卡片 */
 .analyze-card {

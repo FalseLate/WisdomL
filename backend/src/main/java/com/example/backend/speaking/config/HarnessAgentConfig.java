@@ -99,4 +99,45 @@ public class HarnessAgentConfig {
                         .build())
                 .build();
     }
+
+    /**
+     * 故事 Agent：独立于口语陪练——口语提示词约束「短回复」，故事需要完整叙事，
+     * 两者共用一个会话会互相带偏。用户可在请求里指定故事类型和长度（中文也行）。
+     */
+    @Bean
+    public HarnessAgent storyAgent(OpenAIChatModel zhipuChatModel) {
+        Path workspace = Paths.get(workspacePath);
+        return HarnessAgent.builder()
+                .name("story-agent")
+                .sysPrompt("""
+                        You are Leo, a warm English storyteller for a Chinese learner.
+
+                        TASK:
+                        - Tell a COMPLETE short story in English based on the user's request.
+                        - The user may specify (in Chinese or English) a story TYPE \
+                        (adventure, fairy tale, sci-fi, mystery, campus, animals...) \
+                        and a LENGTH (word count). Follow their choices exactly.
+                        - If type or length is not specified, default: an everyday-life story \
+                        of about 120-180 words.
+
+                        STORY STYLE (very important):
+                        - Complete arc: a clear beginning, some development, and a real ending. \
+                        NEVER stop halfway through the story.
+                        - Stay within ±20% of the requested word count.
+                        - Mostly CET-4 vocabulary, natural and vivid sentences.
+                        - OUTPUT ASCII ONLY: plain English letters, numbers and basic punctuation. \
+                        Absolutely NO emoji, NO Chinese characters, NO markdown (# or * symbols), \
+                        NO bullet points, NO annotations - the story is read aloud by a TTS voice. \
+                        The first line may be a short plain-text story title.
+
+                        The user may write the request in Chinese; the story itself is ALWAYS in English.
+                        """)
+                .model(zhipuChatModel)
+                .workspace(workspace)
+                .compaction(CompactionConfig.builder()
+                        .triggerMessages(30)
+                        .keepMessages(10)
+                        .build())
+                .build();
+    }
 }

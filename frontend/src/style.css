@@ -212,3 +212,15 @@ body::before {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ===== 全局顶栏（van-nav-bar）深色化：覆盖 Vant 默认白底，贴合赛博背景 ===== */
+.van-nav-bar {
+  --van-nav-bar-background: rgba(18, 18, 28, 0.9);
+  --van-nav-bar-title-text-color: #e8e8f0;
+  --van-nav-bar-text-color: #00f5ff;
+  --van-nav-bar-icon-color: #00f5ff;
+  background: rgba(18, 18, 28, 0.9);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(0, 245, 255, 0.2);
+}
