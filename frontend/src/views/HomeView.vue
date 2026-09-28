@@ -361,12 +361,26 @@ const section2Visible = ref(false)
 const navVisible = ref(false)
 const bottomNavVisible = ref(false)
 
-// 统计数据（模拟）
+// 统计数据：来自 /user/profile，未登录或拉取失败时保持 0
 const stats = reactive({
-  total: 256,
-  accuracy: 89,
-  streak: 7
+  total: 0,
+  accuracy: 0,
+  streak: 0
 })
+
+async function loadStats() {
+  if (!isLoggedIn()) return
+  try {
+    const s = (await request.get('/user/profile'))?.stats
+    if (s) {
+      stats.total = s.totalRecords || 0
+      stats.accuracy = s.accuracy || 0
+      stats.streak = s.streakDays || 0
+    }
+  } catch (e) {
+    console.warn('[HomeView] 首页统计拉取失败', e)
+  }
+}
 
 // 原来的出题状态
 const activeTab = ref(0)
@@ -405,6 +419,8 @@ onMounted(async () => {
       await document.fonts.ready
     }
   } catch (e) {}
+
+  loadStats()   // 不 await：统计异步回填，别挡住下面的入场动画
 
   // 首次加载时 SplashScreen 显示 2.5s，等它结束后再播放入场动画
   // 从其他页面返回时立即播放

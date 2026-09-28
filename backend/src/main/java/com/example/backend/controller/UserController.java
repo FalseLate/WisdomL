@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import java.time.LocalDate;
 import java.util.*;
 
 @RestController
@@ -35,13 +36,27 @@ public class UserController {
 
         long totalAnswers = 0;
         long totalCorrect = 0;
+        Set<LocalDate> activeDays = new HashSet<>();
         List<QuestionRecord> allRecords = questionRecordMapper.selectList(
             new LambdaQueryWrapper<QuestionRecord>().eq(QuestionRecord::getUserId, userId));
         for (QuestionRecord qr : allRecords) {
+            if (qr.getCreateTime() != null) activeDays.add(qr.getCreateTime().toLocalDate());
             List<AnswerRecord> answers = answerRecordMapper.selectList(
                 new LambdaQueryWrapper<AnswerRecord>().eq(AnswerRecord::getRecordId, qr.getId()));
+            for (AnswerRecord a : answers) {
+                if (a.getCreateTime() != null) activeDays.add(a.getCreateTime().toLocalDate());
+            }
             totalAnswers += answers.size();
             totalCorrect += answers.stream().filter(a -> a.getIsCorrect() != null && a.getIsCorrect() == 1).count();
+        }
+
+        // 连续天数：今天还没学习就从昨天起算，避免早上打开首页直接归零
+        long streakDays = 0;
+        LocalDate cursor = LocalDate.now();
+        if (!activeDays.contains(cursor)) cursor = cursor.minusDays(1);
+        while (activeDays.contains(cursor)) {
+            streakDays++;
+            cursor = cursor.minusDays(1);
         }
 
         long favCount = favoriteMapper.selectCount(
@@ -59,7 +74,8 @@ public class UserController {
             "totalAnswers", totalAnswers,
             "totalCorrect", totalCorrect,
             "accuracy", totalAnswers > 0 ? Math.round(totalCorrect * 100.0 / totalAnswers) : 0,
-            "favCount", favCount
+            "favCount", favCount,
+            "streakDays", streakDays
         ));
 
         return result;
