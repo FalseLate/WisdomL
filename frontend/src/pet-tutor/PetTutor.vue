@@ -444,14 +444,23 @@ function clamp(v, a, b) { return Math.max(a, Math.min(b, v)) }
 function initPetLayout() {
   try {
     const saved = JSON.parse(localStorage.getItem(PET_LAYOUT_KEY) || 'null')
-    if (saved && typeof saved.x === 'number') { petPos.value = saved; return }
+    if (saved && typeof saved.x === 'number') {
+      // 手机上若读到的是桌面存档（人物过大/被拖出屏），收敛到手机档，避免整屏被挡
+      if (window.innerWidth <= 600) {
+        saved.scale = Math.min(saved.scale || 1, 0.6)
+        saved.x = clamp(saved.x, -100, window.innerWidth - 100)
+        saved.y = clamp(saved.y, -100, window.innerHeight - 100)
+      }
+      petPos.value = saved; return
+    }
   } catch { /* 存档损坏则用默认 */ }
-  // 人物停靠屏幕右下角；手机宽度下默认缩小一号，少挡页面内容。
+  // 人物停靠屏幕右下角；手机宽度下默认缩小，少挡页面内容。
   // 注意按"缩放后的视觉尺寸"贴边（holder 的 scale 以左下角为原点）
   const small = window.innerWidth <= 900
+  const phone = window.innerWidth <= 600
   const baseW = small ? 300 : 380
   const baseH = small ? 500 : 600
-  const scale = small ? 0.75 : 1
+  const scale = phone ? 0.5 : small ? 0.75 : 1
   petPos.value = {
     // 功能栏已贴进人物层内部，拖到屏幕左缘也不会被裁掉
     x: Math.max(0, window.innerWidth - baseW * scale - 24),
@@ -557,6 +566,8 @@ function startPassThrough(e, combo) {
 // ========== 聊天悬浮窗：独立于人物——拖标题栏移动、标题栏上滚轮缩放、布局记忆 ==========
 const CHAT_LAYOUT_KEY = 'pet-tutor-chat-layout-v1'
 const CHAT_W = 420
+// 手机屏比 420px 窄：实际宽度取「面板宽」与「屏幕宽-边距」的较小值，保证拖动/停靠不出屏
+const chatW = () => Math.min(CHAT_W, window.innerWidth - 16)
 const chatPos = ref({ x: 0, y: 0, scale: 1 })
 function initChatLayout() {
   try {
@@ -564,7 +575,7 @@ function initChatLayout() {
     if (saved && typeof saved.x === 'number') { chatPos.value = saved; return }
   } catch { /* 存档损坏则用默认 */ }
   // 默认停靠屏幕右上角
-  chatPos.value = { x: Math.max(16, window.innerWidth - CHAT_W - 24), y: 16, scale: 1 }
+  chatPos.value = { x: Math.max(8, window.innerWidth - chatW() - 8), y: 16, scale: 1 }
 }
 function saveChatLayout() {
   try { localStorage.setItem(CHAT_LAYOUT_KEY, JSON.stringify(chatPos.value)) } catch { /* 忽略 */ }
@@ -591,7 +602,7 @@ function onChatDragMove(e) {
   if (!chatDragging) return
   chatPos.value = {
     ...chatPos.value,
-    x: clamp(chatDragFrom.x + dx, -(CHAT_W - 80), window.innerWidth - 80),
+    x: clamp(chatDragFrom.x + dx, -(chatW() - 80), window.innerWidth - 80),
     y: clamp(chatDragFrom.y + dy, -100, window.innerHeight - 60)
   }
 }
@@ -1430,5 +1441,17 @@ h2 { text-align: center; }
 ::highlight(lookup-hit) {
   background-color: rgba(0, 245, 255, 0.4);
   color: #fff;
+}
+
+/* ===== 手机端适配（≤600px）：聊天窗不超屏、内边距收紧、输入框 16px 防 iOS 聚焦自动放大 ===== */
+@media (max-width: 600px) {
+  .chat-drawer {
+    width: calc(100vw - 16px);
+    height: min(520px, 70dvh);
+  }
+  .chat-container { padding: 10px 12px; }
+  .chat-box { flex: 1; }
+  .input-area input { font-size: 16px; padding: 8px; }
+  .debug-bar .char-select { max-width: 60vw; }
 }
 </style>
