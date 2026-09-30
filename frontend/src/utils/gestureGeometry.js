@@ -51,7 +51,7 @@ export const GESTURE_CONFIG = {
   COOLDOWN_SUBMIT: 1500,     // 提交完成后冷却 ms
   ARM_HOLD_MS: 1500,         // 第一握：需保持多久进入待确认
   CONFIRM_HOLD_MS: 600,      // 第二握：需保持多久真正提交
-  ARM_WINDOW_MS: 3000        // 待确认窗口：松开后多久内必须完成第二握
+  ARM_WINDOW_MS: 4000        // 待确认窗口：进入待确认后多久内必须完成第二握（中途张开手不取消）
 }
 export function dist(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y)
@@ -232,12 +232,10 @@ export function createSubmitArmer(cfg = GESTURE_CONFIG, now = () => (typeof perf
         event = 'submit-arm'
       }
     } else if (phase === 'armed') {
-      if (!isFist) {
-        if (stableKey) reset()
-        else { phase = 'arm2'; t2 = 0 }
-      } else if (nowMs - tArmed >= cfg.ARM_WINDOW_MS) {
-        reset()
-      }
+      // 第二握必须先张开手，中间必然出现"五指张开/伸N指"候选——绝不能因此取消待确认，
+      // 否则两阶段永远走不完（真机反馈）。退出只靠窗口超时或显式 reset（摇头/Esc）。
+      if (nowMs - tArmed >= cfg.ARM_WINDOW_MS) reset()
+      else { phase = 'arm2'; t2 = isFist ? nowMs : 0 }
     } else if (phase === 'arm2') {
       if (nowMs - tArmed >= cfg.ARM_WINDOW_MS) {
         reset()
@@ -247,8 +245,6 @@ export function createSubmitArmer(cfg = GESTURE_CONFIG, now = () => (typeof perf
           event = 'submit'
           reset()
         }
-      } else if (stableKey) {
-        reset()
       } else {
         t2 = 0
       }

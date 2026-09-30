@@ -1,4 +1,12 @@
 /**
+ * 【已停用 · 保留备查】本文件基于 legacy @mediapipe/hands（自编译 wasm 全局单例）。
+ * 懒人模式的手势识别已整体切换到 src/channels/ChannelManager.js（@mediapipe/tasks-vision，
+ * 手/头/臂三通道共用一套 wasm 运行时）。两套 MediaPipe 运行时同页共存会触发
+ * "Module.arguments has been replaced" 单例冲突（历史上真实踩过），因此：
+ *   - 新代码不要再 import 本文件；
+ *   - 本文件与 public/mediapipe/hands/（约20MB）暂不删除，留作回退底牌；
+ *   - 确认 tasks-vision 链路稳定后可单独发起清理。
+ *
  * 手势识别工具类（基于 MediaPipe Hands）
  * 纯浏览器端运行，免费，无需后端
  *

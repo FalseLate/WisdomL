@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div
     v-if="visible"
     class="gesture-hud"
@@ -26,29 +26,40 @@
 
     <!-- 视频+画布区域 -->
     <div v-show="!minimized" class="hud-video-wrap">
-      <video ref="videoRef" class="hud-video" playsinline muted></video>
-      <canvas ref="canvasRef" class="hud-canvas" width="160" height="120"></canvas>
+      <canvas ref="canvasRef" class="hud-canvas" width="176" height="132"></canvas>
       <!-- 加载中遮罩 -->
       <div v-if="loading" class="hud-overlay">
         <div class="hud-spinner"></div>
         <div class="hud-overlay-text">{{ loadingText }}</div>
       </div>
       <!-- 错误遮罩 -->
-      <div v-if="error" class="hud-overlay error">
+      <div v-if="channelError" class="hud-overlay error">
         <div class="hud-overlay-icon">⚠️</div>
-        <div class="hud-overlay-text">{{ error }}</div>
-        <button class="hud-retry-btn" @click.stop="retryInit">重试</button>
+        <div class="hud-overlay-text">{{ channelError }}</div>
+        <button class="hud-retry-btn" @click.stop="retryChannels">重试</button>
       </div>
-      <!-- 确认进度条 -->
-      <div v-if="confirmProgress > 0" class="hud-confirm-bar">
-        <div class="hud-confirm-fill" :style="{ width: confirmProgress + '%' }"></div>
+      <!-- 确认进度条（两阶段握拳） -->
+      <div v-if="st.hand.progress > 0" class="hud-confirm-bar">
+        <div class="hud-confirm-fill" :style="{ width: st.hand.progress + '%' }"></div>
+      </div>
+      <!-- 无通道提示 -->
+      <div v-if="!anyChannel && !loading && !channelError" class="hud-overlay">
+        <div class="hud-overlay-text">未开启感知通道\n请在「无障碍设置」中开启 手/头/臂</div>
       </div>
     </div>
 
-    <!-- 当前手势（实时显示识别候选/稳定度/两阶段提交提示） -->
-    <div v-show="!minimized" class="hud-gesture" :class="{ armed }">
+    <!-- 三通道状态灯 + 步进选答提示 -->
+    <div v-show="!minimized" class="hud-gesture" :class="{ armed: st.hand.armPhase === 'armed' }">
+      <div class="lamp-row">
+        <span class="lamp" :class="lampClass('hand')">手</span>
+        <span class="lamp" :class="lampClass('head')">头</span>
+        <span class="lamp" :class="lampClass('arm')">臂</span>
+        <span v-if="debugOn && st.hand.on && st.hand.detected" class="lamp-ratio">稳定{{ Math.round(st.hand.ratio * 100) }}%</span>
+      </div>
       <div class="gesture-label">{{ currentGestureText }}</div>
-      <div class="gesture-action">{{ currentActionText }}</div>
+      <div v-if="headDebug" class="hud-debug">{{ headDebug }}</div>
+      <div v-if="faceDebug" class="hud-debug">{{ faceDebug }}</div>
+      <div class="gesture-action" :class="{ fired: !!firedAction }">{{ currentActionText }}</div>
     </div>
 
     <!-- 最小化时只显示状态点 -->
@@ -59,221 +70,225 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { GestureRecognizer } from '../../utils/gestureRecognizer.js'
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
+import { getRuntime } from '../../a11y/runtime.js'
+import { loadSettings, onSettingsChange } from '../../a11y/settings.js'
 
 const props = defineProps({
   visible: { type: Boolean, default: false }
 })
 
-const emit = defineEmits(['close', 'gesture', 'handDetected'])
+const emit = defineEmits(['close'])
 
-const videoRef = ref(null)
+const { bus, manager } = getRuntime()
 const canvasRef = ref(null)
 
-// 重要：recognizer 用普通变量，不进 Vue 响应式系统，避免 WASM 实例被 Proxy 代理
-let recognizer = null
-let initialized = false
-let destroyed = false
-let firedTimer = null
-
-const handDetected = ref(false)
-// 识别器每帧上报的稳定候选 { key, ratio, armPhase }
-const candidate = ref({ key: null, ratio: 0, armPhase: 'idle' })
-// 手势刚触发时的动作闪示
+const st = reactive({
+  hand: { on: false, detected: false, candidate: null, firedGesture: null, ratio: 0, armPhase: 'idle', progress: 0 },
+  head: { on: false, detected: false, candidate: null, firedGesture: null, angles: null, offscreen: false, debug: null },
+  arm: { on: false, detected: false, candidate: null, firedGesture: null }
+})
 const firedAction = ref('')
-// 两阶段握拳：是否处于“再次握拳确认提交”状态
-const armed = ref(false)
-const confirmProgress = ref(0)
+const channelError = ref('')
 const minimized = ref(false)
+// 判定诊断（俯仰/峰/阈/速…）默认隐藏：数字一直跳动对用户无意义还占渲染，只在设置里按需打开
+const debugOn = ref(false)
 const loading = ref(false)
 const loadingText = ref('')
-const error = ref('')
+let firedTimer = null
+let drawRaf = null
+let unsubBus = null
 
-// 位置（可拖动）
-const pos = ref({ x: 20, y: 100 })
-let dragStart = null
-let posStart = null
+const anyChannel = computed(() => st.hand.on || st.head.on || st.arm.on)
 
 const statusClass = computed(() => {
   if (loading.value) return 'loading'
-  if (error.value) return 'error'
-  if (armed.value || confirmProgress.value > 0) return 'confirm'
-  return handDetected.value ? 'detected' : 'none'
+  if (channelError.value) return 'error'
+  if (st.hand.armPhase === 'armed' || st.hand.progress > 0) return 'confirm'
+  if (!anyChannel.value) return 'none'
+  return (st.hand.detected || st.head.detected || st.arm.detected) ? 'detected' : 'none'
 })
 
 const statusText = computed(() => {
   if (loading.value) return loadingText.value || '加载中...'
-  if (error.value) return '初始化失败'
-  if (armed.value) return '待确认'
-  if (confirmProgress.value > 0) return '确认中...'
-  return handDetected.value ? '识别中' : '未检测到手'
+  if (channelError.value) return '通道异常'
+  if (st.hand.armPhase === 'armed') return '待确认'
+  if (!anyChannel.value) return '通道未开启'
+  return '识别中'
 })
 
-// 实时候选文案（识别器当前认为你在比什么）
+function lampClass(ch) {
+  const s = st[ch]
+  if (!s.on) return ''
+  return s.detected ? 'on hot' : 'on'
+}
+
+// 候选文案：手（沿用）+ 头 + 臂
 const candidateMap = {
-  'select:A': '伸1指 → 选A',
-  'select:B': '伸2指 → 选B',
-  'select:C': '伸3指 → 选C',
-  'select:D': '伸4指 → 选D',
-  'clear': '五指张开 → 清空',
-  'prev': '点赞偏左 → 上一题',
-  'next': '点赞偏右 → 下一题',
-  'fist': '握拳保持中…（拇指要收回贴掌）'
+  'select:A': '伸1指 → 选A', 'select:B': '伸2指 → 选B', 'select:C': '伸3指 → 选C', 'select:D': '伸4指 → 选D',
+  'clear': '五指张开 → 清空', 'prev': '点赞偏左 → 上一题', 'next': '点赞偏右 → 下一题',
+  'fist': '握拳保持中…（拇指要收回贴掌）',
+  'submit-arm': '松手后再握拳 = 确认提交',
+  'turnLeft': '左扭头', 'turnRight': '右扭头',
+  'nod': '点头 ✓', 'lookUp': '抬头', 'shake': '摇头', 'mouthOpen': '张嘴 ✓', 'smile': '微笑 ✓',
+  'elbowUp:left': '左举肘', 'elbowUp:right': '右举肘', 'handsUp': '变身姿势', 'sweep': '横扫'
 }
-
-// 手势真正触发瞬间的动作文案
+// 识别成功的手势名（下面那行回显用）
+const gestureWords = {
+  'select:A': '伸1指', 'select:B': '伸2指', 'select:C': '伸3指', 'select:D': '伸4指',
+  clear: '五指张开', prev: '点赞偏左', next: '点赞偏右', fist: '握拳',
+  'submit-arm': '握拳待确认', submit: '提交手势',
+  turnLeft: '左扭头', turnRight: '右扭头',
+  nod: '点头', lookUp: '抬头', shake: '摇头', mouthOpen: '张嘴', smile: '微笑',
+  'elbowUp:left': '左举肘', 'elbowUp:right': '右举肘', handsUp: '双手过头', sweep: '横扫'
+}
 const actionMap = {
-  'select:A': '✓ 已选择 A',
-  'select:B': '✓ 已选择 B',
-  'select:C': '✓ 已选择 C',
-  'select:D': '✓ 已选择 D',
-  'clear': '✓ 已清空重选',
-  'prev': '← 上一题',
-  'next': '下一题 →',
-  'submit-arm': '再次握拳 = 确认提交',
-  'submit': '正在提交整卷…'
-}
-
-function eventKey(g) {
-  if (!g) return ''
-  return g.type === 'select' ? `select:${g.data?.option || ''}` : g.type
+  selectA: '✓ 已选择 A', selectB: '✓ 已选择 B', selectC: '✓ 已选择 C', selectD: '✓ 已选择 D',
+  clear: '✓ 已清空重选', prev: '← 上一题', next: '下一题 →',
+  'submit-arm': '再次握拳 = 确认提交', submit: '正在提交整卷…',
+  optNext: '→ 下一选项', optPrev: '← 上一选项', confirm: '✓ 确认选中', undo: '↺ 已撤销', cancel: '已取消'
 }
 
 const currentGestureText = computed(() => {
-  if (armed.value) return '⚠ 再次握拳确认提交'
-  if (firedAction.value) return firedAction.value
-  const key = candidate.value.key
-  if (key) return candidateMap[key] || '手势稳定中…'
-  if (handDetected.value) return '手势稳定中…'
+  const c = st.hand.candidate || st.head.candidate || st.arm.candidate
+  if (c) return candidateMap[c] || '识别中…'
+  if (anyChannel.value) return '等待手势...'
   return '等待手势...'
 })
 
+// 下面一行：识别成功的手势 -> 落到的动作
 const currentActionText = computed(() => {
-  if (armed.value) return '改比其他手势可取消'
-  if (!firedAction.value && candidate.value.key) {
-    const r = Math.round((candidate.value.ratio || 0) * 100)
-    let text = r > 0 ? `稳定度 ${r}%` : ''
-    // 点赞切题时实时显示拇指偏移量，真机调 LIKE_DIR 直接看这个数（负=偏左，正=偏右）
-    if ((candidate.value.key === 'prev' || candidate.value.key === 'next') &&
-      typeof candidate.value.likeOffset === 'number') {
-      text += (text ? ' · ' : '') + `偏移 ${candidate.value.likeOffset.toFixed(2)}`
-    }
-    return text
-  }
-  return ''
+  if (firedAction.value) return firedAction.value
+  if (st.hand.on && st.hand.detected && st.hand.candidate === 'fist') return '保持 1.5 秒进入待确认'
+  return '等待手势触发'
 })
 
-// 初始化识别器（只执行一次，后续开关只启停摄像头）
-async function initRecognizer() {
-  if (initialized || destroyed) return
-  if (!videoRef.value || !canvasRef.value) return
+// 俯仰判定链：显示真正参与判定的相对值/峰值/速度，哪道门拦住的肉眼可见
+const headDebug = computed(() => {
+  const d = st.head.debug
+  if (!st.head.on || !d) return ''
+  const exc = d.excOpen ? ' 开口' : ''
+  return `俯仰${d.pitchRel ?? '—'}° 峰${d.peak ?? 0}° 阈${d.thresh ?? 5}° 速${d.vel ?? 0}|${d.meanVel ?? 0}${exc}`
+})
 
-  initialized = true
+const faceDebug = computed(() => {
+  const d = st.head.debug
+  if (!st.head.on || !d) return ''
+  return `源${d.src || '矩阵'} 矩${d.pitchMat}° 几${d.geo ?? '—'} 嘴${d.jaw ?? '—'} 笑${d.smile ?? '—'}`
+})
+
+// ============ 通道同步：设置变化/挂载时按开关 open/close（开哪条加载哪条模型） ============
+async function syncChannels() {
+  if (!props.visible) return
+  const all = loadSettings()
+  debugOn.value = !!all.feedback.debug
+  const s = all.channels
   loading.value = true
-  error.value = ''
-  handDetected.value = false
-  candidate.value = { key: null, ratio: 0, armPhase: 'idle', likeOffset: null }
-  firedAction.value = ''
-  armed.value = false
-  confirmProgress.value = 0
-
-  try {
-    loadingText.value = '加载手势模型...'
-    recognizer = new GestureRecognizer()
-    recognizer.setGestureCallback((g) => {
-      emit('gesture', g)
-      confirmProgress.value = 0
-      if (g.type === 'submit-arm') {
-        // 进入两阶段提交的待确认态（由 armChange 驱动 armed，这里兜底）
-        armed.value = true
-        firedAction.value = ''
-      } else {
-        const text = actionMap[eventKey(g)]
-        if (text) {
-          firedAction.value = text
-          clearTimeout(firedTimer)
-          firedTimer = setTimeout(() => { firedAction.value = '' }, 1200)
-        }
-      }
-    })
-    recognizer.setHandDetectedCallback((detected) => {
-      handDetected.value = detected
-      emit('handDetected', detected)
-      if (!detected) {
-        candidate.value = { key: null, ratio: 0, armPhase: 'idle', likeOffset: null }
-        confirmProgress.value = 0
-      }
-    })
-    recognizer.setConfirmCallback((progress) => {
-      confirmProgress.value = progress
-    })
-    recognizer.setCandidateCallback((c) => {
-      candidate.value = c
-    })
-    recognizer.setArmChangeCallback((isArmed) => {
-      armed.value = isArmed
-      if (!isArmed) confirmProgress.value = 0
-    })
-
-    loadingText.value = '加载模型中...'
-    await recognizer.init(videoRef.value, canvasRef.value)
-
-    loadingText.value = '请求摄像头权限...'
-    await recognizer.start()
-
-    loading.value = false
-    loadingText.value = ''
-  } catch (e) {
-    console.error('手势识别初始化失败:', e)
-    loading.value = false
-    loadingText.value = ''
-    initialized = false // 失败后允许重试
-    const msg = e.message || String(e)
-    if (msg.includes('Permission') || msg.includes('权限') || msg.includes('NotAllowed')) {
-      error.value = '摄像头权限被拒绝，请在浏览器设置中允许'
-    } else if (msg.includes('NotFound') || msg.includes('找不到') || msg.includes('no video')) {
-      error.value = '未检测到摄像头设备'
-    } else if (msg.includes('加载失败') || msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
-      error.value = '模型加载失败，请检查网络后重试'
-    } else {
-      error.value = '初始化失败: ' + msg.substring(0, 40)
-    }
-  }
-}
-
-function retryInit() {
-  error.value = ''
-  initialized = false
-  initRecognizer()
-}
-
-// 停止摄像头（不销毁实例，保留单例供下次开启复用）
-async function stopRecognizer() {
-  if (recognizer) {
+  loadingText.value = '加载模型/请求摄像头...'
+  channelError.value = ''
+  const errs = []
+  for (const name of ['hand', 'head', 'arm']) {
     try {
-      await recognizer.stop()
+      if (s[name] && !manager.channels.has(name)) await manager.open(name)
+      else if (!s[name] && manager.channels.has(name)) await manager.close(name)
     } catch (e) {
-      console.warn('stop error:', e)
+      errs.push(`${name}: ${e.message}`)
     }
   }
-  clearTimeout(firedTimer)
-  handDetected.value = false
-  candidate.value = { key: null, ratio: 0, armPhase: 'idle', likeOffset: null }
-  firedAction.value = ''
-  armed.value = false
-  confirmProgress.value = 0
   loading.value = false
+  if (errs.length) {
+    const msg = errs.join('；')
+    channelError.value = msg.includes('Permission') || msg.includes('NotAllowed') || msg.includes('权限')
+      ? '摄像头权限被拒绝，请在浏览器设置中允许'
+      : ('通道启动失败: ' + msg.substring(0, 60))
+  }
 }
 
-function handleClose() {
-  stopRecognizer()
-  emit('close')
+function retryChannels() {
+  channelError.value = ''
+  syncChannels()
 }
 
-// 拖动
+async function closeAllChannels() {
+  for (const name of ['hand', 'head', 'arm']) {
+    try { await manager.close(name) } catch { /* noop */ }
+  }
+}
+
+// ============ 画面绘制：镜像视频帧 + 三套骨架（霓虹风格沿用原 HUD） ============
+const HAND_CONN = [
+  [0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7], [7, 8],
+  [5, 9], [9, 10], [10, 11], [11, 12], [9, 13], [13, 14], [14, 15], [15, 16],
+  [13, 17], [17, 18], [18, 19], [19, 20], [0, 17]
+]
+const POSE_CONN = [[11, 12], [11, 13], [13, 15], [12, 14], [14, 16]]
+const FACE_IDX = [1, 10, 33, 133, 263, 362, 61, 291, 152, 17, 269]
+
+function drawLoop() {
+  const cv = canvasRef.value
+  if (cv) {
+    const ctx = cv.getContext('2d')
+    const w = cv.width, h = cv.height
+    ctx.save()
+    ctx.clearRect(0, 0, w, h)
+    ctx.translate(w, 0)
+    ctx.scale(-1, 1)
+    const video = manager.videoEl
+    if (video && video.srcObject && video.readyState >= 2) {
+      ctx.globalAlpha = 0.4   // 旧版视频底透明度
+      ctx.drawImage(video, 0, 0, w, h)
+      ctx.globalAlpha = 1
+    } else {
+      ctx.fillStyle = '#000'
+      ctx.fillRect(0, 0, w, h)
+    }
+    const d = manager.latestDraw
+    // 旧版霓虹配色：青色描边发光 + 品红关键点发光
+    if (st.hand.on) drawSet(ctx, d.hand, HAND_CONN, w, h)
+    if (st.head.on) drawSet(ctx, d.face ? FACE_IDX.map(i => d.face[i]).filter(Boolean) : null, null, w, h)
+    if (st.arm.on) drawSet(ctx, d.pose ? pickPose(d.pose) : null, POSE_CONN_IDX, w, h)
+    ctx.restore()
+  }
+  drawRaf = requestAnimationFrame(drawLoop)
+}
+
+const POSE_IDX = [11, 12, 13, 14, 15, 16]
+const POSE_CONN_IDX = [[0, 1], [0, 2], [2, 4], [1, 3], [3, 5]]
+function pickPose(pose) { return POSE_IDX.map(i => pose[i]).filter(Boolean) }
+
+function drawSet(ctx, pts, conn, w, h) {
+  if (!pts || !pts.length) return
+  ctx.strokeStyle = '#00f5ff'
+  ctx.lineWidth = 2
+  ctx.shadowColor = '#00f5ff'
+  ctx.shadowBlur = 4
+  if (conn) {
+    for (const [a, b] of conn) {
+      if (!pts[a] || !pts[b]) continue
+      ctx.beginPath()
+      ctx.moveTo(pts[a].x * w, pts[a].y * h)
+      ctx.lineTo(pts[b].x * w, pts[b].y * h)
+      ctx.stroke()
+    }
+  }
+  ctx.fillStyle = '#ff00ff'
+  ctx.shadowColor = '#ff00ff'
+  for (const p of pts) {
+    ctx.beginPath()
+    ctx.arc(p.x * w, p.y * h, 2, 0, Math.PI * 2)
+    ctx.fill()
+  }
+  ctx.shadowBlur = 0
+}
+
+// 位置（可拖动，沿用原实现）
+const pos = ref({ x: 20, y: 100 })
+let dragStart = null
+let posStart = null
+
 function startDrag(e) {
-  if (e.target.classList.contains('hud-close') || e.target.classList.contains('hud-minimize')) return
+  if (e.target.classList.contains('hud-close') || e.target.classList.contains('hud-minimize') ||
+      e.target.classList.contains('hud-retry-btn')) return
   const point = e.touches ? e.touches[0] : e
   dragStart = { x: point.clientX, y: point.clientY }
   posStart = { ...pos.value }
@@ -288,8 +303,8 @@ function onDrag(e) {
   e.preventDefault?.()
   const point = e.touches ? e.touches[0] : e
   pos.value = {
-    x: Math.max(0, Math.min(window.innerWidth - 180, posStart.x + point.clientX - dragStart.x)),
-    y: Math.max(0, Math.min(window.innerHeight - 120, posStart.y + point.clientY - dragStart.y))
+    x: Math.max(0, Math.min(window.innerWidth - 190, posStart.x + point.clientX - dragStart.x)),
+    y: Math.max(0, Math.min(window.innerHeight - 140, posStart.y + point.clientY - dragStart.y))
   }
 }
 
@@ -301,38 +316,46 @@ function stopDrag() {
   document.removeEventListener('touchend', stopDrag)
 }
 
-// visible 变化：只启停摄像头，不销毁实例（避免 WASM 单例冲突）
+function handleClose() {
+  closeAllChannels()
+  emit('close')
+}
+
+let unsubSettings = null
+
 watch(() => props.visible, (val) => {
-  if (val) {
-    if (!initialized) {
-      setTimeout(initRecognizer, 100)
-    } else if (recognizer) {
-      recognizer.start().catch(e => console.warn('start error:', e))
-    }
-  } else {
-    stopRecognizer()
-  }
+  if (val) syncChannels()
+  else closeAllChannels()
 })
 
 onMounted(() => {
-  if (props.visible) {
-    setTimeout(initRecognizer, 100)
+  manager.onState = (s) => {
+    Object.assign(st.hand, s.hand)
+    Object.assign(st.head, s.head)
+    Object.assign(st.arm, s.arm)
   }
+  unsubBus = bus.on((evt) => {
+    // 手势名直接读 manager 的实时状态：st 是每帧同步的副本，emit 时还是上一帧的值
+    const src = manager.state[evt.source]
+    const raw = src && src.firedGesture
+    const g = raw ? (gestureWords[raw] || raw) : ''
+    const a = actionMap[evt.action] || evt.action
+    firedAction.value = g ? `✓ ${g} → ${a.replace(/^[✓→←]+\s*/, '')}` : `✓ ${a}`
+    clearTimeout(firedTimer)
+    firedTimer = setTimeout(() => { firedAction.value = '' }, 2000)
+  })
+  unsubSettings = onSettingsChange(() => syncChannels())
+  drawRaf = requestAnimationFrame(drawLoop)
+  if (props.visible) syncChannels()
 })
 
-// 组件卸载时才真正销毁实例（只执行一次）
-onUnmounted(async () => {
-  if (destroyed) return
-  destroyed = true
+onUnmounted(() => {
+  cancelAnimationFrame(drawRaf)
+  clearTimeout(firedTimer)
+  if (unsubBus) unsubBus()
+  if (unsubSettings) unsubSettings()
   stopDrag()
-  if (recognizer) {
-    try {
-      await recognizer.destroy()
-    } catch (e) {
-      console.warn('destroy error:', e)
-    }
-    recognizer = null
-  }
+  closeAllChannels()
 })
 </script>
 
@@ -352,7 +375,6 @@ onUnmounted(async () => {
   overflow: hidden;
 }
 
-/* 四角装饰 */
 .hud-corner {
   position: absolute;
   width: 10px;
@@ -391,39 +413,18 @@ onUnmounted(async () => {
   background: #555;
   transition: all 0.3s;
 }
-.status-dot.detected {
-  background: #00ff88;
-  box-shadow: 0 0 8px #00ff88;
-  animation: pulse 1.5s ease-in-out infinite;
-}
-.status-dot.none {
-  background: #ff4444;
-  box-shadow: 0 0 8px #ff4444;
-}
-.status-dot.confirm {
-  background: #f9f002;
-  box-shadow: 0 0 8px #f9f002;
-  animation: pulse 0.5s ease-in-out infinite;
-}
-.status-dot.loading {
-  background: #00f5ff;
-  box-shadow: 0 0 8px #00f5ff;
-  animation: pulse 0.8s ease-in-out infinite;
-}
-.status-dot.error {
-  background: #ff8800;
-  box-shadow: 0 0 8px #ff8800;
-}
+.status-dot.detected { background: #00ff88; box-shadow: 0 0 8px #00ff88; animation: pulse 1.5s ease-in-out infinite; }
+.status-dot.none { background: #ff4444; box-shadow: 0 0 8px #ff4444; }
+.status-dot.confirm { background: #f9f002; box-shadow: 0 0 8px #f9f002; animation: pulse 0.5s ease-in-out infinite; }
+.status-dot.loading { background: #00f5ff; box-shadow: 0 0 8px #00f5ff; animation: pulse 0.8s ease-in-out infinite; }
+.status-dot.error { background: #ff8800; box-shadow: 0 0 8px #ff8800; }
 
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
 }
 
-.hud-actions {
-  display: flex;
-  gap: 8px;
-}
+.hud-actions { display: flex; gap: 8px; }
 .hud-minimize, .hud-close {
   cursor: pointer;
   color: #555;
@@ -437,19 +438,9 @@ onUnmounted(async () => {
 .hud-video-wrap {
   position: relative;
   width: 100%;
-  height: 120px;
+  height: 132px;
   background: #000;
   overflow: hidden;
-}
-
-.hud-video {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transform: scaleX(-1); /* 镜像 */
-  opacity: 0.4;
 }
 
 .hud-canvas {
@@ -457,7 +448,6 @@ onUnmounted(async () => {
   inset: 0;
   width: 100%;
   height: 100%;
-  transform: scaleX(-1); /* 镜像 */
 }
 
 .hud-confirm-bar {
@@ -479,6 +469,33 @@ onUnmounted(async () => {
   border-top: 1px solid rgba(0, 245, 255, 0.15);
 }
 
+.lamp-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.lamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 9px;
+  color: #555;
+  font-family: 'Courier New', monospace;
+}
+.lamp::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #333;
+  border: 1px solid #555;
+}
+.lamp.on { color: #8a8a9a; }
+.lamp.on::before { background: #f9f002; border-color: #f9f002; box-shadow: 0 0 6px #f9f002; }
+.lamp.hot::before { background: #00ff88; border-color: #00ff88; box-shadow: 0 0 6px #00ff88; }
+.lamp-ratio { margin-left: auto; font-size: 9px; color: #8a8a9a; font-variant-numeric: tabular-nums; }
+
 .gesture-label {
   font-family: 'Courier New', monospace;
   font-size: 11px;
@@ -488,23 +505,25 @@ onUnmounted(async () => {
   text-shadow: 0 0 6px rgba(0, 245, 255, 0.4);
 }
 
+.hud-debug {
+  font-size: 9px;
+  color: #6a7a8a;
+  font-family: 'Courier New', monospace;
+  margin-bottom: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
 .gesture-action {
   font-size: 10px;
   color: #8a8a9a;
 }
 
-/* 两阶段握拳待确认态 */
 .hud-gesture.armed {
   background: rgba(249, 240, 2, 0.1);
   box-shadow: inset 0 0 12px rgba(249, 240, 2, 0.15);
 }
-.hud-gesture.armed .gesture-label {
-  color: #f9f002;
-  text-shadow: 0 0 6px rgba(249, 240, 2, 0.5);
-}
-.hud-gesture.armed .gesture-action {
-  color: #c9c24a;
-}
+.hud-gesture.armed .gesture-label { color: #f9f002; text-shadow: 0 0 6px rgba(249, 240, 2, 0.5); }
+.hud-gesture.armed .gesture-action { color: #c9c24a; }
 
 .hud-mini-status {
   display: flex;
@@ -514,7 +533,6 @@ onUnmounted(async () => {
   cursor: pointer;
 }
 
-/* 加载/错误遮罩 */
 .hud-overlay {
   position: absolute;
   inset: 0;
@@ -526,10 +544,7 @@ onUnmounted(async () => {
   gap: 8px;
   z-index: 10;
 }
-
-.hud-overlay.error {
-  background: rgba(20, 5, 0, 0.9);
-}
+.hud-overlay.error { background: rgba(20, 5, 0, 0.9); }
 
 .hud-spinner {
   width: 24px;
@@ -539,14 +554,9 @@ onUnmounted(async () => {
   border-radius: 50%;
   animation: hudSpin 0.8s linear infinite;
 }
+@keyframes hudSpin { to { transform: rotate(360deg); } }
 
-@keyframes hudSpin {
-  to { transform: rotate(360deg); }
-}
-
-.hud-overlay-icon {
-  font-size: 20px;
-}
+.hud-overlay-icon { font-size: 20px; }
 
 .hud-overlay-text {
   font-size: 10px;
@@ -554,11 +564,9 @@ onUnmounted(async () => {
   text-align: center;
   padding: 0 8px;
   line-height: 1.4;
+  white-space: pre-line;
 }
-
-.hud-overlay.error .hud-overlay-text {
-  color: #ffaa66;
-}
+.hud-overlay.error .hud-overlay-text { color: #ffaa66; }
 
 .hud-retry-btn {
   margin-top: 4px;
@@ -571,7 +579,23 @@ onUnmounted(async () => {
   cursor: pointer;
   transition: all 0.2s;
 }
-.hud-retry-btn:hover {
-  background: rgba(0, 245, 255, 0.25);
+.hud-retry-btn:hover { background: rgba(0, 245, 255, 0.25); }
+
+/* 识别成功的手势：绿色霓虹强调 */
+.gesture-action.fired {
+  color: #00ff88;
+  font-weight: 700;
+  text-shadow: 0 0 8px rgba(0, 255, 136, 0.55);
+}
+
+/* 手机端：整体收缩，触控区放大 */
+@media (max-width: 560px) {
+  .gesture-hud { width: 150px; }
+  .hud-video-wrap { height: 112px; }
+  .hud-header { padding: 8px 10px; }
+  .hud-minimize, .hud-close { font-size: 16px; padding: 4px; }
+  .gesture-label { font-size: 10px; }
+  .hud-debug { font-size: 8px; line-height: 1.35; }
+  .gesture-action { font-size: 10px; }
 }
 </style>

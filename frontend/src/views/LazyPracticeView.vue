@@ -20,10 +20,20 @@
         </div>
       </div>
 
+      <!-- 扫描模式状态条：游标停在哪一项、还剩多久命中，手机端一眼可见 -->
+      <div v-if="a11y.scanActive.value" class="scan-bar">
+        <span class="scan-chip">🎯 扫描中</span>
+        <span class="scan-target">{{ a11y.scanCurrent.value ? a11y.scanCurrent.value.label : '—' }}</span>
+        <span class="scan-hint">做命中动作（张嘴 / 点头 / 长按空格）即选中</span>
+        <div class="scan-dwell">
+          <div class="scan-dwell-fill" :style="{ width: Math.round(a11y.scanCursor.value.progress * 100) + '%' }"></div>
+        </div>
+      </div>
+
       <!-- 题目卡片 -->
       <div class="lp-card-wrap">
         <!-- 左右切换箭头 -->
-        <div class="lp-arrow left" @click="prevQuestion" :class="{ disabled: currentIndex === 0 }">
+        <div class="lp-arrow left" @click="prevQuestion" :class="{ disabled: currentIndex === 0, 'scan-cursor': a11y.scanHighlightOfNav('prev') }">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M15 18l-6-6 6-6"/>
           </svg>
@@ -39,11 +49,12 @@
               v-for="(val, key) in currentQuestion?.options"
               :key="key"
               class="lp-option"
-              :class="{ selected: isOptionSelected(key), correct: showResult && isCorrectOption(key), wrong: showResult && isWrongSelected(key) }"
+              :class="{ selected: isOptionSelected(key), correct: showResult && isCorrectOption(key), wrong: showResult && isWrongSelected(key), 'cycle-cursor': a11y.cycleLetter.value === key, 'scan-cursor': a11y.scanHighlightOf(key) }"
               @click="toggleOption(key)"
             >
               <span class="opt-key">{{ key }}</span>
               <span class="opt-text">{{ val }}</span>
+              <span v-if="a11y.cycleLetter.value === key || a11y.scanHighlightOf(key)" class="cycle-badge">{{ a11y.scanActive.value ? '命中即选' : '张嘴确认' }}</span>
               <span v-if="isOptionSelected(key)" class="opt-check">✓</span>
             </div>
           </div>
@@ -62,7 +73,7 @@
         </div>
 
         <!-- 左右切换箭头 -->
-        <div class="lp-arrow right" @click="nextQuestion" :class="{ disabled: currentIndex === questions.length - 1 }">
+        <div class="lp-arrow right" @click="nextQuestion" :class="{ disabled: currentIndex === questions.length - 1, 'scan-cursor': a11y.scanHighlightOfNav('next') }">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M9 18l6-6-6-6"/>
           </svg>
@@ -77,8 +88,26 @@
           <span>{{ gestureEnabled ? '手势：开' : '手势：关' }}</span>
         </div>
 
+        <!-- 无障碍设置 -->
+        <div class="lp-gesture-toggle" @click="showA11ySettings = true">
+          <span class="gesture-icon">♿</span>
+          <span>无障碍设置</span>
+        </div>
+
+        <!-- 扫描模式开关（手机端唯一入口，键盘 S 等效） -->
+        <div
+          class="lp-gesture-toggle scan-toggle"
+          :class="{ active: a11y.scanActive.value }"
+          role="switch"
+          :aria-checked="a11y.scanActive.value"
+          @click="toggleScan"
+        >
+          <span class="gesture-icon">🎯</span>
+          <span>{{ a11y.scanActive.value ? '扫描：开' : '扫描：关' }}</span>
+        </div>
+
         <!-- 整卷提交按钮 -->
-        <button class="lp-submit-btn" :class="{ loading: submitting }" @click="handleSubmit" :disabled="submitting">
+        <button class="lp-submit-btn" :class="{ loading: submitting, 'scan-cursor': a11y.scanHighlightOfNav('submit') }" @click="handleSubmit" :disabled="submitting">
           <span v-if="submitting" class="btn-spinner"></span>
           {{ submitting ? '提交中...' : '整卷提交' }}
         </button>
@@ -239,24 +268,28 @@
       </div>
     </div>
 
-    <!-- 手势 HUD 小窗 -->
+    <!-- 手势 HUD 小窗（多通道：手/头/臂，tasks-vision） -->
     <GestureHUD
       v-if="gestureEnabled"
       :visible="gestureEnabled"
       @close="gestureEnabled = false"
-      @gesture="handleGesture"
     />
+
+    <!-- 无障碍设置抽屉 -->
+    <A11ySettingsDrawer :visible="showA11ySettings" @close="showA11ySettings = false" />
 
     <!-- 手势教程弹窗（首次） -->
     <div v-if="showTutorial" class="tutorial-overlay" @click.self="showTutorial = false">
       <div class="tutorial-card">
-        <div class="tutorial-title">🤚 手势控制教程</div>
+        <div class="tutorial-title">♿ 无障碍手势教程</div>
         <div class="tutorial-list">
-          <div class="tutorial-item"><span class="t-gesture">伸1/2/3/4指</span><span>选择 A/B/C/D；多选题再比一次可取消该项</span></div>
-          <div class="tutorial-item"><span class="t-gesture">点赞偏左/右</span><span>四指握拳、拇指竖起并偏向一侧 = 上一题/下一题</span></div>
-          <div class="tutorial-item"><span class="t-gesture">五指张开</span><span>多选题清空重选</span></div>
-          <div class="tutorial-item"><span class="t-gesture">握拳1.5秒</span><span>四指与拇指都收回贴掌才进入待确认，不会直接提交</span></div>
-          <div class="tutorial-item"><span class="t-gesture">再握0.6秒</span><span>松手后3秒内再次握拳 = 确认整卷提交</span></div>
+          <div class="tutorial-item"><span class="t-gesture">轻快点头</span><span>切到下一个选项：A→B→C→D→A 循环，小幅快速即可，慢速低头不会误触</span></div>
+          <div class="tutorial-item"><span class="t-gesture">微笑</span><span>切回上一个选项：A 再微笑绕回 D（D→C→B→A）</span></div>
+          <div class="tutorial-item"><span class="t-gesture">张嘴</span><span>确认当前高亮选项（落子）</span></div>
+          <div class="tutorial-item"><span class="t-gesture">摇头</span><span>撤销上一步（3 秒窗口内）</span></div>
+          <div class="tutorial-item"><span class="t-gesture">手部（可选）</span><span>伸1-4指选A-D；点赞偏左右切题；五指张开清空；握拳1.5秒→张开手→再握拳0.6秒=整卷提交（4秒内完成，中途张开手不会取消，摇头或 Esc 可取消）</span></div>
+          <div class="tutorial-item"><span class="t-gesture">姿态（可选）</span><span>单臂举肘=命中；双手举过头合拢（变身姿势）=整卷提交</span></div>
+          <div class="tutorial-item"><span class="t-gesture">🎯 扫描按钮</span><span>底部「扫描：开」或 S 键；顶部状态条实时显示游标停在哪一项，做命中动作（张嘴/点头/长按空格）即选中</span></div>
         </div>
         <button class="tutorial-close" @click="showTutorial = false">我知道了</button>
       </div>
@@ -275,7 +308,9 @@ import { classify } from '../utils/questionType.js'
 import { loadDraftStore, writeDraftAnswers, clearDraftStore } from '../utils/practiceDraft.js'
 import { ParticleBackground } from '../components/cyber'
 import GestureHUD from '../components/cyber/GestureHUD.vue'
+import A11ySettingsDrawer from '../components/cyber/A11ySettingsDrawer.vue'
 import ErrorTypeTagger from '../components/ErrorTypeTagger.vue'
+import { useA11yPractice } from '../composables/useA11yPractice.js'
 
 const router = useRouter()
 const qStore = useQuestionsStore()
@@ -618,44 +653,33 @@ async function handleSubmit() {
   }
 }
 
-// ===== 手势处理 =====
-function handleGesture(gesture) {
-  if (!gesture) return
-
-  switch (gesture.type) {
-    case 'select':
-      if (!showResult.value && !isSubjective.value) {
-        const option = gesture.data?.option
-        if (option) toggleOption(option)
-      }
-      break
-    case 'clear':
-      if (!showResult.value && isMultiple.value) {
-        delete drafts.value[currentQid.value]
-        triggerCardAnim()
-        showSuccessToast('已清空选择')
-      }
-      break
-    case 'prev':
-      prevQuestion()
-      break
-    case 'next':
-      nextQuestion()
-      break
-    case 'submit-arm':
-      // 第一握达标：仅提示，绝不提交
-      if (!showResult.value) {
-        showToast({ message: '再次握拳确认提交，改其他手势可取消', position: 'middle', duration: 2500 })
-      }
-      break
-    case 'submit':
-      // 第二握确认后才真正提交
-      if (!showResult.value) {
-        handleSubmit()
-      }
-      break
-  }
-}
+// ===== 无障碍运行时（替代旧 handleGesture 硬编码 switch；动作->处理由设置页映射决定） =====
+const showA11ySettings = ref(false)
+const a11y = useA11yPractice({
+  letters: () => Object.keys(currentQuestion.value?.options || {}),
+  optionText: (key) => currentQuestion.value?.options?.[key] || '',
+  toggleOption: (key) => toggleOption(key),
+  clearCurrent: () => {
+    delete drafts.value[currentQid.value]
+    triggerCardAnim()
+    showSuccessToast('已清空选择')
+  },
+  prev: () => prevQuestion(),
+  next: () => nextQuestion(),
+  submit: () => handleSubmit(),
+  armToast: () => {
+    if (!showResult.value) showToast({ message: '张开手后再握拳 0.6 秒 = 确认提交（4 秒内），摇头或 Esc 取消', position: 'middle', duration: 3000 })
+  },
+  isDone: () => showResult.value,
+  isSubjective: () => isSubjective.value,
+  unDone: () => {},
+  snapshot: () => JSON.parse(JSON.stringify(drafts.value)),
+  restore: (snap) => { drafts.value = snap },
+  toast: (msg) => showToast({ message: msg, position: 'bottom', duration: 1500 }),
+  pauseTimer: () => settleTimer(currentIndex.value),
+  resumeTimer: () => startTimer(currentIndex.value),
+  runtimeOn: () => gestureEnabled.value
+})
 
 // ===== 再做一次：清空内存结果与草稿，回到第一题（无需退出重进，可立即重复提交）=====
 function resetPractice() {
@@ -687,6 +711,16 @@ function toggleGesture() {
       localStorage.setItem('lazy_gesture_tutorial_shown', '1')
     }
   }
+}
+
+function toggleScan() {
+  if (!gestureEnabled.value) {
+    gestureEnabled.value = true
+    a11y.startScan()
+    return
+  }
+  if (a11y.scanActive.value) a11y.stopScan()
+  else a11y.startScan()
 }
 
 // ===== 结果页操作 =====
@@ -1436,5 +1470,111 @@ onUnmounted(() => {
 .tutorial-close:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 24px var(--accent-soft);
+}
+
+/* ===== 无障碍：步进选答/扫描游标高亮（霓虹风格） ===== */
+.lp-option.cycle-cursor {
+  border-color: #00f5ff;
+  box-shadow: 0 0 12px rgba(0, 245, 255, 0.35), inset 0 0 8px rgba(0, 245, 255, 0.12);
+}
+.lp-option.scan-cursor, .lp-submit-btn.scan-cursor {
+  border: 2px solid #00ff88;
+  box-shadow: 0 0 14px rgba(0, 255, 136, 0.4);
+}
+.cycle-badge {
+  margin-left: auto;
+  font-size: 10px;
+  color: #00f5ff;
+  border: 1px solid rgba(0, 245, 255, 0.5);
+  border-radius: 999px;
+  padding: 1px 8px;
+  letter-spacing: 1px;
+  text-shadow: 0 0 6px rgba(0, 245, 255, 0.5);
+}
+
+/* ===== 扫描模式：屏幕可见开关 + 游标状态条（手机端不依赖键盘） ===== */
+.scan-toggle.active {
+  border-color: #00ff88;
+  color: #00ff88;
+  box-shadow: 0 0 12px rgba(0, 255, 136, 0.3);
+}
+
+.scan-bar {
+  position: fixed;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 8500;
+  width: min(92vw, 420px);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(6, 10, 16, 0.92);
+  border: 1px solid rgba(0, 255, 136, 0.45);
+  border-radius: 10px;
+  box-shadow: 0 0 18px rgba(0, 255, 136, 0.2);
+  backdrop-filter: blur(8px);
+  font-family: 'Courier New', monospace;
+}
+.scan-chip {
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: #00ff88;
+  border: 1px solid rgba(0, 255, 136, 0.5);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+.scan-target {
+  flex: 1;
+  min-width: 90px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #00f5ff;
+  text-shadow: 0 0 8px rgba(0, 245, 255, 0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.scan-hint {
+  width: 100%;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+.scan-dwell {
+  width: 100%;
+  height: 3px;
+  background: rgba(0, 255, 136, 0.18);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.scan-dwell-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #00ff88, #00f5ff);
+}
+.lp-option.scan-cursor,
+.lp-arrow.scan-cursor,
+.lp-submit-btn.scan-cursor {
+  animation: scanPulse 0.9s ease-in-out infinite;
+}
+@keyframes scanPulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(0, 255, 136, 0.35); }
+  50% { box-shadow: 0 0 22px rgba(0, 255, 136, 0.75); }
+}
+
+/* 手机端：底部操作条换行、HUD 由自身媒体查询收缩 */
+@media (max-width: 560px) {
+  .lp-footer {
+    flex-wrap: wrap;
+  }
+  .lp-gesture-toggle {
+    height: 42px;
+    padding: 0 12px;
+    font-size: 12px;
+  }
+  .scan-bar {
+    top: 52px;
+  }
 }
 </style>
