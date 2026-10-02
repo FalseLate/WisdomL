@@ -71,6 +71,12 @@
           <span class="menu-value">{{ stats?.favCount ? stats.favCount + '道' : '0道' }}</span>
           <span class="menu-arrow">›</span>
         </div>
+        <div class="menu-item" @click="$router.push('/settings')">
+          <span class="menu-icon">⚙️</span>
+          <span class="menu-title">设置</span>
+          <span class="menu-value">外观与无障碍</span>
+          <span class="menu-arrow">›</span>
+        </div>
       </div>
 
       <!-- 退出登录 -->

@@ -314,7 +314,7 @@ defineExpose({
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #000;
+  background: var(--accent-contrast);
 }
 
 .opt-box.checked {
@@ -323,7 +323,7 @@ defineExpose({
 }
 
 .check-icon {
-  color: #000;
+  color: var(--accent-contrast);
   font-size: 12px;
   font-weight: 700;
 }

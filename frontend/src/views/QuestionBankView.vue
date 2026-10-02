@@ -419,7 +419,7 @@ function goPracticeLazy(item) {
 
 .qb-title-btn.save {
   background: var(--accent);
-  color: #000;
+  color: var(--accent-contrast);
 }
 
 .qb-title-btn.save:hover {
@@ -482,7 +482,7 @@ function goPracticeLazy(item) {
 
 .cyber-checkbox input:checked + .checkmark::after {
   content: '✓';
-  color: #000;
+  color: var(--accent-contrast);
   font-size: 12px;
   font-weight: 700;
 }
@@ -496,7 +496,7 @@ function goPracticeLazy(item) {
   width: 100%;
   max-width: 480px;
   padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
-  background: rgba(10, 10, 15, 0.95);
+  background: var(--surface-bar);
   backdrop-filter: blur(20px);
   border-top: 1px solid var(--danger);
   z-index: 100;

@@ -30,7 +30,7 @@ defineProps({
 .progress-bar {
   flex: 1;
   height: 6px;
-  background: rgba(0, 245, 255, 0.1);
+  background: var(--accent-soft);
   border-radius: 3px;
   overflow: hidden;
   position: relative;
@@ -38,15 +38,15 @@ defineProps({
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #00f5ff, #00c8d4);
+  background: linear-gradient(90deg, var(--accent), var(--accent-deep));
   border-radius: 3px;
-  box-shadow: 0 0 8px rgba(0, 245, 255, 0.5);
+  box-shadow: none;
   transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
 }
 
 .progress-fill.complete {
-  background: linear-gradient(90deg, #00ff88, #00cc6a);
+  background: linear-gradient(90deg, var(--success), var(--success-deep));
   box-shadow: 0 0 8px rgba(0, 255, 136, 0.5);
 }
 
@@ -65,9 +65,9 @@ defineProps({
   font-family: 'Orbitron', 'Courier New', monospace;
   font-size: 11px;
   font-weight: 700;
-  color: #00f5ff;
+  color: var(--accent);
   min-width: 36px;
   text-align: right;
-  text-shadow: 0 0 6px rgba(0, 245, 255, 0.4);
+  
 }
 </style>

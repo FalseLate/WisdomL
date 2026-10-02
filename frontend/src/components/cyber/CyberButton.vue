@@ -80,32 +80,32 @@ function handleClick(e) {
 
 /* 变体：primary 霓虹青 */
 .cyber-button.primary {
-  background: linear-gradient(135deg, #00f5ff, #00c8d4);
-  color: #000;
-  box-shadow: 0 4px 16px rgba(0, 245, 255, 0.3);
+  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+  color: var(--accent-contrast);
+  box-shadow: 0 4px 16px var(--accent-soft);
 }
 
 .cyber-button.primary:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 8px 28px rgba(0, 245, 255, 0.5);
+  box-shadow: 0 8px 28px var(--accent-soft);
 }
 
 /* 变体：secondary 品红 */
 .cyber-button.secondary {
-  background: linear-gradient(135deg, #ff00ff, #cc00cc);
+  background: linear-gradient(135deg, var(--secondary), var(--secondary-deep));
   color: #fff;
-  box-shadow: 0 4px 16px rgba(255, 0, 255, 0.3);
+  box-shadow: 0 4px 16px var(--secondary-soft);
 }
 
 .cyber-button.secondary:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 8px 28px rgba(255, 0, 255, 0.5);
+  box-shadow: 0 8px 28px var(--secondary-soft);
 }
 
 /* 变体：success 绿色 */
 .cyber-button.success {
-  background: linear-gradient(135deg, #00ff88, #00cc6a);
-  color: #000;
+  background: linear-gradient(135deg, var(--success), var(--success-deep));
+  color: var(--accent-contrast);
   box-shadow: 0 4px 16px rgba(0, 255, 136, 0.3);
 }
 
@@ -116,7 +116,7 @@ function handleClick(e) {
 
 /* 变体：danger 红色 */
 .cyber-button.danger {
-  background: linear-gradient(135deg, #ff4444, #cc0000);
+  background: linear-gradient(135deg, var(--danger), var(--danger-deep));
   color: #fff;
   box-shadow: 0 4px 16px rgba(255, 68, 68, 0.3);
 }
@@ -128,8 +128,8 @@ function handleClick(e) {
 
 /* 变体：warning 黄色 */
 .cyber-button.warning {
-  background: linear-gradient(135deg, #f9f002, #e0d000);
-  color: #000;
+  background: linear-gradient(135deg, var(--warning), var(--warning-deep));
+  color: var(--accent-contrast);
   font-weight: 700;
   box-shadow: 0 4px 16px rgba(249, 240, 2, 0.35);
 }
@@ -142,14 +142,14 @@ function handleClick(e) {
 /* 变体：ghost 幽灵按钮 */
 .cyber-button.ghost {
   background: transparent;
-  color: #00f5ff;
-  border: 1px solid rgba(0, 245, 255, 0.4);
+  color: var(--accent);
+  border: 1px solid var(--accent-border);
 }
 
 .cyber-button.ghost:hover:not(:disabled) {
-  background: rgba(0, 245, 255, 0.1);
-  border-color: #00f5ff;
-  box-shadow: 0 0 16px rgba(0, 245, 255, 0.2);
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  box-shadow: none;
 }
 
 /* 加载动画 */

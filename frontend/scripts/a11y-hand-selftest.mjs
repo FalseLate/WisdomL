@@ -223,7 +223,7 @@ console.log('\n[4] 两阶段握拳提交状态机（注入时钟）')
   assert(armed, '（前置）第一握成功进入待确认')
   // 之后一直不握（超过3秒窗口）
   for (; t <= 6000; t += 33) { const r = armer.frame(null, t); if (r.event === 'submit') gotSubmit = true }
-  assert(!gotSubmit, '只完成第一握、4s窗口内未第二握 => 不提交')
+  assert(!gotSubmit, '只完成第一握、6s窗口内未第二握 => 不提交')
 }
 
 {
@@ -254,9 +254,34 @@ console.log('\n[4] 两阶段握拳提交状态机（注入时钟）')
   let t = 0
   const armer = createSubmitArmer(CFG, () => t)
   let gotSubmit = false
+  // 第一握进入待确认
   for (; t <= 1550; t += 33) armer.frame('fist', t)
-  for (; t <= 6000; t += 33) { const r = armer.frame('clear', t); if (r.event === 'submit') gotSubmit = true }
-  assert(!gotSubmit, '窗口（4s）内始终没有第二握 => 自动取消，不提交')
+  for (; t <= 6000; t += 33) armer.frame('clear', t)
+  assert(armer.getPhase() === 'arm2', '张开手后进入第二握等待（窗口从松开这一帧才开始计时）')
+  for (; t <= 8000; t += 33) { const r = armer.frame('clear', t); if (r.event === 'submit') gotSubmit = true }
+  assert(!gotSubmit && armer.getPhase() === 'idle', '松开后 6 秒内没有第二握 => 窗口超时自动取消')
+}
+
+{
+  let t = 0
+  const armer = createSubmitArmer(CFG, () => t)
+  let gotSubmit = false
+  // 握着第一把死活不松：绝不能绕过"松手再握"直接提交
+  for (; t <= 5000; t += 33) { const r = armer.frame('fist', t); if (r.event === 'submit') gotSubmit = true }
+  assert(!gotSubmit, '第一握后一直不松手 => 永不提交（必须松开再握）')
+}
+
+{
+  let t = 0
+  const armer = createSubmitArmer(CFG, () => t)
+  let remain = null
+  for (; t <= 1550; t += 33) armer.frame('fist', t)
+  const holding = armer.frame('fist', t)          // 还握着：窗口不计时
+  t += 33
+  const released = armer.frame(null, t)           // 松开这一帧才开始烧窗口
+  for (; t <= 2500; t += 33) remain = armer.frame(null, t).remainMs
+  assert(holding.remainMs === null && released.remainMs !== null && remain < released.remainMs,
+    `剩余时间从松开起递减（${released.remainMs} -> ${remain}）`)
 }
 
 {

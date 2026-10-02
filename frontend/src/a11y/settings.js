@@ -46,7 +46,7 @@ export function defaultSettings() {
     sensitivity: { hand: 'normal', head: 'normal', arm: 'normal' },
     mappings: structuredClone(DEFAULT_MAPPINGS),
     scan: { enabled: false, dwell: 1200 },
-    feedback: { theme: 'dark', fontSize: 'normal', reduceMotion: true, tts: false, debug: false },
+    feedback: { theme: 'dark', fontSize: 'normal', reduceMotion: true, tts: false, debug: false, motion: 'auto' },
     adhd: { enabled: true, offscreenPause: true, undoWindow: 3000, rhythmEvery: 5 }
   }
 }

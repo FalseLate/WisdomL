@@ -10,7 +10,7 @@ import { computed } from 'vue'
 
 const props = defineProps({
   hoverable: { type: Boolean, default: true },
-  accentColor: { type: String, default: '#00f5ff' },
+  accentColor: { type: String, default: 'var(--accent)' },
   accentLine: { type: Boolean, default: false },
   padding: { type: String, default: '20px' }
 })
@@ -23,8 +23,8 @@ const cardStyle = computed(() => ({
 <style scoped>
 .cyber-card {
   position: relative;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(0, 245, 255, 0.15);
+  background: var(--bg-card);
+  border: 1px solid var(--hairline);
   border-radius: 16px;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -34,9 +34,9 @@ const cardStyle = computed(() => ({
 
 .cyber-card.hoverable:hover {
   transform: translateY(-3px);
-  border-color: rgba(0, 245, 255, 0.4);
-  background: rgba(0, 245, 255, 0.04);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3), 0 0 24px rgba(0, 245, 255, 0.1);
+  border-color: var(--accent-border);
+  background: var(--bg-card);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12), 0 0 0 1px var(--hairline);
 }
 
 .card-accent-line {

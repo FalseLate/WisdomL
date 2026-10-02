@@ -82,7 +82,7 @@ async function remove(id) {
 
 .fav-card {
   background: var(--bg-card);
-  border: 1px solid rgba(249, 240, 2, 0.2);
+  border: 1px solid var(--warning-soft);
   border-radius: var(--radius-card);
   backdrop-filter: blur(12px);
   padding: 16px;

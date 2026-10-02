@@ -259,8 +259,8 @@ function nextOne() {
   cursor: pointer;
 }
 .rv-option.pick { border-color: var(--accent); background: var(--accent-soft); }
-.rv-option.correct { border-color: var(--success); background: rgba(0,255,136,0.1); }
-.rv-option.wrong { border-color: var(--danger); background: rgba(255,68,68,0.1); }
+.rv-option.correct { border-color: var(--success); background: var(--success-soft); }
+.rv-option.wrong { border-color: var(--danger); background: var(--danger-soft); }
 .o-key { width: 26px; height: 26px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; flex-shrink: 0; }
 .o-text { font-size: 14px; color: var(--text-primary); }
 
@@ -273,8 +273,8 @@ function nextOne() {
 .rv-textarea:focus { outline: none; border-color: var(--accent); }
 
 .rv-feedback { margin-top: 14px; padding: 12px; border-radius: 8px; font-size: 13px; line-height: 1.6; }
-.rv-feedback.ok { background: rgba(0,255,136,0.1); color: var(--success); border: 1px solid rgba(0,255,136,0.3); }
-.rv-feedback.bad { background: rgba(255,68,68,0.1); color: var(--danger); border: 1px solid rgba(255,68,68,0.3); }
+.rv-feedback.ok { background: var(--success-soft); color: var(--success); border: 1px solid var(--success-border); }
+.rv-feedback.bad { background: var(--danger-soft); color: var(--danger); border: 1px solid var(--danger-border); }
 .rv-feedback.info { background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-border); }
 .fb-answer { margin-top: 6px; font-weight: 600; }
 .fb-explain { margin-top: 8px; color: var(--text-secondary); font-size: 12px; line-height: 1.6; }
@@ -288,7 +288,7 @@ function nextOne() {
   flex: 1; height: 44px; border-radius: var(--radius-pill);
   font-size: 14px; font-weight: 600; cursor: pointer; border: 1px solid var(--accent-border);
 }
-.rv-btn.primary { background: linear-gradient(135deg, var(--accent), #00c8d4); color: #000; border: none; }
+.rv-btn.primary { background: linear-gradient(135deg, var(--accent), var(--accent-deep)); color: var(--accent-contrast); border: none; }
 .rv-btn.primary:disabled, .rv-btn.ghost:disabled { opacity: 0.6; cursor: not-allowed; }
 .rv-btn.ghost { background: transparent; color: var(--accent); }
 </style>

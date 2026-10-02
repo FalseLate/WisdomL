@@ -656,8 +656,8 @@ function goHistory() {
 }
 
 .tab-item.active {
-  background: linear-gradient(135deg, var(--accent), #00c8d4);
-  color: #000;
+  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+  color: var(--accent-contrast);
   box-shadow: 0 2px 12px var(--accent-soft);
 }
 
@@ -688,7 +688,7 @@ function goHistory() {
   width: 100%;
   max-width: 480px;
   padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
-  background: rgba(10, 10, 15, 0.95);
+  background: var(--surface-bar);
   backdrop-filter: blur(20px);
   border-top: 1px solid var(--accent-border);
   z-index: 30;
@@ -698,7 +698,7 @@ function goHistory() {
 .complete-dialog-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: var(--scrim);
   backdrop-filter: blur(4px);
   z-index: 4000;
   display: flex;
@@ -715,7 +715,7 @@ function goHistory() {
 
 .complete-dialog {
   position: relative;
-  background: rgba(10, 10, 15, 0.98);
+  background: var(--surface-solid);
   border: 1px solid var(--accent-border);
   border-radius: 20px;
   padding: 32px 24px 24px;

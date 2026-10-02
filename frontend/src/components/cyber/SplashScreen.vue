@@ -72,6 +72,8 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* 开屏动画故意保持深色（两种主题都一样）：它是 1~2 秒的品牌过场，不是页面表面，
+   深色底 + 霓虹扫描线是它唯一成立的样子；深色启动画面 → 浅色应用是常见做法。 */
 .splash-screen {
   position: fixed;
   inset: 0;

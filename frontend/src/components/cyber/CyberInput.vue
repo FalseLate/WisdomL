@@ -60,7 +60,7 @@ defineExpose({
   display: block;
   font-size: 13px;
   font-weight: 600;
-  color: #8a8a9a;
+  color: var(--text-muted);
   margin-bottom: 8px;
   letter-spacing: 0.5px;
 }
@@ -69,8 +69,8 @@ defineExpose({
   display: flex;
   align-items: center;
   gap: 10px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(0, 245, 255, 0.2);
+  background: var(--bg-card);
+  border: 1px solid var(--hairline);
   border-radius: 12px;
   padding: 0 14px;
   height: 48px;
@@ -78,13 +78,13 @@ defineExpose({
 }
 
 .input-container.focused {
-  border-color: #00f5ff;
-  background: rgba(0, 245, 255, 0.04);
-  box-shadow: 0 0 0 3px rgba(0, 245, 255, 0.1), 0 0 16px rgba(0, 245, 255, 0.15);
+  border-color: var(--accent);
+  background: var(--bg-card);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .input-container.error {
-  border-color: #ff4444;
+  border-color: var(--danger);
 }
 
 .input-icon {
@@ -99,24 +99,24 @@ defineExpose({
   outline: none;
   background: transparent;
   font-size: 15px;
-  color: #e8e8f0;
+  color: var(--text-primary);
   font-family: 'Noto Sans SC', sans-serif;
   min-width: 0;
 }
 
 .cyber-input::placeholder {
-  color: #555566;
+  color: var(--text-muted);
 }
 
 .cyber-input:-webkit-autofill {
-  -webkit-box-shadow: 0 0 0 30px #0a0a0f inset;
-  -webkit-text-fill-color: #e8e8f0;
+  -webkit-box-shadow: 0 0 0 30px var(--surface-solid) inset;
+  -webkit-text-fill-color: var(--text-primary);
 }
 
 .input-error {
   display: block;
   font-size: 12px;
-  color: #ff4444;
+  color: var(--danger);
   margin-top: 6px;
 }
 </style>

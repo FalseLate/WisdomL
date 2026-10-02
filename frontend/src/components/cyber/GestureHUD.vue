@@ -1,10 +1,10 @@
 <template>
   <div
     v-if="visible"
+    ref="hudRef"
     class="gesture-hud"
-    :style="{ left: pos.x + 'px', top: pos.y + 'px' }"
-    @mousedown="startDrag"
-    @touchstart="startDrag"
+    :class="{ minimized }"
+    :style="{ left: pos.x + 'px', top: pos.y + 'px', width: size.w + 'px' }"
   >
     <!-- HUD 边框装饰 -->
     <div class="hud-corner tl"></div>
@@ -12,21 +12,21 @@
     <div class="hud-corner bl"></div>
     <div class="hud-corner br"></div>
 
-    <!-- 标题栏 -->
-    <div class="hud-header">
+    <!-- 标题栏（拖动只在这里起手，避免和缩放/按钮抢事件） -->
+    <div class="hud-header" @pointerdown="startDrag">
       <div class="hud-title">
         <span class="status-dot" :class="statusClass"></span>
         <span>{{ statusText }}</span>
       </div>
       <div class="hud-actions">
-        <span class="hud-minimize" @click.stop="minimized = !minimized">{{ minimized ? '▢' : '—' }}</span>
+        <span class="hud-minimize" @click.stop="toggleMinimize">{{ minimized ? '▢' : '—' }}</span>
         <span class="hud-close" @click.stop="handleClose">✕</span>
       </div>
     </div>
 
     <!-- 视频+画布区域 -->
-    <div v-show="!minimized" class="hud-video-wrap">
-      <canvas ref="canvasRef" class="hud-canvas" width="176" height="132"></canvas>
+    <div v-show="!minimized" class="hud-video-wrap" :style="{ height: videoH + 'px' }">
+      <canvas ref="canvasRef" class="hud-canvas" :width="canvasW" :height="canvasH"></canvas>
       <!-- 加载中遮罩 -->
       <div v-if="loading" class="hud-overlay">
         <div class="hud-spinner"></div>
@@ -63,14 +63,23 @@
     </div>
 
     <!-- 最小化时只显示状态点 -->
-    <div v-if="minimized" class="hud-mini-status" @click.stop="minimized = false">
+    <div v-if="minimized" class="hud-mini-status" @click.stop="toggleMinimize">
       <span class="status-dot" :class="statusClass"></span>
     </div>
+
+    <!-- 右下角缩放手把（pointer 事件，鼠标与触摸通用） -->
+    <div
+      v-show="!minimized"
+      class="hud-resize"
+      aria-label="拖动调整小窗大小"
+      title="拖动调整大小"
+      @pointerdown.stop="startResize"
+    ></div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { getRuntime } from '../../a11y/runtime.js'
 import { loadSettings, onSettingsChange } from '../../a11y/settings.js'
 
@@ -84,13 +93,12 @@ const { bus, manager } = getRuntime()
 const canvasRef = ref(null)
 
 const st = reactive({
-  hand: { on: false, detected: false, candidate: null, firedGesture: null, ratio: 0, armPhase: 'idle', progress: 0 },
+  hand: { on: false, detected: false, candidate: null, firedGesture: null, ratio: 0, armPhase: 'idle', progress: 0, remainMs: null },
   head: { on: false, detected: false, candidate: null, firedGesture: null, angles: null, offscreen: false, debug: null },
   arm: { on: false, detected: false, candidate: null, firedGesture: null }
 })
 const firedAction = ref('')
 const channelError = ref('')
-const minimized = ref(false)
 // 判定诊断（俯仰/峰/阈/速…）默认隐藏：数字一直跳动对用户无意义还占渲染，只在设置里按需打开
 const debugOn = ref(false)
 const loading = ref(false)
@@ -149,7 +157,20 @@ const actionMap = {
   optNext: '→ 下一选项', optPrev: '← 上一选项', confirm: '✓ 确认选中', undo: '↺ 已撤销', cancel: '已取消'
 }
 
+// 两阶段握拳全程把"下一步该做什么"顶在最显眼的一行，并显出剩余秒数（真机反馈：不知道窗口还剩多久）
+const armHint = computed(() => {
+  const p = st.hand.armPhase
+  const left = st.hand.remainMs != null ? `（剩 ${(st.hand.remainMs / 1000).toFixed(1)} 秒）` : ''
+  if (p === 'arm1') return `第一握保持中 ${Math.round(st.hand.progress)}%`
+  if (p === 'armed') return '✓ 第一握完成，张开手'
+  if (p === 'arm2') return st.hand.progress >= 99
+    ? `✋ 再握拳 = 提交整卷${left}`
+    : `第二握 ${Math.round(st.hand.progress)}%…${left}`
+  return ''
+})
+
 const currentGestureText = computed(() => {
+  if (armHint.value) return armHint.value
   const c = st.hand.candidate || st.head.candidate || st.arm.candidate
   if (c) return candidateMap[c] || '识别中…'
   if (anyChannel.value) return '等待手势...'
@@ -159,7 +180,9 @@ const currentGestureText = computed(() => {
 // 下面一行：识别成功的手势 -> 落到的动作
 const currentActionText = computed(() => {
   if (firedAction.value) return firedAction.value
-  if (st.hand.on && st.hand.detected && st.hand.candidate === 'fist') return '保持 1.5 秒进入待确认'
+  if (st.hand.armPhase === 'armed') return '松开手后 6 秒内再握一次，摇头或 Esc 取消'
+  if (st.hand.armPhase === 'arm2') return st.hand.progress >= 99 ? '现在再握拳，握紧不放直到进度满' : '握紧别松，松手就要重新来'
+  if (st.hand.armPhase === 'arm1') return '握满 1.5 秒才进入待确认，不会直接提交'
   return '等待手势触发'
 })
 
@@ -258,10 +281,12 @@ function pickPose(pose) { return POSE_IDX.map(i => pose[i]).filter(Boolean) }
 
 function drawSet(ctx, pts, conn, w, h) {
   if (!pts || !pts.length) return
+  // 背衬按 dpr 放大后，线宽/点径要同比放大，否则缩放大窗时骨架会变细
+  const s = dpr
   ctx.strokeStyle = '#00f5ff'
-  ctx.lineWidth = 2
+  ctx.lineWidth = 2 * s
   ctx.shadowColor = '#00f5ff'
-  ctx.shadowBlur = 4
+  ctx.shadowBlur = 4 * s
   if (conn) {
     for (const [a, b] of conn) {
       if (!pts[a] || !pts[b]) continue
@@ -275,45 +300,118 @@ function drawSet(ctx, pts, conn, w, h) {
   ctx.shadowColor = '#ff00ff'
   for (const p of pts) {
     ctx.beginPath()
-    ctx.arc(p.x * w, p.y * h, 2, 0, Math.PI * 2)
+    ctx.arc(p.x * w, p.y * h, 2 * s, 0, Math.PI * 2)
     ctx.fill()
   }
   ctx.shadowBlur = 0
 }
 
-// 位置（可拖动，沿用原实现）
-const pos = ref({ x: 20, y: 100 })
-let dragStart = null
-let posStart = null
+// ============ 布局：可拖拽 + 右下角自由缩放，位置/尺寸/最小化态记忆 ============
+const LAYOUT_KEY = 'lazy_hud_layout_v1'
+const hudRef = ref(null)
+// tsParticles 之外这里也要限 DPR：3 倍屏按 3 倍背衬绘制，HUD 只是预览小窗，2 足够
+const dpr = Math.min(window.devicePixelRatio || 1, 2)
+const MIN_W = 150
+const maxW = () => Math.max(MIN_W, Math.min(420, window.innerWidth - 24))
 
-function startDrag(e) {
-  if (e.target.classList.contains('hud-close') || e.target.classList.contains('hud-minimize') ||
-      e.target.classList.contains('hud-retry-btn')) return
-  const point = e.touches ? e.touches[0] : e
-  dragStart = { x: point.clientX, y: point.clientY }
-  posStart = { ...pos.value }
-  document.addEventListener('mousemove', onDrag)
-  document.addEventListener('mouseup', stopDrag)
-  document.addEventListener('touchmove', onDrag, { passive: false })
-  document.addEventListener('touchend', stopDrag)
+function defaultW() {
+  return window.innerWidth <= 560 ? 150 : 180
 }
 
-function onDrag(e) {
-  if (!dragStart) return
-  e.preventDefault?.()
-  const point = e.touches ? e.touches[0] : e
+const size = ref({ w: defaultW() })
+const pos = ref({ x: 20, y: 100 })
+const minimized = ref(false)
+
+const videoH = computed(() => Math.round(size.value.w * 0.75))   // 跟随原 176:132 比例
+const canvasW = computed(() => Math.max(1, Math.round((size.value.w - 4) * dpr)))
+const canvasH = computed(() => Math.max(1, Math.round(videoH.value * dpr)))
+
+function loadLayout() {
+  try {
+    const raw = localStorage.getItem(LAYOUT_KEY)
+    if (!raw) return
+    const l = JSON.parse(raw)
+    if (Number.isFinite(l.w)) size.value = { w: Math.min(Math.max(l.w, MIN_W), maxW()) }
+    if (Number.isFinite(l.x) && Number.isFinite(l.y)) pos.value = { x: l.x, y: l.y }
+    if (typeof l.min === 'boolean') minimized.value = l.min
+  } catch { /* 存档坏了就用默认值 */ }
+  clampPos()
+}
+
+function saveLayout() {
+  try {
+    localStorage.setItem(LAYOUT_KEY, JSON.stringify({ x: pos.value.x, y: pos.value.y, w: size.value.w, min: minimized.value }))
+  } catch { /* 隐私模式忽略 */ }
+}
+
+function clampPos() {
+  const h = hudRef.value?.getBoundingClientRect().height || 300
   pos.value = {
-    x: Math.max(0, Math.min(window.innerWidth - 190, posStart.x + point.clientX - dragStart.x)),
-    y: Math.max(0, Math.min(window.innerHeight - 140, posStart.y + point.clientY - dragStart.y))
+    x: Math.min(Math.max(pos.value.x, 4), Math.max(4, window.innerWidth - size.value.w - 4)),
+    y: Math.min(Math.max(pos.value.y, 4), Math.max(4, window.innerHeight - h - 4))
   }
 }
 
-function stopDrag() {
-  dragStart = null
-  document.removeEventListener('mousemove', onDrag)
-  document.removeEventListener('mouseup', stopDrag)
-  document.removeEventListener('touchmove', onDrag)
-  document.removeEventListener('touchend', stopDrag)
+// pointer 事件统一鼠标与触摸；拖动只在标题栏，缩放只在右下角手把
+let gesture = null
+
+function startDrag(e) {
+  if (e.target.classList.contains('hud-close') || e.target.classList.contains('hud-minimize')) return
+  beginGesture('drag', e)
+}
+
+function startResize(e) {
+  beginGesture('resize', e)
+}
+
+function beginGesture(mode, e) {
+  gesture = {
+    mode,
+    sx: e.clientX, sy: e.clientY,
+    w0: size.value.w,
+    x0: pos.value.x, y0: pos.value.y
+  }
+  try { e.currentTarget.setPointerCapture?.(e.pointerId) } catch { /* 合成事件/指针已失效时忽略 */ }
+  window.addEventListener('pointermove', onGestureMove)
+  window.addEventListener('pointerup', endGesture)
+  window.addEventListener('pointercancel', endGesture)
+}
+
+function onGestureMove(e) {
+  if (!gesture) return
+  e.preventDefault?.()
+  if (gesture.mode === 'drag') {
+    pos.value = { x: gesture.x0 + (e.clientX - gesture.sx), y: gesture.y0 + (e.clientY - gesture.sy) }
+    clampPos()
+  } else {
+    size.value = { w: Math.min(Math.max(gesture.w0 + (e.clientX - gesture.sx), MIN_W), maxW()) }
+  }
+}
+
+function endGesture() {
+  gesture = null
+  window.removeEventListener('pointermove', onGestureMove)
+  window.removeEventListener('pointerup', endGesture)
+  window.removeEventListener('pointercancel', endGesture)
+  clampPos()
+  saveLayout()
+  // 视频高度随宽度联动，本次手势造成的重排还没发生：重排后再钳一次，避免底部溢出视口
+  nextTick(() => requestAnimationFrame(clampPos))
+}
+
+function toggleMinimize() {
+  minimized.value = !minimized.value
+  saveLayout()
+}
+
+let resizeRaf = 0
+function onWindowResize() {
+  if (resizeRaf) return
+  resizeRaf = requestAnimationFrame(() => {
+    resizeRaf = 0
+    if (size.value.w > maxW()) size.value = { w: maxW() }
+    clampPos()
+  })
 }
 
 function handleClose() {
@@ -329,6 +427,8 @@ watch(() => props.visible, (val) => {
 })
 
 onMounted(() => {
+  loadLayout()
+  window.addEventListener('resize', onWindowResize)
   manager.onState = (s) => {
     Object.assign(st.hand, s.hand)
     Object.assign(st.head, s.head)
@@ -342,7 +442,7 @@ onMounted(() => {
     const a = actionMap[evt.action] || evt.action
     firedAction.value = g ? `✓ ${g} → ${a.replace(/^[✓→←]+\s*/, '')}` : `✓ ${a}`
     clearTimeout(firedTimer)
-    firedTimer = setTimeout(() => { firedAction.value = '' }, 2000)
+    firedTimer = setTimeout(() => { firedAction.value = '' }, 3200)
   })
   unsubSettings = onSettingsChange(() => syncChannels())
   drawRaf = requestAnimationFrame(drawLoop)
@@ -352,9 +452,11 @@ onMounted(() => {
 onUnmounted(() => {
   cancelAnimationFrame(drawRaf)
   clearTimeout(firedTimer)
+  if (resizeRaf) cancelAnimationFrame(resizeRaf)
   if (unsubBus) unsubBus()
   if (unsubSettings) unsubSettings()
-  stopDrag()
+  endGesture()
+  window.removeEventListener('resize', onWindowResize)
   closeAllChannels()
 })
 </script>
@@ -362,8 +464,9 @@ onUnmounted(() => {
 <style scoped>
 .gesture-hud {
   position: fixed;
-  z-index: 9000;
-  width: 180px;
+  /* 低于 Vant 弹层基准 2000：提交确认框/toast 必须能盖住 HUD，否则小窗会挡住弹窗（v8.1 教训） */
+  z-index: 1500;
+  /* 宽度由内联 style 控制（可拖右下角缩放并记忆） */
   background: rgba(10, 10, 15, 0.92);
   border: 1px solid rgba(0, 245, 255, 0.3);
   border-radius: 10px;
@@ -371,8 +474,21 @@ onUnmounted(() => {
   -webkit-backdrop-filter: blur(10px);
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 245, 255, 0.1);
   user-select: none;
-  cursor: move;
   overflow: hidden;
+}
+
+/* 右下角缩放手把：pointer 事件 + touch-action:none 防拖动手势被浏览器抢走 */
+.hud-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+  touch-action: none;
+  background:
+    linear-gradient(135deg, transparent 0 50%, rgba(0, 245, 255, 0.55) 50% 60%, transparent 60% 72%,
+      rgba(0, 245, 255, 0.55) 72% 82%, transparent 82%);
 }
 
 .hud-corner {
@@ -393,6 +509,8 @@ onUnmounted(() => {
   align-items: center;
   padding: 6px 10px;
   border-bottom: 1px solid rgba(0, 245, 255, 0.15);
+  cursor: move;
+  touch-action: none;
 }
 
 .hud-title {
@@ -438,7 +556,7 @@ onUnmounted(() => {
 .hud-video-wrap {
   position: relative;
   width: 100%;
-  height: 132px;
+  /* 高度由内联 style 按宽度 3:4 比例控制 */
   background: #000;
   overflow: hidden;
 }
@@ -581,21 +699,37 @@ onUnmounted(() => {
 }
 .hud-retry-btn:hover { background: rgba(0, 245, 255, 0.25); }
 
-/* 识别成功的手势：绿色霓虹强调 */
+/* 识别成功的手势：绿色霓虹强调，入场脉冲一下，避免"一闪而过看不见" */
 .gesture-action.fired {
   color: #00ff88;
+  font-size: 12px;
   font-weight: 700;
   text-shadow: 0 0 8px rgba(0, 255, 136, 0.55);
+  animation: firedPop 0.35s var(--ease-out, ease-out);
+}
+@keyframes firedPop {
+  0% { transform: scale(0.86); opacity: 0.2; }
+  60% { transform: scale(1.06); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* 两阶段握拳进行中：整块黄底呼吸，提示不可能被忽略 */
+.hud-gesture.armed .gesture-label {
+  animation: armBreath 0.9s ease-in-out infinite;
+}
+@keyframes armBreath {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
 }
 
 /* 手机端：整体收缩，触控区放大 */
+/* 手机端：只放大触控区，尺寸本身交给用户拖拽（写死会把缩放结果打回去） */
 @media (max-width: 560px) {
-  .gesture-hud { width: 150px; }
-  .hud-video-wrap { height: 112px; }
   .hud-header { padding: 8px 10px; }
   .hud-minimize, .hud-close { font-size: 16px; padding: 4px; }
   .gesture-label { font-size: 10px; }
   .hud-debug { font-size: 8px; line-height: 1.35; }
   .gesture-action { font-size: 10px; }
+  .hud-resize { width: 26px; height: 26px; }
 }
 </style>

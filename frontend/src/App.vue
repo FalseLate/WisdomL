@@ -14,6 +14,9 @@
        挂在 App 层按路由显隐，页面切换时不会重新加载模型 -->
   <PetTutor v-if="showPetTutor" :api-base="petApiBase" session-id="word-quiz-user" />
 
+  <!-- 无障碍与手势设置面板：全站只挂这一份，设置页与懒人模式都通过 a11yPanelOpen 打开 -->
+  <A11ySettingsDrawer :visible="a11yPanelOpen" @close="a11yPanelOpen = false" />
+
   <!-- 全局生成中浮动条 -->
   <div v-if="notifyStore.isGenerating" class="global-loading-bar">
     <div class="glb-loading-inner">
@@ -60,6 +63,8 @@ import { useRouter, useRoute } from 'vue-router'
 import { useNotificationStore } from './stores/notification'
 import { useQuestionsStore } from './stores/questions'
 import { ParticleBackground, SplashScreen } from './components/cyber'
+import A11ySettingsDrawer from './components/cyber/A11ySettingsDrawer.vue'
+import { a11yPanelOpen } from './a11y/settingsPanel.js'
 import PetTutor from './pet-tutor/PetTutor.vue'
 
 const router = useRouter()
@@ -116,7 +121,7 @@ function goPractice() {
 }
 
 .glb-loading-inner {
-  background: rgba(10, 10, 15, 0.96);
+  background: var(--surface-bar);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-radius: 16px;
@@ -141,14 +146,14 @@ function goPractice() {
 
 .glb-text {
   font-size: 14px;
-  color: #e8e8f0;
+  color: var(--text-primary);
   font-weight: 500;
 }
 
 .glb-sub {
   display: block;
   font-size: 11px;
-  color: #555566;
+  color: var(--text-muted);
   margin-top: 4px;
 }
 
@@ -165,7 +170,7 @@ function goPractice() {
 .complete-dialog-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: var(--scrim);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   z-index: 4000;
@@ -183,7 +188,7 @@ function goPractice() {
 
 .complete-dialog {
   position: relative;
-  background: rgba(10, 10, 15, 0.98);
+  background: var(--surface-solid);
   border: 1px solid rgba(0, 245, 255, 0.3);
   border-radius: 20px;
   padding: 32px 24px 24px;
@@ -219,7 +224,7 @@ function goPractice() {
   font-family: 'Orbitron', 'Courier New', monospace;
   font-size: 20px;
   font-weight: 700;
-  color: #e8e8f0;
+  color: var(--text-primary);
   text-align: center;
   margin-bottom: 20px;
   letter-spacing: 2px;
@@ -243,7 +248,7 @@ function goPractice() {
   font-family: 'Orbitron', 'Courier New', monospace;
   font-size: 24px;
   font-weight: 700;
-  color: #e8e8f0;
+  color: var(--text-primary);
   margin-bottom: 4px;
 }
 
@@ -259,12 +264,12 @@ function goPractice() {
 
 .ds-label {
   font-size: 11px;
-  color: #555566;
+  color: var(--text-muted);
 }
 
 .dialog-warning {
   font-size: 12px;
-  color: #f9f002;
+  color: var(--warning);
   text-align: center;
   margin-bottom: 16px;
   line-height: 1.5;
@@ -289,8 +294,8 @@ function goPractice() {
 }
 
 .cyber-btn.primary {
-  background: linear-gradient(135deg, #00f5ff, #00c8d4);
-  color: #000;
+  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+  color: var(--accent-contrast);
   box-shadow: 0 4px 16px rgba(0, 245, 255, 0.3);
 }
 
@@ -301,7 +306,7 @@ function goPractice() {
 
 .cyber-btn.ghost {
   background: transparent;
-  color: #00f5ff;
+  color: var(--accent);
   border: 1px solid rgba(0, 245, 255, 0.4);
 }
 

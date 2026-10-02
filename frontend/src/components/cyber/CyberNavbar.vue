@@ -31,10 +31,10 @@ defineEmits(['back'])
   justify-content: space-between;
   height: 56px;
   padding: 0 16px;
-  background: rgba(10, 10, 15, 0.92);
+  background: var(--surface-bar);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border-bottom: 1px solid rgba(0, 245, 255, 0.15);
+  border-bottom: 1px solid var(--hairline);
 }
 
 .navbar-left {
@@ -42,14 +42,13 @@ defineEmits(['back'])
   align-items: center;
   gap: 8px;
   min-width: 60px;
-  color: #00f5ff;
+  color: var(--accent);
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .navbar-left:hover {
-  color: #fff;
-  text-shadow: 0 0 8px rgba(0, 245, 255, 0.6);
+  color: var(--text-primary);
 }
 
 .back-icon {
@@ -63,7 +62,7 @@ defineEmits(['back'])
   font-family: 'Orbitron', 'Courier New', monospace;
   font-size: 15px;
   font-weight: 700;
-  color: #e8e8f0;
+  color: var(--text-secondary);
   letter-spacing: 1px;
   overflow: hidden;
   text-overflow: ellipsis;

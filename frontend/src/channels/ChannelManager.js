@@ -48,9 +48,9 @@ export class ChannelManager {
     // 供 HUD 绘制骨架的最新关键点（镜像前原始归一化坐标）
     this.latestDraw = { hand: null, face: null, pose: null }
     this.state = {
-      hand: { on: false, detected: false, candidate: null, ratio: 0, armPhase: 'idle', progress: 0 },
-      head: { on: false, detected: false, candidate: null, angles: null, calibrating: false, calibProgress: 0, offscreen: false, debug: null },
-      arm: { on: false, detected: false, candidate: null },
+      hand: { on: false, detected: false, candidate: null, firedGesture: null, ratio: 0, armPhase: 'idle', progress: 0, remainMs: null },
+      head: { on: false, detected: false, candidate: null, firedGesture: null, angles: null, calibrating: false, calibProgress: 0, offscreen: false, debug: null },
+      arm: { on: false, detected: false, candidate: null, firedGesture: null },
       error: null
     }
   }
@@ -217,6 +217,7 @@ export class ChannelManager {
     const arm = entry.armer.frame(stable, ts)
     st.armPhase = arm.phase
     st.progress = arm.progress
+    st.remainMs = arm.remainMs
     if (arm.event === 'submit-arm' || arm.event === 'submit') {
       this._emitCandidate('hand', arm.event === 'submit' ? 'submit' : null)
       if (arm.event === 'submit-arm') st.candidate = 'submit-arm'

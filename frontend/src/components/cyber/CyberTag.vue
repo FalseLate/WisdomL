@@ -44,42 +44,42 @@ const customStyle = computed(() => {
 
 /* default */
 .cyber-tag.default {
-  color: #8a8a9a;
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.1);
+  color: var(--text-muted);
+  background: var(--bg-hover);
+  border-color: var(--hairline);
 }
 
 /* primary 霓虹青 */
 .cyber-tag.primary {
-  color: #00f5ff;
-  background: rgba(0, 245, 255, 0.1);
-  border-color: rgba(0, 245, 255, 0.3);
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
 }
 
 /* secondary 品红 */
 .cyber-tag.secondary {
-  color: #ff00ff;
-  background: rgba(255, 0, 255, 0.1);
-  border-color: rgba(255, 0, 255, 0.3);
+  color: var(--secondary);
+  background: var(--secondary-soft);
+  border-color: var(--secondary-border);
 }
 
 /* success 绿色 */
 .cyber-tag.success {
-  color: #00ff88;
+  color: var(--success);
   background: rgba(0, 255, 136, 0.1);
   border-color: rgba(0, 255, 136, 0.3);
 }
 
 /* warning 黄色 */
 .cyber-tag.warning {
-  color: #f9f002;
+  color: var(--warning);
   background: rgba(249, 240, 2, 0.1);
   border-color: rgba(249, 240, 2, 0.3);
 }
 
 /* danger 红色 */
 .cyber-tag.danger {
-  color: #ff4444;
+  color: var(--danger);
   background: rgba(255, 68, 68, 0.1);
   border-color: rgba(255, 68, 68, 0.3);
 }

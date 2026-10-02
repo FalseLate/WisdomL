@@ -50,8 +50,8 @@ export const GESTURE_CONFIG = {
   COOLDOWN_CLEAR: 1000,      // 清空手势冷却 ms
   COOLDOWN_SUBMIT: 1500,     // 提交完成后冷却 ms
   ARM_HOLD_MS: 1500,         // 第一握：需保持多久进入待确认
-  CONFIRM_HOLD_MS: 600,      // 第二握：需保持多久真正提交
-  ARM_WINDOW_MS: 4000        // 待确认窗口：进入待确认后多久内必须完成第二握（中途张开手不取消）
+  CONFIRM_HOLD_MS: 450,      // 第二握：需保持多久真正提交（真机反馈 600ms 刻意数秒不顺手）
+  ARM_WINDOW_MS: 6000        // 待确认窗口：从「真正松开那一帧」起算 6 秒（中途张开手/换手势都不取消）
 }
 export function dist(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y)
@@ -206,16 +206,18 @@ export function createVoter(
  * 两阶段握拳提交状态机
  * idle：第一握保持 ARM_HOLD_MS -> submit‑arm（待确认）
  * 待确认：必须先松手，再在 ARM_WINDOW_MS 内第二握保持 CONFIRM_HOLD_MS -> submit
+ * 窗口从「真正松开的那一帧」才开始计时（含手移出画面），进入待确认后的那几秒不算——
+ * 真机反馈：从 armed 瞬间就开始烧秒，用户还没来的及张开手窗口就没了。
  */
 export function createSubmitArmer(cfg = GESTURE_CONFIG, now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now())) {
   let phase = 'idle'
   let t1 = 0
-  let tArmed = 0
+  let tRelease = 0
   let t2 = 0
   function reset() {
     phase = 'idle'
     t1 = 0
-    tArmed = 0
+    tRelease = 0
     t2 = 0
   }
   function frame(stableKey, nowMs = now()) {
@@ -228,18 +230,19 @@ export function createSubmitArmer(cfg = GESTURE_CONFIG, now = () => (typeof perf
         reset()
       } else if (nowMs - t1 >= cfg.ARM_HOLD_MS) {
         phase = 'armed'
-        tArmed = nowMs
         event = 'submit-arm'
       }
     } else if (phase === 'armed') {
-      // 第二握必须先张开手，中间必然出现"五指张开/伸N指"候选——绝不能因此取消待确认，
-      // 否则两阶段永远走不完（真机反馈）。退出只靠窗口超时或显式 reset（摇头/Esc）。
-      if (nowMs - tArmed >= cfg.ARM_WINDOW_MS) reset()
-      else { phase = 'arm2'; t2 = isFist ? nowMs : 0 }
+      // 还握着第一把：不进第二握计时（否则"握着不放 2.1 秒"会绕过两阶段直接提交）
+      if (!isFist) {
+        tRelease = nowMs
+        phase = 'arm2'
+        t2 = 0
+      }
     } else if (phase === 'arm2') {
-      if (nowMs - tArmed >= cfg.ARM_WINDOW_MS) {
-        reset()
-      } else if (isFist) {
+      // 窗口内出现任何非握拳候选（张开手/伸指/甚至手离开画面）都继续等待，
+      // 只由窗口超时或显式 reset（摇头/Esc）结束——真机反馈：过渡手势取消会导致永远提交不了
+      if (isFist) {
         if (!t2) t2 = nowMs
         if (nowMs - t2 >= cfg.CONFIRM_HOLD_MS) {
           event = 'submit'
@@ -249,11 +252,14 @@ export function createSubmitArmer(cfg = GESTURE_CONFIG, now = () => (typeof perf
         t2 = 0
       }
     }
+    if (tRelease && nowMs - tRelease >= cfg.ARM_WINDOW_MS) reset()
     let progress = 0
     if (phase === 'arm1') progress = Math.min(99, (nowMs - t1) / cfg.ARM_HOLD_MS * 100)
     else if (phase === 'armed') progress = 100
-    else if (phase === 'arm2') progress = t2 ? Math.min(99, (nowMs - t2) / cfg.CONFIRM_HOLD_MS * 100) : 0
-    return { event, phase, progress }
+    else if (phase === 'arm2') progress = t2 ? Math.min(99, (nowMs - t2) / cfg.CONFIRM_HOLD_MS * 100) : 100
+    const remainMs = (phase === 'armed' || phase === 'arm2') && tRelease
+      ? Math.max(0, cfg.ARM_WINDOW_MS - (nowMs - tRelease)) : null
+    return { event, phase, progress, remainMs }
   }
   return { frame, reset, getPhase: () => phase }
 }

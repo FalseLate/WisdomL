@@ -196,7 +196,7 @@ function barOption() {
 }
 .kpi-num { font-size: 24px; font-weight: 800; color: var(--accent); }
 .kpi-num.ok { color: var(--success); }
-.kpi-num.warn { color: #ffb020; }
+.kpi-num.warn { color: var(--warning); }
 .kpi-label { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
 
 .panel {
@@ -208,8 +208,8 @@ function barOption() {
 
 .status-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .status-chip { font-size: 12px; padding: 6px 12px; border-radius: 999px; border: 1px solid; }
-.status-chip.danger { color: #ff4444; border-color: rgba(255,68,68,0.4); }
-.status-chip.warn { color: #ffb020; border-color: rgba(255,176,32,0.4); }
+.status-chip.danger { color: var(--danger); border-color: var(--danger-border); }
+.status-chip.warn { color: var(--warning); border-color: var(--warning-border); }
 .status-chip.primary { color: var(--accent); border-color: var(--accent-border); }
 .status-chip.ok { color: var(--success); border-color: rgba(0,255,136,0.4); }
 

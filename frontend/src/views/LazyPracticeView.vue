@@ -1,7 +1,6 @@
 <template>
   <div class="lazy-practice">
-    <!-- 粒子背景 -->
-    <ParticleBackground />
+    <!-- 粒子背景由 App.vue 全局挂载一层即可；这里再挂一份会让刷题页跑两份 canvas + 两份 rAF -->
 
     <!-- ===== 答题模式 ===== -->
     <div v-if="!showResult" class="lp-container">
@@ -13,6 +12,12 @@
         <div class="lp-progress">
           第 {{ currentIndex + 1 }} / {{ questions.length }} 题
         </div>
+        <button
+          class="lp-theme-toggle"
+          :aria-label="isLight ? '切换到深色背景' : '切换到浅色背景'"
+          :title="isLight ? '切换到深色背景' : '切换到浅色背景'"
+          @click="switchTheme"
+        >{{ isLight ? '🌙' : '☀️' }}</button>
         <div class="lp-back" @click="goBack">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M19 12H5M12 19l-7-7 7-7"/>
@@ -89,7 +94,7 @@
         </div>
 
         <!-- 无障碍设置 -->
-        <div class="lp-gesture-toggle" @click="showA11ySettings = true">
+        <div class="lp-gesture-toggle" @click="a11yPanelOpen = true">
           <span class="gesture-icon">♿</span>
           <span>无障碍设置</span>
         </div>
@@ -157,6 +162,12 @@
             <span class="stat-label">正确率</span>
           </div>
         </div>
+        <button
+          class="lp-theme-toggle"
+          :aria-label="isLight ? '切换到深色背景' : '切换到浅色背景'"
+          :title="isLight ? '切换到深色背景' : '切换到浅色背景'"
+          @click="switchTheme"
+        >{{ isLight ? '🌙' : '☀️' }}</button>
       </div>
 
       <!-- 题目结果卡片 -->
@@ -248,6 +259,18 @@
         </button>
       </div>
 
+      <!-- 结果页手势入口：交卷后 HUD 已自动关闭，这里可重开用扭头翻题（扫描/选答在结果页无意义，不给入口） -->
+      <div class="lp-footer lp-result-a11y">
+        <div class="lp-gesture-toggle" :class="{ active: gestureEnabled }" @click="toggleGesture">
+          <span class="gesture-icon">📷</span>
+          <span>{{ gestureEnabled ? '手势：开' : '手势：关' }}</span>
+        </div>
+        <div class="lp-gesture-toggle" @click="a11yPanelOpen = true">
+          <span class="gesture-icon">♿</span>
+          <span>无障碍设置</span>
+        </div>
+      </div>
+
       <!-- 题号导航（结果模式） -->
       <div class="lp-nav">
         <div class="lp-nav-toggle" @click="navExpanded = !navExpanded">
@@ -275,9 +298,6 @@
       @close="gestureEnabled = false"
     />
 
-    <!-- 无障碍设置抽屉 -->
-    <A11ySettingsDrawer :visible="showA11ySettings" @close="showA11ySettings = false" />
-
     <!-- 手势教程弹窗（首次） -->
     <div v-if="showTutorial" class="tutorial-overlay" @click.self="showTutorial = false">
       <div class="tutorial-card">
@@ -287,7 +307,7 @@
           <div class="tutorial-item"><span class="t-gesture">微笑</span><span>切回上一个选项：A 再微笑绕回 D（D→C→B→A）</span></div>
           <div class="tutorial-item"><span class="t-gesture">张嘴</span><span>确认当前高亮选项（落子）</span></div>
           <div class="tutorial-item"><span class="t-gesture">摇头</span><span>撤销上一步（3 秒窗口内）</span></div>
-          <div class="tutorial-item"><span class="t-gesture">手部（可选）</span><span>伸1-4指选A-D；点赞偏左右切题；五指张开清空；握拳1.5秒→张开手→再握拳0.6秒=整卷提交（4秒内完成，中途张开手不会取消，摇头或 Esc 可取消）</span></div>
+          <div class="tutorial-item"><span class="t-gesture">手部（可选）</span><span>伸1-4指选A-D；点赞偏左右切题；五指张开清空；握拳1.5秒→张开手→再握拳0.45秒=整卷提交（松开后 6 秒内完成，中途换手势不会取消，摇头或 Esc 可取消）</span></div>
           <div class="tutorial-item"><span class="t-gesture">姿态（可选）</span><span>单臂举肘=命中；双手举过头合拢（变身姿势）=整卷提交</span></div>
           <div class="tutorial-item"><span class="t-gesture">🎯 扫描按钮</span><span>底部「扫描：开」或 S 键；顶部状态条实时显示游标停在哪一项，做命中动作（张嘴/点头/长按空格）即选中</span></div>
         </div>
@@ -306,9 +326,9 @@ import { showFailToast, showSuccessToast, showConfirmDialog, showToast } from 'v
 import request from '../utils/request.js'
 import { classify } from '../utils/questionType.js'
 import { loadDraftStore, writeDraftAnswers, clearDraftStore } from '../utils/practiceDraft.js'
-import { ParticleBackground } from '../components/cyber'
+import { appearance, toggleTheme } from '../utils/theme.js'
 import GestureHUD from '../components/cyber/GestureHUD.vue'
-import A11ySettingsDrawer from '../components/cyber/A11ySettingsDrawer.vue'
+import { a11yPanelOpen } from '../a11y/settingsPanel.js'
 import ErrorTypeTagger from '../components/ErrorTypeTagger.vue'
 import { useA11yPractice } from '../composables/useA11yPractice.js'
 
@@ -548,7 +568,8 @@ function triggerCardAnim() {
 
 // ===== 整卷提交 =====
 async function handleSubmit() {
-  if (submitting.value) return
+  // showResult 是「已交卷」唯一真相：结果页草稿故意不清，只靠 submitting 挡不住交卷后再握一次拳
+  if (submitting.value || showResult.value) return
 
   // 结算当前题的活跃作答时间（提交后不再计时）
   settleTimer(currentIndex.value)
@@ -645,6 +666,8 @@ async function handleSubmit() {
     showResult.value = true
     currentIndex.value = 0
     showSuccessToast(`提交完成，正确 ${correctCount.value}/${answers.length} 题`)
+    // 交卷即收尾：卸载 HUD 会连带 closeAllChannels() 释放摄像头，结果页不会再被手势误触发
+    gestureEnabled.value = false
 
   } catch (err) {
     showFailToast(err.message || '提交失败，请重试')
@@ -654,7 +677,6 @@ async function handleSubmit() {
 }
 
 // ===== 无障碍运行时（替代旧 handleGesture 硬编码 switch；动作->处理由设置页映射决定） =====
-const showA11ySettings = ref(false)
 const a11y = useA11yPractice({
   letters: () => Object.keys(currentQuestion.value?.options || {}),
   optionText: (key) => currentQuestion.value?.options?.[key] || '',
@@ -668,7 +690,7 @@ const a11y = useA11yPractice({
   next: () => nextQuestion(),
   submit: () => handleSubmit(),
   armToast: () => {
-    if (!showResult.value) showToast({ message: '张开手后再握拳 0.6 秒 = 确认提交（4 秒内），摇头或 Esc 取消', position: 'middle', duration: 3000 })
+    if (!showResult.value) showToast({ message: '张开手后再握拳 = 确认提交（松开后 6 秒内），摇头或 Esc 取消', position: 'middle', duration: 3000 })
   },
   isDone: () => showResult.value,
   isSubjective: () => isSubjective.value,
@@ -712,6 +734,11 @@ function toggleGesture() {
     }
   }
 }
+
+// ===== 背景主题切换（只作用于懒人模式作用域，队友页面不受影响）=====
+// 主题状态来自 theme.js 的单一来源，别页切换后这里不会变脏
+const isLight = computed(() => appearance.theme === 'light')
+function switchTheme() { toggleTheme() }
 
 function toggleScan() {
   if (!gestureEnabled.value) {
@@ -838,6 +865,34 @@ onUnmounted(() => {
 }
 .lp-back:hover { color: var(--accent); }
 
+/* 背景主题切换（深浅色） */
+.lp-theme-toggle {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: var(--bg-hover);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-pill);
+  color: var(--accent);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+.lp-theme-toggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.lp-result-header .lp-theme-toggle {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+
 /* 卡片区域 */
 .lp-card-wrap {
   flex: 1;
@@ -934,7 +989,7 @@ onUnmounted(() => {
 
 .lp-option.correct {
   border-color: var(--success);
-  background: rgba(0, 255, 136, 0.1);
+  background: var(--success-soft);
 }
 
 .lp-option.wrong {
@@ -957,7 +1012,7 @@ onUnmounted(() => {
 }
 
 .lp-option.correct .opt-key {
-  background: rgba(0, 255, 136, 0.15);
+  background: var(--success-soft);
   color: var(--success);
 }
 
@@ -1082,10 +1137,10 @@ onUnmounted(() => {
 .lp-submit-btn {
   flex: 1;
   height: 48px;
-  background: linear-gradient(135deg, #f9f002, #e0d000);
+  background: linear-gradient(135deg, var(--warning), var(--warning-deep));
   border: none;
   border-radius: var(--radius-pill);
-  color: #000;
+  color: var(--accent-contrast);
   font-size: 15px;
   font-weight: 700;
   letter-spacing: 2px;
@@ -1110,7 +1165,7 @@ onUnmounted(() => {
   width: 16px;
   height: 16px;
   border: 2px solid rgba(0, 0, 0, 0.2);
-  border-top-color: #000;
+  border-top-color: var(--accent-contrast);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -1183,7 +1238,7 @@ onUnmounted(() => {
 }
 
 .nav-dot.correct {
-  background: rgba(0, 255, 136, 0.15);
+  background: var(--success-soft);
   border-color: var(--success);
   color: var(--success);
 }
@@ -1228,6 +1283,7 @@ onUnmounted(() => {
 }
 
 .lp-result-header {
+  position: relative;
   text-align: center;
   margin-bottom: 16px;
   padding: 20px;
@@ -1285,9 +1341,9 @@ onUnmounted(() => {
   align-self: flex-start;
 }
 .result-badge.correct {
-  background: rgba(0, 255, 136, 0.15);
+  background: var(--success-soft);
   color: var(--success);
-  border: 1px solid rgba(0, 255, 136, 0.3);
+  border: 1px solid var(--success-border);
 }
 .result-badge.wrong {
   background: rgba(255, 68, 68, 0.15);
@@ -1379,8 +1435,8 @@ onUnmounted(() => {
 }
 
 .lp-result-btn.primary {
-  background: linear-gradient(135deg, var(--accent), #00c8d4);
-  color: #000;
+  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+  color: var(--accent-contrast);
   box-shadow: 0 4px 16px var(--accent-soft);
 }
 .lp-result-btn.primary:hover {
@@ -1401,7 +1457,7 @@ onUnmounted(() => {
 .tutorial-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: var(--scrim);
   backdrop-filter: blur(4px);
   z-index: 9500;
   display: flex;
@@ -1458,10 +1514,10 @@ onUnmounted(() => {
 .tutorial-close {
   width: 100%;
   height: 44px;
-  background: linear-gradient(135deg, var(--accent), #00c8d4);
+  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
   border: none;
   border-radius: var(--radius-pill);
-  color: #000;
+  color: var(--accent-contrast);
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
@@ -1474,18 +1530,18 @@ onUnmounted(() => {
 
 /* ===== 无障碍：步进选答/扫描游标高亮（霓虹风格） ===== */
 .lp-option.cycle-cursor {
-  border-color: #00f5ff;
+  border-color: var(--accent);
   box-shadow: 0 0 12px rgba(0, 245, 255, 0.35), inset 0 0 8px rgba(0, 245, 255, 0.12);
 }
 .lp-option.scan-cursor, .lp-submit-btn.scan-cursor {
-  border: 2px solid #00ff88;
+  border: 2px solid var(--success);
   box-shadow: 0 0 14px rgba(0, 255, 136, 0.4);
 }
 .cycle-badge {
   margin-left: auto;
   font-size: 10px;
-  color: #00f5ff;
-  border: 1px solid rgba(0, 245, 255, 0.5);
+  color: var(--accent);
+  border: 1px solid var(--accent-border);
   border-radius: 999px;
   padding: 1px 8px;
   letter-spacing: 1px;
@@ -1493,9 +1549,16 @@ onUnmounted(() => {
 }
 
 /* ===== 扫描模式：屏幕可见开关 + 游标状态条（手机端不依赖键盘） ===== */
+.lp-result-a11y {
+  margin-top: -2px;
+}
+.lp-gesture-toggle.active {
+  border-color: var(--success);
+  color: var(--success);
+}
 .scan-toggle.active {
-  border-color: #00ff88;
-  color: #00ff88;
+  border-color: var(--success);
+  color: var(--success);
   box-shadow: 0 0 12px rgba(0, 255, 136, 0.3);
 }
 
@@ -1504,15 +1567,15 @@ onUnmounted(() => {
   top: 60px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 8500;
+  z-index: 1400;
   width: min(92vw, 420px);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: rgba(6, 10, 16, 0.92);
-  border: 1px solid rgba(0, 255, 136, 0.45);
+  background: var(--surface-bar);
+  border: 1px solid var(--success-border);
   border-radius: 10px;
   box-shadow: 0 0 18px rgba(0, 255, 136, 0.2);
   backdrop-filter: blur(8px);
@@ -1521,8 +1584,8 @@ onUnmounted(() => {
 .scan-chip {
   font-size: 10px;
   letter-spacing: 1px;
-  color: #00ff88;
-  border: 1px solid rgba(0, 255, 136, 0.5);
+  color: var(--success);
+  border: 1px solid var(--success-border);
   border-radius: 999px;
   padding: 1px 8px;
 }
@@ -1531,7 +1594,7 @@ onUnmounted(() => {
   min-width: 90px;
   font-size: 14px;
   font-weight: 700;
-  color: #00f5ff;
+  color: var(--accent);
   text-shadow: 0 0 8px rgba(0, 245, 255, 0.5);
   white-space: nowrap;
   overflow: hidden;
@@ -1545,13 +1608,13 @@ onUnmounted(() => {
 .scan-dwell {
   width: 100%;
   height: 3px;
-  background: rgba(0, 255, 136, 0.18);
+  background: var(--success-soft);
   border-radius: 2px;
   overflow: hidden;
 }
 .scan-dwell-fill {
   height: 100%;
-  background: linear-gradient(90deg, #00ff88, #00f5ff);
+  background: linear-gradient(90deg, var(--success), var(--accent));
 }
 .lp-option.scan-cursor,
 .lp-arrow.scan-cursor,

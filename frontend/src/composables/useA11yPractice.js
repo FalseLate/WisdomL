@@ -143,6 +143,14 @@ export function useA11yPractice(callbacks) {
     return !callbacks.isDone() && !callbacks.isSubjective() && currentLetters().includes(letter)
   }
 
+  // 结果页（已交卷）屏蔽一切会再改答题状态的动作：交卷后草稿故意保留，
+  // 只靠 handleSubmit 自己的守卫挡不住 clear/undo/步进这些旁路。
+  // prev/next 不锁——结果页左右箭头就是用来浏览的。
+  for (const key of ['submit', 'clear', 'undo', 'optNext', 'optPrev', 'confirm']) {
+    const fn = handlers[key]
+    handlers[key] = (evt) => (callbacks.isDone() ? undefined : fn(evt))
+  }
+
   // ---------- 键盘 ----------
   let spaceTimer = null
   function onKeydown(e) {

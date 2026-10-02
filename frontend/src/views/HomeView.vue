@@ -22,6 +22,9 @@
               <circle cx="12" cy="7" r="4"/>
             </svg>
           </div>
+          <div class="icon-btn" @click="goSettings" aria-label="设置" title="设置">
+            <van-icon name="setting-o" size="18" />
+          </div>
         </div>
       </nav>
 
@@ -662,6 +665,11 @@ function goProfile() {
   router.push("/profile")
 }
 
+function goSettings() {
+  if (!isLoggedIn()) { showLoginDialog.value = true; return }
+  router.push("/settings")
+}
+
 const goWordQuiz = () => {
   if (!isLoggedIn()) {
     showLoginDialog.value = true
@@ -833,7 +841,7 @@ const goWordQuiz = () => {
 
 .hero-title .line1 {
   display: block;
-  background: linear-gradient(135deg, #ffffff 0%, #a0faff 50%, var(--accent) 100%);
+  background: linear-gradient(135deg, var(--hero-from) 0%, var(--hero-mid) 50%, var(--accent) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -1041,13 +1049,13 @@ const goWordQuiz = () => {
 .tag-new {
   background: var(--secondary-soft);
   color: var(--secondary);
-  border: 1px solid rgba(255,0,255,0.3);
+  border: 1px solid var(--secondary-border);
 }
 
 .tag-hot {
-  background: rgba(249,240,2,0.12);
+  background: var(--warning-soft);
   color: var(--warning);
-  border: 1px solid rgba(249,240,2,0.3);
+  border: 1px solid var(--warning-border);
 }
 
 /* 快捷入口 */
@@ -1088,7 +1096,7 @@ const goWordQuiz = () => {
   width: 100%;
   max-width: 480px;
   padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
-  background: rgba(10, 10, 15, 0.92);
+  background: var(--surface-bar);
   backdrop-filter: blur(20px);
   border-top: 1px solid var(--accent-border);
   display: flex;
@@ -1169,8 +1177,8 @@ const goWordQuiz = () => {
 }
 
 .tab-item.active {
-  background: linear-gradient(135deg, var(--accent), #00c8d4);
-  color: #000;
+  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+  color: var(--accent-contrast);
   box-shadow: 0 2px 12px var(--accent-soft);
 }
 
@@ -1208,7 +1216,7 @@ const goWordQuiz = () => {
   position: fixed;
   z-index: 9999;
   inset: 0;
-  background: rgba(0,0,0,0.9);
+  background: var(--surface-solid);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1331,7 +1339,7 @@ const goWordQuiz = () => {
   align-items: center;
   gap: 8px;
   padding: 10px 14px;
-  background: rgba(255,255,255,0.02);
+  background: var(--bg-elevated);
   border-bottom: 1px solid var(--accent-border);
 }
 
@@ -1367,7 +1375,7 @@ const goWordQuiz = () => {
   gap: 10px;
   padding: 10px 16px;
   cursor: pointer;
-  border-bottom: 1px solid rgba(0,245,255,0.05);
+  border-bottom: 1px solid var(--hairline);
   transition: all 0.2s;
 }
 
@@ -1397,7 +1405,7 @@ const goWordQuiz = () => {
 }
 
 .check-icon {
-  color: #000;
+  color: var(--accent-contrast);
   font-size: 12px;
   font-weight: 700;
 }
@@ -1506,7 +1514,7 @@ const goWordQuiz = () => {
 .dialog-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: var(--scrim);
   backdrop-filter: blur(4px);
   z-index: 4000;
   display: flex;
@@ -1523,7 +1531,7 @@ const goWordQuiz = () => {
 
 .dialog-box {
   position: relative;
-  background: rgba(10, 10, 15, 0.98);
+  background: var(--surface-solid);
   border: 1px solid var(--accent-border);
   border-radius: 20px;
   padding: 32px 24px 24px;

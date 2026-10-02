@@ -47,10 +47,10 @@ function navigate(path) {
   width: 100%;
   max-width: 480px;
   padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
-  background: rgba(10, 10, 15, 0.92);
+  background: var(--surface-bar);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border-top: 1px solid rgba(0, 245, 255, 0.15);
+  border-top: 1px solid var(--hairline);
   display: flex;
   justify-content: space-around;
   z-index: 50;
@@ -65,16 +65,16 @@ function navigate(path) {
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  color: #555566;
+  color: var(--text-muted);
 }
 
 .nav-item.active {
-  color: #00f5ff;
-  background: rgba(0, 245, 255, 0.1);
+  color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .nav-item.active .nav-icon {
-  filter: drop-shadow(0 0 6px #00f5ff);
+  filter: drop-shadow(0 0 6px var(--accent));
   transform: translateY(-1px);
 }
 

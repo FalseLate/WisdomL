@@ -428,7 +428,7 @@ function showDetail(item) {
 
 .cyber-checkbox input:checked + .checkmark::after {
   content: '✓';
-  color: #000;
+  color: var(--accent-contrast);
   font-size: 12px;
   font-weight: 700;
 }
@@ -442,7 +442,7 @@ function showDetail(item) {
   width: 100%;
   max-width: 480px;
   padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
-  background: rgba(10, 10, 15, 0.95);
+  background: var(--surface-bar);
   backdrop-filter: blur(20px);
   border-top: 1px solid var(--danger);
   z-index: 100;

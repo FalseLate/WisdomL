@@ -10,6 +10,7 @@ const COOLDOWNS = {
   selectA: 600, selectB: 600, selectC: 600, selectD: 600,
   prev: 800, next: 800, clear: 1000,
   confirm: 450, cancel: 450, submit: 1500, undo: 500,
+  'submit-arm': 800,          // 无条目=0ms：待确认窗口内每帧候选都会重发一次 toast
   optNext: 500, optPrev: 500
 }
 

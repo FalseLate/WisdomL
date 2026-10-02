@@ -5,12 +5,30 @@
   --bg-elevated: rgba(255, 255, 255, 0.03);
   --bg-hover: rgba(0, 245, 255, 0.06);
   --bg-card: rgba(255, 255, 255, 0.04);
+  /* 导航/标签栏底、不透明面板底、强调色之上的文字色、发丝分隔线 */
+  --surface-bar: rgba(10, 10, 15, 0.92);
+  --surface-solid: #0a0a0f;
+  --accent-contrast: #000;
+  --hairline: rgba(0, 245, 255, 0.15);
+  /* 弹窗遮罩：浅底上纯黑 70% 会压成脏灰，浅色分支减淡 */
+  --scrim: rgba(0, 0, 0, 0.7);
+  --success-deep: #00cc6a;
+  --danger-deep: #cc0000;
+  --warning-deep: #e0d000;
+  --success-border: rgba(0, 255, 136, 0.3);
+  --danger-border: rgba(255, 68, 68, 0.4);
+  --warning-border: rgba(249, 240, 2, 0.3);
+  /* 首页大标题的白→浅青渐变：浅底必须换成深色阶，否则第一行直接看不见 */
+  --hero-from: #ffffff;
+  --hero-mid: #a0faff;
 
   /* 主色：霓虹青 */
   --accent: #00f5ff;
   --accent-soft: rgba(0, 245, 255, 0.15);
   --accent-border: rgba(0, 245, 255, 0.2);
   --accent-glow: 0 0 12px rgba(0, 245, 255, 0.4), 0 0 32px rgba(0, 245, 255, 0.15);
+  --accent-deep: #00c8d4;
+  --secondary-deep: #cc00cc;
 
   /* 辅色：品红 */
   --secondary: #ff00ff;
@@ -44,6 +62,52 @@
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --transition-fast: 0.2s var(--ease-out);
   --transition-normal: 0.35s var(--ease-out);
+}
+
+/* ===== 浅色主题（全站） =====
+   取值依据：Vercel Geist 浅色（画布 #FAFAFA / 卡片 #FFF / 正文 #171717 / 次级 #4D4D4D，
+   层次用 ring shadow 而非描边）与 Linear 2026 改版说明（中性灰从偏冷蓝调转向"仍清脆但更低饱和"的暖灰）。
+   深色那版靠霓虹发光分层，浅色必须换成中性描边 + 极轻阴影，强调色只点缀在可操作处。 */
+:root[data-theme="light"] {
+  --bg-base: #fafafa;
+  --bg-elevated: #ffffff;
+  --bg-hover: rgba(0, 0, 0, 0.04);
+  --bg-card: #ffffff;
+  --surface-bar: rgba(255, 255, 255, 0.92);
+  --surface-solid: #ffffff;
+  --accent-contrast: #ffffff;
+  --hairline: rgba(0, 0, 0, 0.08);
+  --scrim: rgba(15, 23, 32, 0.32);
+  --success-deep: #085c33;
+  --danger-deep: #8f1d18;
+  --warning-deep: #5f4700;
+  --success-border: rgba(10, 107, 60, 0.35);
+  --danger-border: rgba(179, 38, 30, 0.35);
+  --warning-border: rgba(122, 92, 0, 0.35);
+  --hero-from: #171717;
+  --hero-mid: #0a6570;
+
+  --accent: #0a6570;
+  --accent-soft: rgba(10, 101, 112, 0.1);
+  --accent-border: rgba(0, 0, 0, 0.1);
+  --accent-glow: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.05);
+  --accent-deep: #0d8291;
+  --secondary-deep: #6a1a6c;
+
+  --secondary: #7d2a80;
+  --secondary-soft: rgba(125, 42, 128, 0.08);
+  --secondary-border: rgba(0, 0, 0, 0.1);
+
+  --success: #0a6b3c;
+  --success-soft: rgba(10, 107, 60, 0.1);
+  --warning: #7a5c00;
+  --warning-soft: rgba(122, 92, 0, 0.1);
+  --danger: #b3261e;
+  --danger-soft: rgba(179, 38, 30, 0.1);
+
+  --text-primary: #171717;
+  --text-secondary: #4d4d4d;
+  --text-muted: #6b6b6b;
 }
 
 /* ===== 全局重置 ===== */

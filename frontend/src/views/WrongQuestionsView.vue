@@ -425,8 +425,8 @@ async function removeWrong(id) {
   border: 1px solid var(--accent-border);
 }
 .wq-btn.primary {
-  background: linear-gradient(135deg, var(--accent), #00c8d4);
-  color: #000;
+  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+  color: var(--accent-contrast);
   border: none;
 }
 .wq-btn.primary:disabled { opacity: 0.6; cursor: not-allowed; }

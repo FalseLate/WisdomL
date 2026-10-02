@@ -242,12 +242,11 @@ console.log('\n[4] 两阶段握拳提交状态机（注入时钟）')
   let gotSubmit = false
   // 第一握进入待确认
   for (; t <= 1550; t += 33) armer.frame('fist', t)
-  // 松开后改比“选A”（明确其他手势）-> 应立即取消
+  // v8 语义：要再握一次必须先张开手，途中冒发的其它候选不得取消待确认
   for (; t <= 1700; t += 33) armer.frame(null, t)
   for (; t <= 2000; t += 33) armer.frame('select:A', t)
-  // 之后再握拳也不应提交（待确认已取消）
   for (; t <= 4000; t += 33) { const r = armer.frame('fist', t); if (r.event === 'submit') gotSubmit = true }
-  assert(!gotSubmit, '待确认期间改比其他手势 => 取消，后续握拳不提交')
+  assert(gotSubmit, '待确认期间张开手/冒出其它候选 => 不取消，随后再握拳仍能提交')
 }
 
 console.log(`\n========== 结果：${pass} passed, ${fail} failed ==========`)
