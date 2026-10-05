@@ -93,7 +93,7 @@ function handleClick(e) {
 /* 变体：secondary 品红 */
 .cyber-button.secondary {
   background: linear-gradient(135deg, var(--secondary), var(--secondary-deep));
-  color: #fff;
+  color: var(--text-on-solid-brand);
   box-shadow: 0 4px 16px var(--secondary-soft);
 }
 
@@ -117,7 +117,7 @@ function handleClick(e) {
 /* 变体：danger 红色 */
 .cyber-button.danger {
   background: linear-gradient(135deg, var(--danger), var(--danger-deep));
-  color: #fff;
+  color: var(--text-on-solid-brand);
   box-shadow: 0 4px 16px rgba(255, 68, 68, 0.3);
 }
 
@@ -156,7 +156,7 @@ function handleClick(e) {
 .btn-spinner {
   width: 16px;
   height: 16px;
-  border: 2px solid rgba(0, 0, 0, 0.2);
+  border: 2px solid var(--spinner-track);
   border-top-color: currentColor;
   border-radius: 50%;
   animation: btn-spin 0.8s linear infinite;
@@ -164,5 +164,17 @@ function handleClick(e) {
 
 @keyframes btn-spin {
   to { transform: rotate(360deg); }
+}
+
+/* 浅色靠描边与中性阴影分层，绿/黄/红按钮的霓虹光晕在白底上只会糊出一圈脏边 */
+[data-theme="light"] .cyber-button.success,
+[data-theme="light"] .cyber-button.warning,
+[data-theme="light"] .cyber-button.danger {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.16);
+}
+[data-theme="light"] .cyber-button.success:hover:not(:disabled),
+[data-theme="light"] .cyber-button.warning:hover:not(:disabled),
+[data-theme="light"] .cyber-button.danger:hover:not(:disabled) {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22);
 }
 </style>

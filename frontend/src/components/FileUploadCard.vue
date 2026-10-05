@@ -201,7 +201,7 @@ function doUpload() {
 
 .file-remove:hover {
   background: var(--danger);
-  color: #fff;
+  color: var(--text-on-solid-brand);
 }
 
 .file-count {

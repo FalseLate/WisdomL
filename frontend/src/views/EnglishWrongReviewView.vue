@@ -248,7 +248,7 @@ function goPractice(item) {
 .filter-pill.active {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--accent-contrast);
   font-weight: 700;
 }
 
@@ -257,12 +257,12 @@ function goPractice(item) {
   margin-bottom: 12px;
   padding: 14px 16px;
   background: var(--bg-card);
-  border: 1px solid rgba(255, 68, 68, 0.25);
+  border: 1px solid rgb(var(--danger-rgb) / 0.25);
   border-radius: 14px;
 }
 
 .wrong-card.mastered {
-  border-color: rgba(52, 211, 153, 0.4);
+  border-color: rgb(var(--emerald-rgb) / 0.4);
 }
 
 .wc-head {
@@ -283,14 +283,14 @@ function goPractice(item) {
 }
 
 .wc-tag.wrong {
-  background: rgba(248, 113, 113, 0.12);
-  border-color: rgba(248, 113, 113, 0.6);
+  background: rgb(var(--coral-rgb) / 0.12);
+  border-color: rgb(var(--coral-rgb) / 0.6);
   color: var(--danger, #f87171);
 }
 
 .mastered-tag {
-  background: rgba(52, 211, 153, 0.12);
-  border-color: rgba(52, 211, 153, 0.6);
+  background: rgb(var(--emerald-rgb) / 0.12);
+  border-color: rgb(var(--emerald-rgb) / 0.6);
   color: var(--success, #34d399);
 }
 
@@ -384,7 +384,7 @@ function goPractice(item) {
 }
 
 .etype-pill.active {
-  background: rgba(79, 124, 255, 0.18);
+  background: rgb(var(--indigo-rgb) / 0.18);
   border-color: var(--accent);
   color: var(--accent);
   font-weight: 600;
@@ -392,8 +392,8 @@ function goPractice(item) {
 
 .etype-pill.ai-tag {
   border-style: dashed;
-  border-color: rgba(167, 139, 250, 0.6);
-  color: #a78bfa;
+  border-color: rgb(var(--violet-rgb) / 0.6);
+  color: var(--violet-text);
 }
 
 .etype-pill.ai-tag.busy {
@@ -405,15 +405,15 @@ function goPractice(item) {
   margin-top: 8px;
   font-size: 12px;
   line-height: 1.6;
-  color: #a78bfa;
-  background: rgba(124, 58, 237, 0.1);
+  color: var(--violet-text);
+  background: rgb(var(--purple-deep-rgb) / 0.1);
   padding: 8px 12px;
   border-radius: 8px;
 }
 
 .wc-ai-reason.absorb {
-  color: #86efac;
-  background: rgba(52, 211, 153, 0.1);
+  color: var(--emerald-soft-text);
+  background: rgb(var(--emerald-rgb) / 0.1);
 }
 
 .wc-actions {

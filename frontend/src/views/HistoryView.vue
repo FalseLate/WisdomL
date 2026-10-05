@@ -344,7 +344,7 @@ function showDetail(item) {
 
 .del-btn {
   font-size: 16px;
-  opacity: 0.5;
+  opacity: var(--icon-rest-opacity);
   cursor: pointer;
   transition: all 0.2s;
 }

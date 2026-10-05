@@ -4,7 +4,7 @@
 
     <!-- 学习进度条 -->
     <div class="progress-wrap" v-if="session.total > 0">
-      <van-progress :percentage="progressPct" stroke-width="8" :show-pivot="false" color="#00f5ff" track-color="rgba(255,255,255,0.08)" />
+      <van-progress :percentage="progressPct" stroke-width="8" :show-pivot="false" color="var(--accent)" track-color="rgb(var(--overlay-rgb) / 0.08)" />
       <div class="progress-text">{{ session.done }}/{{ session.total }} · 已答对 {{ session.correct }} 题</div>
     </div>
 
@@ -592,7 +592,7 @@ async function studyAgain() {
 .finish-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.75);
+  background: var(--scrim);
   backdrop-filter: blur(6px);
   z-index: 5000;
   display: flex;
@@ -649,7 +649,7 @@ async function studyAgain() {
 .wordbook-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: var(--scrim);
   backdrop-filter: blur(4px);
   z-index: 5000;
   display: flex;
@@ -662,7 +662,7 @@ async function studyAgain() {
   width: 100%;
   max-width: 700px;
   height: 70vh;
-  background: rgba(10, 10, 15, 0.98);
+  background: rgb(var(--ink-rgb) / 0.98);
   border: 1px solid var(--accent-border);
   border-radius: 20px;
   display: flex;

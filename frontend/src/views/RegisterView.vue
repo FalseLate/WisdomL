@@ -250,7 +250,7 @@ async function handleRegister() {
 .input-wrap:focus-within {
   border-color: var(--accent);
   background: var(--accent-soft);
-  box-shadow: 0 0 0 3px rgba(0, 245, 255, 0.1), 0 0 16px var(--accent-soft);
+  box-shadow: 0 0 0 3px var(--accent-soft), 0 0 16px var(--accent-soft);
 }
 
 .input-wrap.error {

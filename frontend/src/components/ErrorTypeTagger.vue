@@ -95,8 +95,8 @@ async function save() {
 .err-tagger {
   margin-top: 14px;
   padding: 12px;
-  background: rgba(255, 68, 68, 0.06);
-  border: 1px solid rgba(255, 68, 68, 0.25);
+  background: rgb(var(--danger-rgb) / 0.06);
+  border: 1px solid rgb(var(--danger-rgb) / 0.25);
   border-radius: var(--radius-button);
 }
 .et-title {

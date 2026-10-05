@@ -218,13 +218,13 @@ async function submitAnswer() {
   border-radius: var(--radius-card);
   padding: 20px;
   margin-bottom: 12px;
-  border-left: 4px solid #ff8c00;
+  border-left: 4px solid var(--tag-subjective);
   backdrop-filter: blur(12px);
   transition: all 0.3s var(--ease-out);
 }
 
 .sub-card:hover {
-  border-color: #ff8c00;
+  border-color: var(--tag-subjective);
   box-shadow: 0 4px 20px rgba(255, 140, 0, 0.1);
 }
 
@@ -238,7 +238,7 @@ async function submitAnswer() {
 .fav-btn {
   font-size: 18px;
   cursor: pointer;
-  opacity: 0.5;
+  opacity: var(--icon-rest-opacity);
   transition: all 0.2s;
 }
 
@@ -283,7 +283,7 @@ async function submitAnswer() {
 }
 
 .answer-textarea:focus {
-  border-color: #ff8c00;
+  border-color: var(--tag-subjective);
   box-shadow: 0 0 0 3px rgba(255, 140, 0, 0.1);
 }
 
@@ -323,7 +323,7 @@ async function submitAnswer() {
 }
 
 .ai-eval {
-  background: rgba(0, 245, 255, 0.05);
+  background: var(--bg-hover);
   border: 1px solid var(--accent-border);
   border-radius: 10px;
   padding: 14px;
@@ -375,8 +375,8 @@ async function submitAnswer() {
 }
 
 .ref-card {
-  background: rgba(255, 140, 0, 0.05);
-  border: 1px solid rgba(255, 140, 0, 0.2);
+  background: rgb(var(--tag-subjective-rgb) / 0.05);
+  border: 1px solid rgb(var(--tag-subjective-rgb) / 0.2);
   border-radius: 10px;
   padding: 14px;
   margin-bottom: 10px;
@@ -386,7 +386,7 @@ async function submitAnswer() {
 }
 
 .ref-card.idea {
-  background: rgba(0, 245, 255, 0.05);
+  background: var(--bg-hover);
   border-color: var(--accent-border);
 }
 

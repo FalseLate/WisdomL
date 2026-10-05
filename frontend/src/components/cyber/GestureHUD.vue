@@ -82,6 +82,7 @@
 import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { getRuntime } from '../../a11y/runtime.js'
 import { loadSettings, onSettingsChange } from '../../a11y/settings.js'
+import { canvasColor } from '../../utils/themeAssets.js'
 
 const props = defineProps({
   visible: { type: Boolean, default: false }
@@ -283,9 +284,13 @@ function drawSet(ctx, pts, conn, w, h) {
   if (!pts || !pts.length) return
   // 背衬按 dpr 放大后，线宽/点径要同比放大，否则缩放大窗时骨架会变细
   const s = dpr
-  ctx.strokeStyle = '#00f5ff'
+  // 骨架色来自 token：视口里是摄像头画面（永远偏暗），所以浅色主题反而给更亮的青/品红，
+  // 由 tokens-light.css 的 --hud-skel-* 决定，这里不写死
+  const line = canvasColor('--hud-skel-line')
+  const joint = canvasColor('--hud-skel-joint')
+  ctx.strokeStyle = line
   ctx.lineWidth = 2 * s
-  ctx.shadowColor = '#00f5ff'
+  ctx.shadowColor = line
   ctx.shadowBlur = 4 * s
   if (conn) {
     for (const [a, b] of conn) {
@@ -296,8 +301,8 @@ function drawSet(ctx, pts, conn, w, h) {
       ctx.stroke()
     }
   }
-  ctx.fillStyle = '#ff00ff'
-  ctx.shadowColor = '#ff00ff'
+  ctx.fillStyle = joint
+  ctx.shadowColor = joint
   for (const p of pts) {
     ctx.beginPath()
     ctx.arc(p.x * w, p.y * h, 2 * s, 0, Math.PI * 2)
@@ -467,12 +472,12 @@ onUnmounted(() => {
   /* 低于 Vant 弹层基准 2000：提交确认框/toast 必须能盖住 HUD，否则小窗会挡住弹窗（v8.1 教训） */
   z-index: 1500;
   /* 宽度由内联 style 控制（可拖右下角缩放并记忆） */
-  background: rgba(10, 10, 15, 0.92);
-  border: 1px solid rgba(0, 245, 255, 0.3);
+  background: rgb(var(--ink-rgb) / 0.92);
+  border: 1px solid rgb(var(--accent-rgb) / 0.3);
   border-radius: 10px;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 245, 255, 0.1);
+  box-shadow: var(--hud-shadow);
   user-select: none;
   overflow: hidden;
 }
@@ -487,15 +492,15 @@ onUnmounted(() => {
   cursor: nwse-resize;
   touch-action: none;
   background:
-    linear-gradient(135deg, transparent 0 50%, rgba(0, 245, 255, 0.55) 50% 60%, transparent 60% 72%,
-      rgba(0, 245, 255, 0.55) 72% 82%, transparent 82%);
+    linear-gradient(135deg, transparent 0 50%, rgb(var(--accent-rgb) / 0.55) 50% 60%, transparent 60% 72%,
+      rgb(var(--accent-rgb) / 0.55) 72% 82%, transparent 82%);
 }
 
 .hud-corner {
   position: absolute;
   width: 10px;
   height: 10px;
-  border-color: #00f5ff;
+  border-color: var(--accent);
   opacity: 0.6;
 }
 .hud-corner.tl { top: 3px; left: 3px; border-top: 2px solid; border-left: 2px solid; }
@@ -508,7 +513,7 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 6px 10px;
-  border-bottom: 1px solid rgba(0, 245, 255, 0.15);
+  border-bottom: 1px solid rgb(var(--accent-rgb) / 0.15);
   cursor: move;
   touch-action: none;
 }
@@ -519,7 +524,7 @@ onUnmounted(() => {
   gap: 6px;
   font-family: 'Courier New', monospace;
   font-size: 10px;
-  color: #8a8a9a;
+  color: var(--text-secondary);
   letter-spacing: 1px;
   text-transform: uppercase;
 }
@@ -528,14 +533,14 @@ onUnmounted(() => {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #555;
+  background: var(--hud-dim);
   transition: all 0.3s;
 }
-.status-dot.detected { background: #00ff88; box-shadow: 0 0 8px #00ff88; animation: pulse 1.5s ease-in-out infinite; }
-.status-dot.none { background: #ff4444; box-shadow: 0 0 8px #ff4444; }
-.status-dot.confirm { background: #f9f002; box-shadow: 0 0 8px #f9f002; animation: pulse 0.5s ease-in-out infinite; }
-.status-dot.loading { background: #00f5ff; box-shadow: 0 0 8px #00f5ff; animation: pulse 0.8s ease-in-out infinite; }
-.status-dot.error { background: #ff8800; box-shadow: 0 0 8px #ff8800; }
+.status-dot.detected { background: var(--success); box-shadow: 0 0 8px var(--success); animation: pulse 1.5s ease-in-out infinite; }
+.status-dot.none { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+.status-dot.confirm { background: var(--warning); box-shadow: 0 0 8px var(--warning); animation: pulse 0.5s ease-in-out infinite; }
+.status-dot.loading { background: var(--accent); box-shadow: 0 0 8px var(--accent); animation: pulse 0.8s ease-in-out infinite; }
+.status-dot.error { background: var(--hud-error); box-shadow: 0 0 8px var(--hud-error); }
 
 @keyframes pulse {
   0%, 100% { opacity: 1; }
@@ -545,13 +550,13 @@ onUnmounted(() => {
 .hud-actions { display: flex; gap: 8px; }
 .hud-minimize, .hud-close {
   cursor: pointer;
-  color: #555;
+  color: var(--hud-dim);
   font-size: 12px;
   transition: color 0.2s;
   line-height: 1;
 }
-.hud-minimize:hover { color: #00f5ff; }
-.hud-close:hover { color: #ff4444; }
+.hud-minimize:hover { color: var(--accent); }
+.hud-close:hover { color: var(--danger); }
 
 .hud-video-wrap {
   position: relative;
@@ -574,17 +579,17 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   height: 3px;
-  background: rgba(249, 240, 2, 0.2);
+  background: rgb(var(--warning-rgb) / 0.2);
 }
 .hud-confirm-fill {
   height: 100%;
-  background: linear-gradient(90deg, #f9f002, #00f5ff);
+  background: linear-gradient(90deg, var(--warning), var(--accent));
   transition: width 0.1s linear;
 }
 
 .hud-gesture {
   padding: 8px 10px;
-  border-top: 1px solid rgba(0, 245, 255, 0.15);
+  border-top: 1px solid rgb(var(--accent-rgb) / 0.15);
 }
 
 .lamp-row {
@@ -598,7 +603,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 3px;
   font-size: 9px;
-  color: #555;
+  color: var(--hud-dim);
   font-family: 'Courier New', monospace;
 }
 .lamp::before {
@@ -606,26 +611,26 @@ onUnmounted(() => {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #333;
-  border: 1px solid #555;
+  background: var(--hud-off);
+  border: 1px solid var(--hud-dim);
 }
-.lamp.on { color: #8a8a9a; }
-.lamp.on::before { background: #f9f002; border-color: #f9f002; box-shadow: 0 0 6px #f9f002; }
-.lamp.hot::before { background: #00ff88; border-color: #00ff88; box-shadow: 0 0 6px #00ff88; }
-.lamp-ratio { margin-left: auto; font-size: 9px; color: #8a8a9a; font-variant-numeric: tabular-nums; }
+.lamp.on { color: var(--text-secondary); }
+.lamp.on::before { background: var(--warning); border-color: var(--warning); box-shadow: 0 0 6px var(--warning); }
+.lamp.hot::before { background: var(--success); border-color: var(--success); box-shadow: 0 0 6px var(--success); }
+.lamp-ratio { margin-left: auto; font-size: 9px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 
 .gesture-label {
   font-family: 'Courier New', monospace;
   font-size: 11px;
-  color: #00f5ff;
+  color: var(--accent);
   font-weight: 600;
   margin-bottom: 2px;
-  text-shadow: 0 0 6px rgba(0, 245, 255, 0.4);
+  text-shadow: 0 0 6px rgb(var(--accent-rgb) / 0.4);
 }
 
 .hud-debug {
   font-size: 9px;
-  color: #6a7a8a;
+  color: var(--hud-debug-text);
   font-family: 'Courier New', monospace;
   margin-bottom: 2px;
   font-variant-numeric: tabular-nums;
@@ -633,15 +638,15 @@ onUnmounted(() => {
 
 .gesture-action {
   font-size: 10px;
-  color: #8a8a9a;
+  color: var(--text-secondary);
 }
 
 .hud-gesture.armed {
-  background: rgba(249, 240, 2, 0.1);
-  box-shadow: inset 0 0 12px rgba(249, 240, 2, 0.15);
+  background: rgb(var(--warning-rgb) / 0.1);
+  box-shadow: inset 0 0 12px rgb(var(--warning-rgb) / 0.15);
 }
-.hud-gesture.armed .gesture-label { color: #f9f002; text-shadow: 0 0 6px rgba(249, 240, 2, 0.5); }
-.hud-gesture.armed .gesture-action { color: #c9c24a; }
+.hud-gesture.armed .gesture-label { color: var(--warning); text-shadow: 0 0 6px rgb(var(--warning-rgb) / 0.5); }
+.hud-gesture.armed .gesture-action { color: var(--hud-armed-text); }
 
 .hud-mini-status {
   display: flex;
@@ -667,8 +672,8 @@ onUnmounted(() => {
 .hud-spinner {
   width: 24px;
   height: 24px;
-  border: 2px solid rgba(0, 245, 255, 0.2);
-  border-top-color: #00f5ff;
+  border: 2px solid rgb(var(--accent-rgb) / 0.2);
+  border-top-color: var(--accent);
   border-radius: 50%;
   animation: hudSpin 0.8s linear infinite;
 }
@@ -689,22 +694,22 @@ onUnmounted(() => {
 .hud-retry-btn {
   margin-top: 4px;
   padding: 4px 12px;
-  background: rgba(0, 245, 255, 0.15);
-  border: 1px solid rgba(0, 245, 255, 0.4);
+  background: rgb(var(--accent-rgb) / 0.15);
+  border: 1px solid rgb(var(--accent-rgb) / 0.4);
   border-radius: 4px;
-  color: #00f5ff;
+  color: var(--accent);
   font-size: 10px;
   cursor: pointer;
   transition: all 0.2s;
 }
-.hud-retry-btn:hover { background: rgba(0, 245, 255, 0.25); }
+.hud-retry-btn:hover { background: rgb(var(--accent-rgb) / 0.25); }
 
 /* 识别成功的手势：绿色霓虹强调，入场脉冲一下，避免"一闪而过看不见" */
 .gesture-action.fired {
-  color: #00ff88;
+  color: var(--success);
   font-size: 12px;
   font-weight: 700;
-  text-shadow: 0 0 8px rgba(0, 255, 136, 0.55);
+  text-shadow: 0 0 8px rgb(var(--success-rgb) / 0.55);
   animation: firedPop 0.35s var(--ease-out, ease-out);
 }
 @keyframes firedPop {

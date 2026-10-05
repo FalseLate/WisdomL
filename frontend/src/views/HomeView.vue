@@ -71,7 +71,7 @@
           </div>
           <div class="func-grid">
             <!-- WORD 背单词 -->
-            <div class="func-card" style="--card-accent: #00f5ff; --card-glow: rgba(0,245,255,0.12); --icon-bg: rgba(0,245,255,0.1); --icon-border: rgba(0,245,255,0.2);"
+            <div class="func-card" style="--card-accent: var(--accent); --card-glow: var(--accent-soft); --icon-bg: var(--accent-soft); --icon-border: var(--accent-border);"
               @click="goWordQuiz">
               <div class="func-tag tag-new">NEW</div>
               <div class="func-icon">📖</div>
@@ -80,7 +80,7 @@
             </div>
 
             <!-- PHOTO -->
-            <div class="func-card" style="--card-accent: #ff00ff; --card-glow: rgba(255,0,255,0.12); --icon-bg: rgba(255,0,255,0.1); --icon-border: rgba(255,0,255,0.2);"
+            <div class="func-card" style="--card-accent: var(--secondary); --card-glow: var(--secondary-soft); --icon-bg: var(--secondary-soft); --icon-border: var(--secondary-border);"
               @click="openGenerate('photo')">
               <div class="func-tag tag-hot">HOT</div>
               <div class="func-icon">📷</div>
@@ -89,7 +89,7 @@
             </div>
 
             <!-- FILE -->
-            <div class="func-card" style="--card-accent: #f9f002; --card-glow: rgba(249,240,2,0.12); --icon-bg: rgba(249,240,2,0.1); --icon-border: rgba(249,240,2,0.2);"
+            <div class="func-card" style="--card-accent: var(--warning); --card-glow: var(--warning-soft); --icon-bg: var(--warning-soft); --icon-border: var(--warning-border);"
               @click="openGenerate('file')">
               <div class="func-icon">📁</div>
               <div class="func-name">FILE</div>
@@ -97,7 +97,7 @@
             </div>
 
             <!-- AI MIND -->
-            <div class="func-card" style="--card-accent: #00ff88; --card-glow: rgba(0,255,136,0.12); --icon-bg: rgba(0,255,136,0.1); --icon-border: rgba(0,255,136,0.2);"
+            <div class="func-card" style="--card-accent: var(--success); --card-glow: var(--success-soft); --icon-bg: var(--success-soft); --icon-border: var(--success-border);"
               @click="openAiMind">
               <div class="func-tag tag-new">NEW</div>
               <div class="func-icon">🧠</div>
@@ -329,11 +329,24 @@
         </div>
       </div>
     </div>
+
+    <!-- ===== 出题失败弹窗：原因写清楚，不再只丢一条 toast ===== -->
+    <div v-if="genFailMsg" class="dialog-overlay" @click.self="genFailMsg=''">
+      <div class="dialog-box">
+        <div class="dialog-accent-line"></div>
+        <div class="dialog-icon">⚠️</div>
+        <div class="dialog-title">出题未完成</div>
+        <p class="dialog-warning">{{ genFailMsg }}</p>
+        <div class="dialog-actions">
+          <CyberButton variant="primary" block @click="genFailMsg=''">知道了</CyberButton>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { showFailToast, showSuccessToast } from 'vant'
 import { useRouter } from 'vue-router'
 import { isLoggedIn } from '../utils/auth.js'
@@ -393,6 +406,8 @@ const genLoading = ref(false)
 const fLoading = ref(false)
 const pLoading = ref(false)
 const showGenDialog = ref(false)
+// 失败必须"看得见"：2 秒的底部 toast 用户根本来不及读，之前"什么都不弹"就是这么来的
+const genFailMsg = ref('')
 const showLoginDialog = ref(false)
 const genTotal = ref(0)
 const genObj = ref(0)
@@ -438,6 +453,8 @@ onMounted(async () => {
   setTimeout(() => { bottomNavVisible.value = true }, baseDelay + 600)
 })
 
+onUnmounted(clearPollSignals)
+
 function openGenerate(tab) {
   const tabMap = { text: 0, photo: 1, file: 2 }
   activeTab.value = tabMap[tab] ?? 0
@@ -467,6 +484,19 @@ function openAiMind() {
   router.push('/study-map')
 }
 
+// 生成中的轮询统一挂在这里：离开页面时全部 abort，避免"人已经走了、还在后台轮询，
+// 回来发现既没弹成功也没弹失败"
+const pollControllers = new Set()
+function newPollSignal() {
+  const c = new AbortController()
+  pollControllers.add(c)
+  return c
+}
+function clearPollSignals() {
+  pollControllers.forEach(c => { try { c.abort() } catch { /* noop */ } })
+  pollControllers.clear()
+}
+
 // ===== 原来的出题逻辑（完整保留） =====
 async function handleGenerate({ text, questionType }) {
   if (!text?.trim()) { showFailToast('请输入复习资料'); return }
@@ -477,23 +507,23 @@ async function handleGenerate({ text, questionType }) {
   try {
     const res = await request.post('/generate-async', { text, questionType, title: '文本出题' })
     const taskId = res.taskId
-    if (!taskId) { showFailToast('创建任务失败'); return }
+    if (!taskId) { genFail('创建任务失败：后端没有返回任务 ID'); return }
     notifyStore.message = 'AI正在出题中...（你可以去刷其他题目）'
-    const result = await pollTask(taskId)
+    const result = await pollTask(taskId, { signal: newPollSignal().signal })
     const cnt = (result.objectiveQuestions || []).length + (result.subjectiveQuestions || []).length
     // 双重校验：状态完成且确实解析出题目才算成功，杜绝空题假成功
     if (result.status !== 'completed' || cnt === 0) {
-      showFailToast('未生成有效题目，请缩短资料或稍后重试')
+      genFail('未生成有效题目，请缩短资料或稍后重试')
       return
     }
     popDialog(result)
     ok = true
   } catch (e) {
-    showFailToast(e.message || '出题失败')
+    genFail(e.message || '出题失败')
   } finally {
     loading.value = false
     // 失败/空题时强制关闭全局生成中状态；成功时 popDialog 已写入结果，不再覆盖
-    if (!ok) notifyStore.finishGenerating(null)
+    if (!ok) notifyStore.finishGenerating()
   }
 }
 
@@ -503,14 +533,18 @@ async function handlePhotoGenerate({ files, questionType }) {
   pLoading.value = true
   notifyStore.startGenerating('正在OCR识别，生成试题...')
   let ok = false
+  // 必须在发起请求前声明：.then/.catch 回调会在下面 await 挂起期间就跑起来，
+  // 放在 await 之后会踩到「变量未初始化」，结果是每张图都静默失败
+  const pollSignal = newPollSignal().signal
+  let ocrErr = ''
   try {
     const tasks = files.map(file => {
       const fd = new FormData()
       fd.append('file', file)
       fd.append('questionType', questionType)
       return request.post('/photo-and-generate-async', fd, { timeout: 180000 })
-        .then(res => pollTask(res.taskId))
-        .catch(() => null)
+        .then(res => pollTask(res.taskId, { signal: pollSignal }))
+        .catch((err) => { ocrErr = err && err.message ? err.message : '识别失败'; return null })
     })
     const results = await Promise.all(tasks)
 
@@ -527,17 +561,17 @@ async function handlePhotoGenerate({ files, questionType }) {
       subCount += (r.subjectiveQuestions || []).length
     })
 
-    if (allObj.length === 0 && allSub.length === 0) { showFailToast('所有图片识别失败或未生成题目'); return }
+    if (allObj.length === 0 && allSub.length === 0) { genFail(ocrErr ? `所有图片未能出题：${ocrErr}` : '所有图片识别失败或未生成题目'); return }
     visImg.value = firstVis ? 'data:image/jpeg;base64,' + firstVis : ''
     regCount.value = firstRegCount
     if (failedAny) showSuccessToast('部分图片识别失败，展示可用题目')
     popDialog({ totalCount: allObj.length + allSub.length, objectiveCount: objCount, subjectiveCount: subCount, objectiveQuestions: allObj, subjectiveQuestions: allSub })
     ok = true
   } catch (e) {
-    showFailToast(e.message || '识别失败')
+    genFail(e.message || '识别失败')
   } finally {
     pLoading.value = false
-    if (!ok) notifyStore.finishGenerating(null)
+    if (!ok) notifyStore.finishGenerating()
   }
 }
 
@@ -575,10 +609,20 @@ async function handleFileUpload({ files, questionType }) {
       })
     })
 
-    if (frList.length === 0) { showFailToast('未能提取到文字内容'); return }
+    if (frList.length === 0) {
+      genFail(files.length > 1 ? `${files.length} 个文件全部解析失败，请检查文件格式或稍后重试` : '未能提取到文字内容，请换一份资料试试')
+      return
+    }
     fileResults.value = frList
     secTexts.value = txt
     upDone.value = true
+    const parsed = frList.length
+    const qCount = frList.reduce((a, fr) => a + (fr.questions ? fr.questions.length : 0), 0)
+    const sCount = frList.reduce((a, fr) => a + fr.sections.length, 0)
+    if (parsed < files.length) showFailToast(`${files.length - parsed} 个文件解析失败，已跳过`)
+    showSuccessToast(qCount > 0
+      ? `解析成功：${parsed} 个文件、${qCount} 道现成题目，勾选后点「开始生成」`
+      : `解析成功：${parsed} 个文件、${sCount} 个章节，勾选章节后点「开始生成」`)
   } catch (e) { showFailToast(e.message || '上传失败') }
   finally { fLoading.value = false }
 }
@@ -613,7 +657,7 @@ async function genFromSecs() {
       const taskId = createRes.taskId
       notifyStore.message = 'AI正在按章节出题...（你可以去刷其他题目）'
       try {
-        const result = await pollTask(taskId)
+        const result = await pollTask(taskId, { signal: newPollSignal().signal })
         const secCnt = (result.objectiveQuestions || []).length + (result.subjectiveQuestions || []).length
         if (result.error || result.status !== 'completed' || secCnt === 0) {
           sectionFailed = true
@@ -623,18 +667,23 @@ async function genFromSecs() {
         }
       } catch (secErr) { sectionFailed = true }
     }
-    if (allQs.length === 0) { showFailToast('未生成有效题目，请稍后重试'); return }
+    if (allQs.length === 0) { genFail(sectionFailed ? '所选章节都未生成有效题目，请稍后重试' : '未生成有效题目，请稍后重试'); return }
     const subQs = allQs.filter(q => q.type === 'subjective')
     const objQs = allQs.filter(q => q.type !== 'subjective')
     if (sectionFailed) showSuccessToast('部分章节生成失败，展示可用题目')
     popDialog({ totalCount: allQs.length, objectiveQuestions: objQs, subjectiveQuestions: subQs })
     ok = true
   } catch (e) {
-    showFailToast(e.message || '出题失败')
+    genFail(e.message || '出题失败')
   } finally {
     genLoading.value = false
-    if (!ok) notifyStore.finishGenerating(null)
+    if (!ok) notifyStore.finishGenerating()
   }
+}
+
+function genFail(msg) {
+  genFailMsg.value = msg || '出题失败'
+  showFailToast(genFailMsg.value)
 }
 
 function popDialog(r) {
@@ -645,7 +694,7 @@ function popDialog(r) {
   genSub.value = ss.length
   genMissingCount.value = countMissingAnswers(all)
   // 只关闭全局“生成中”状态；完成提示统一用本页弹窗，避免与 App.vue 全局完成弹窗叠加成双框
-  notifyStore.finishGenerating(null)
+  notifyStore.finishGenerating()
   showGenDialog.value = true
 }
 
@@ -783,7 +832,7 @@ const goWordQuiz = () => {
   border-radius: 50%;
   font-size: 9px;
   font-weight: 700;
-  color: #fff;
+  color: var(--accent-contrast);
   display: flex;
   align-items: center;
   justify-content: center;

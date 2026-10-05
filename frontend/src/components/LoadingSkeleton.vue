@@ -51,4 +51,10 @@
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
+
+/* 浅底上 8% 青色微光看不见，骨架改成中性灰阶，shimmer 动画照旧 */
+[data-theme="light"] .sk-line {
+  background: linear-gradient(90deg, rgb(var(--overlay-rgb) / 0.03) 25%, rgb(var(--overlay-rgb) / 0.07) 50%, rgb(var(--overlay-rgb) / 0.03) 75%);
+  background-size: 200% 100%;
+}
 </style>

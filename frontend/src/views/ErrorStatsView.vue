@@ -62,11 +62,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import * as echarts from 'echarts'
 import request from '../utils/request.js'
 import { CyberNavbar } from '../components/cyber'
 import { mountChart } from '../utils/chartHost.js'
+import { appearance } from '../utils/theme.js'
 
 const loading = ref(true)
 const stats = ref({})
@@ -76,9 +77,26 @@ const barEl = ref(null)
 // 图表清理函数（chartHost.mountChart 返回值），卸载时统一调用
 let chartTeardowns = []
 
+/* echarts 画在 canvas 上，不跟随 CSS 变量：颜色按主题各给一套。
+   深色那版是霓虹配色；浅色必须整体压深，否则亮青/亮紫在白卡片上等于没画。 */
+const CHART_COLORS = {
+  dark: {
+    axisLine: 'rgba(0,240,255,0.3)', axisText: '#9fb3c8', splitLine: 'rgba(255,255,255,0.06)',
+    label: '#d6e4f0', pieBorder: '#0a0e1a', line: '#00f0ff', lineFill: 'rgba(0,240,255,0.15)',
+    barFrom: '#b14eff', barTo: '#00f0ff',
+    pie: ['#00f0ff', '#b14eff', '#ffb020', '#00ff88', '#ff4444']
+  },
+  light: {
+    axisLine: 'rgba(10,101,112,0.35)', axisText: '#4d4d4d', splitLine: 'rgba(0,0,0,0.08)',
+    label: '#171717', pieBorder: '#ffffff', line: '#0a6570', lineFill: 'rgba(10,101,112,0.14)',
+    barFrom: '#6a1a6c', barTo: '#0a6570',
+    pie: ['#0a6570', '#6a1a6c', '#8a6d00', '#0a6b3c', '#b3261e']
+  }
+}
+function cc() { return appearance.theme === 'light' ? CHART_COLORS.light : CHART_COLORS.dark }
+
 const ERROR_LABEL = { audit: '审题性', knowledge: '知识性', math: '数学性', strategy: '策略性', habit: '习惯性' }
 const TYPE_LABEL = { single: '单选', multiple: '多选', judge: '判断', subjective: '主观' }
-const PIE_COLORS = ['#00f0ff', '#b14eff', '#ffb020', '#00ff88', '#ff4444']
 
 const errorTypeTotal = computed(() => {
   const d = stats.value.errorTypeDist || {}
@@ -101,12 +119,20 @@ onMounted(async () => {
   // 不在挂载时硬 init：首屏有开场动画（router-view 用 v-show 隐藏），
   // 此时容器 display:none 会让 echarts 把宽度算成 100px。
   // 交给 chartHost：容器可见（有真实布局尺寸）后才初始化，并持续跟随尺寸变化。
+  mountAll()
+})
+
+// option 只在首次 init 时写入（见 chartHost 注释），换主题时重挂一次才能取到新配色
+function mountAll() {
+  chartTeardowns.forEach(fn => fn && fn())
   chartTeardowns = [
     mountChart(pieEl.value, pieOption, { echarts }),
     mountChart(lineEl.value, lineOption, { echarts }),
     mountChart(barEl.value, barOption, { echarts })
   ]
-})
+}
+
+watch(() => appearance.theme, () => { nextTick(mountAll) })
 
 onUnmounted(() => {
   chartTeardowns.forEach(fn => fn && fn())
@@ -116,69 +142,77 @@ onUnmounted(() => {
 function baseGrid() {
   return { left: 40, right: 16, top: 30, bottom: 30, containLabel: true }
 }
-const axisStyle = {
-  axisLine: { lineStyle: { color: 'rgba(0,240,255,0.3)' } },
-  axisLabel: { color: '#9fb3c8', fontSize: 11 },
-  splitLine: { lineStyle: { color: 'rgba(255,255,255,0.06)' } }
+function axisStyle() {
+  const c = cc()
+  return {
+    axisLine: { lineStyle: { color: c.axisLine } },
+    axisLabel: { color: c.axisText, fontSize: 11 },
+    splitLine: { lineStyle: { color: c.splitLine } }
+  }
 }
 
 function pieOption() {
+  const c = cc()
   const d = stats.value.errorTypeDist || {}
   const data = Object.keys(ERROR_LABEL).map((k, i) => ({
     name: ERROR_LABEL[k], value: Number(d[k] || 0),
-    itemStyle: { color: PIE_COLORS[i] }
+    itemStyle: { color: c.pie[i] }
   }))
   return {
     backgroundColor: 'transparent',
     tooltip: { trigger: 'item', confine: true },
-    legend: { bottom: 0, textStyle: { color: '#9fb3c8', fontSize: 11 } },
+    legend: { bottom: 0, textStyle: { color: c.axisText, fontSize: 11 } },
     series: [{
       type: 'pie', radius: ['42%', '66%'], center: ['50%', '44%'],
-      label: { color: '#d6e4f0', fontSize: 11 },
-      itemStyle: { borderColor: '#0a0e1a', borderWidth: 2 },
+      label: { color: c.label, fontSize: 11 },
+      itemStyle: { borderColor: c.pieBorder, borderWidth: 2 },
       data
     }]
   }
 }
 
 function lineOption() {
+  const c = cc()
+  const ax = axisStyle()
   const d = stats.value.trend7 || {}
   const keys = Object.keys(d)
   return {
     backgroundColor: 'transparent',
     tooltip: { trigger: 'axis', confine: true },
     grid: baseGrid(),
-    xAxis: { type: 'category', data: keys, ...axisStyle },
-    yAxis: { type: 'value', minInterval: 1, ...axisStyle },
+    xAxis: { type: 'category', data: keys, ...ax },
+    yAxis: { type: 'value', minInterval: 1, ...ax },
     series: [{
       type: 'line', smooth: true, data: keys.map(k => d[k]),
       symbolSize: 7,
-      lineStyle: { color: '#00f0ff', width: 2 },
-      itemStyle: { color: '#00f0ff' },
-      areaStyle: { color: 'rgba(0,240,255,0.15)' }
+      lineStyle: { color: c.line, width: 2 },
+      itemStyle: { color: c.line },
+      areaStyle: { color: c.lineFill }
     }]
   }
 }
 
 function barOption() {
+  const c = cc()
+  const ax = axisStyle()
   const d = stats.value.byType || {}
   const keys = Object.keys(d)
   return {
     backgroundColor: 'transparent',
     tooltip: { trigger: 'axis', confine: true, valueFormatter: v => v + '%' },
     grid: baseGrid(),
-    xAxis: { type: 'category', data: keys.map(k => TYPE_LABEL[k] || k), ...axisStyle },
-    yAxis: { type: 'value', max: 100, axisLabel: { formatter: '{value}%', color: '#9fb3c8', fontSize: 11 }, axisLine: axisStyle.axisLine, splitLine: axisStyle.splitLine },
+    xAxis: { type: 'category', data: keys.map(k => TYPE_LABEL[k] || k), ...ax },
+    yAxis: { type: 'value', max: 100, axisLabel: { formatter: '{value}%', color: ax.axisLabel.color, fontSize: 11 }, axisLine: ax.axisLine, splitLine: ax.splitLine },
     series: [{
       type: 'bar', barWidth: '46%',
       data: keys.map(k => Number(d[k]?.rate) || 0),
       itemStyle: {
         borderRadius: [6, 6, 0, 0],
         color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-          { offset: 0, color: '#b14eff' }, { offset: 1, color: '#00f0ff' }
+          { offset: 0, color: c.barFrom }, { offset: 1, color: c.barTo }
         ])
       },
-      label: { show: true, position: 'top', color: '#d6e4f0', fontSize: 11, formatter: '{c}%' }
+      label: { show: true, position: 'top', color: c.label, fontSize: 11, formatter: '{c}%' }
     }]
   }
 }
@@ -204,15 +238,15 @@ function barOption() {
   border-radius: 12px; padding: 14px; margin-bottom: 14px;
 }
 .panel-title { font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 10px; }
-.panel-sub { font-size: 11px; color: var(--text-muted); font-weight: 400; margin-left: 6px; }
+.panel-sub { font-size: 11px; color: var(--text-secondary); font-weight: 400; margin-left: 6px; }
 
 .status-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .status-chip { font-size: 12px; padding: 6px 12px; border-radius: 999px; border: 1px solid; }
 .status-chip.danger { color: var(--danger); border-color: var(--danger-border); }
 .status-chip.warn { color: var(--warning); border-color: var(--warning-border); }
 .status-chip.primary { color: var(--accent); border-color: var(--accent-border); }
-.status-chip.ok { color: var(--success); border-color: rgba(0,255,136,0.4); }
+.status-chip.ok { color: var(--success); border-color: var(--success-border); }
 
 .chart { width: 100%; height: 260px; }
-.chart-empty { font-size: 12px; color: var(--text-muted); text-align: center; padding: 10px 0; }
+.chart-empty { font-size: 12px; color: var(--text-secondary); text-align: center; padding: 10px 0; }
 </style>

@@ -122,7 +122,7 @@ function speak(text) {
   margin-bottom: 12px;
   padding: 14px 16px;
   background: var(--bg-card);
-  border: 1px solid rgba(124, 58, 237, 0.4);
+  border: 1px solid rgb(var(--purple-deep-rgb) / 0.4);
   border-radius: 14px;
 }
 
@@ -139,10 +139,10 @@ function speak(text) {
   font-size: 11px;
 }
 
-.kt-1 { background: rgba(56, 189, 248, 0.15); color: #38bdf8; }
-.kt-2 { background: rgba(52, 211, 153, 0.15); color: #34d399; }
-.kt-3 { background: rgba(139, 92, 246, 0.15); color: #a78bfa; }
-.kt-4 { background: rgba(249, 115, 22, 0.15); color: #f97316; }
+.kt-1 { background: rgb(var(--sky-rgb) / 0.15); color: var(--sky-text); }
+.kt-2 { background: rgb(var(--emerald-rgb) / 0.15); color: var(--emerald-text); }
+.kt-3 { background: rgb(var(--purple-rgb) / 0.15); color: var(--violet-text); }
+.kt-4 { background: rgb(var(--orange-rgb) / 0.15); color: var(--orange-text); }
 
 .kw-title {
   flex: 1;

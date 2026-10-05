@@ -5,7 +5,7 @@
     <!-- 复习模式：用生词本里的词做 4 选 1，只在本页统计，不上报学习进度 -->
     <div v-if="reviewing" class="page-container">
       <div class="review-head">
-        <van-progress :percentage="reviewPct" stroke-width="8" :show-pivot="false" color="#4F7CFF" track-color="rgba(255,255,255,0.08)" />
+        <van-progress :percentage="reviewPct" stroke-width="8" :show-pivot="false" color="var(--indigo)" track-color="rgb(var(--overlay-rgb) / 0.08)" />
         <div class="review-count">{{ reviewIndex + 1 }} / {{ reviewWords.length }} · 答对 {{ reviewCorrect }}</div>
       </div>
 
@@ -433,8 +433,8 @@ function quizBtnClass(opt) {
   gap: 12px;
   margin-bottom: 12px;
   padding: 14px 16px;
-  background: linear-gradient(135deg, rgba(52, 211, 153, 0.16), rgba(79, 124, 255, 0.12));
-  border: 1px solid rgba(52, 211, 153, 0.5);
+  background: linear-gradient(135deg, rgb(var(--emerald-rgb) / 0.16), rgb(var(--indigo-rgb) / 0.12));
+  border: 1px solid rgb(var(--emerald-rgb) / 0.5);
   border-radius: 16px;
   cursor: pointer;
 }
@@ -466,7 +466,7 @@ function quizBtnClass(opt) {
   margin-bottom: 12px;
   padding: 12px 16px;
   background: var(--bg-card);
-  border: 1px dashed rgba(124, 58, 237, 0.5);
+  border: 1px dashed rgb(var(--purple-deep-rgb) / 0.5);
   border-radius: 14px;
   font-size: 14px;
   color: var(--text-primary);
@@ -475,14 +475,14 @@ function quizBtnClass(opt) {
 }
 
 .quiz-entry:hover {
-  border-color: #a78bfa;
+  border-color: var(--violet);
 }
 
 .quiz-card {
   margin-bottom: 12px;
   padding: 16px;
   background: var(--bg-card);
-  border: 1px solid rgba(124, 58, 237, 0.45);
+  border: 1px solid rgb(var(--purple-deep-rgb) / 0.45);
   border-radius: 16px;
 }
 
@@ -495,7 +495,7 @@ function quizBtnClass(opt) {
 .quiz-badge {
   font-size: 13px;
   font-weight: 700;
-  color: #a78bfa;
+  color: var(--violet-text);
 }
 
 .quiz-close {
@@ -541,8 +541,8 @@ function quizBtnClass(opt) {
   align-items: center;
   justify-content: space-between;
   padding: 16px;
-  background: linear-gradient(135deg, rgba(79, 124, 255, 0.16), rgba(124, 58, 237, 0.1));
-  border: 1px solid rgba(79, 124, 255, 0.45);
+  background: linear-gradient(135deg, rgb(var(--indigo-rgb) / 0.16), rgb(var(--purple-deep-rgb) / 0.1));
+  border: 1px solid rgb(var(--indigo-rgb) / 0.45);
   border-radius: 16px;
 }
 
@@ -597,7 +597,7 @@ function quizBtnClass(opt) {
 .level-pill.active {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--accent-contrast);
   font-weight: 700;
 }
 
@@ -653,9 +653,9 @@ function quizBtnClass(opt) {
   font-size: 11px;
 }
 
-.lv-4 { background: rgba(56, 189, 248, 0.15); color: #38bdf8; }
-.lv-6 { background: rgba(249, 115, 22, 0.15); color: #f97316; }
-.lv-ky { background: rgba(139, 92, 246, 0.15); color: #a78bfa; }
+.lv-4 { background: rgb(var(--sky-rgb) / 0.15); color: var(--sky-text); }
+.lv-6 { background: rgb(var(--orange-rgb) / 0.15); color: var(--orange-text); }
+.lv-ky { background: rgb(var(--purple-rgb) / 0.15); color: var(--violet-text); }
 
 .wi-del {
   font-size: 12px;

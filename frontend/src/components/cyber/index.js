@@ -1,7 +1,6 @@
 export { default as ParticleBackground } from './ParticleBackground.vue'
 export { default as SplashScreen } from './SplashScreen.vue'
 export { default as CyberNavbar } from './CyberNavbar.vue'
-export { default as CyberBottomNav } from './CyberBottomNav.vue'
 export { default as CyberCard } from './CyberCard.vue'
 export { default as CyberButton } from './CyberButton.vue'
 export { default as CyberProgress } from './CyberProgress.vue'

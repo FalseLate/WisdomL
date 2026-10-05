@@ -100,6 +100,7 @@ public class AsyncGenerateService {
 
 
     @Async("generateExecutor")
+
     public void generateFromSections(String taskId, List<String> sectionIds,
                                      Map<String, String> sectionTexts,
                                      String questionType) {

@@ -50,6 +50,9 @@ defineProps({
   box-shadow: 0 0 8px rgba(0, 255, 136, 0.5);
 }
 
+/* 浅底不靠发光分层，绿色霓虹光晕在白卡片上只会糊成一圈脏边 */
+[data-theme="light"] .progress-fill.complete { box-shadow: none; }
+
 .progress-fill::after {
   content: '';
   position: absolute;
@@ -57,7 +60,7 @@ defineProps({
   top: 0;
   width: 20px;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4));
+  background: linear-gradient(90deg, transparent, rgb(var(--overlay-rgb) / 0.4));
   filter: blur(2px);
 }
 

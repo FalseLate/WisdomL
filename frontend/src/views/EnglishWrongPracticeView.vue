@@ -244,8 +244,8 @@ async function pick(st, k) {
 .conquer-banner {
   padding: 14px 16px;
   border-radius: 14px;
-  background: rgba(52, 211, 153, 0.12);
-  border: 1px solid rgba(52, 211, 153, 0.6);
+  background: rgb(var(--emerald-rgb) / 0.12);
+  border: 1px solid rgb(var(--emerald-rgb) / 0.6);
   color: var(--success, #34d399);
   font-size: 14px;
   font-weight: 600;
@@ -309,16 +309,16 @@ async function pick(st, k) {
 .practice-card {
   padding: 14px 16px;
   background: var(--bg-card);
-  border: 1px dashed rgba(251, 146, 60, 0.5);
+  border: 1px dashed rgb(var(--orange-soft-rgb) / 0.5);
   border-radius: 14px;
-  background-color: rgba(251, 146, 60, 0.04);
+  background-color: rgb(var(--orange-soft-rgb) / 0.04);
   margin-bottom: 12px;
 }
 
 .pc-title {
   font-size: 14px;
   font-weight: 600;
-  color: #fb923c;
+  color: var(--orange-soft-text);
   margin-bottom: 10px;
 }
 
@@ -448,7 +448,7 @@ async function pick(st, k) {
 .p-fail-err {
   font-size: 11px;
   color: var(--danger, #f87171);
-  background: rgba(248, 113, 113, 0.08);
+  background: rgb(var(--coral-rgb) / 0.08);
   border-radius: 8px;
   padding: 6px 10px;
   margin-bottom: 10px;

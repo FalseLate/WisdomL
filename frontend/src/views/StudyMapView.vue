@@ -224,8 +224,8 @@ async function load() {
   width: fit-content;
   margin: 0 auto 4px;
   padding: 10px 26px;
-  background: linear-gradient(135deg, rgba(79, 124, 255, 0.3), rgba(124, 58, 237, 0.25));
-  border: 1px solid rgba(79, 124, 255, 0.6);
+  background: linear-gradient(135deg, rgb(var(--indigo-rgb) / 0.3), rgb(var(--purple-deep-rgb) / 0.25));
+  border: 1px solid rgb(var(--indigo-rgb) / 0.6);
   border-radius: 999px;
   font-size: 16px;
   font-weight: 800;
@@ -285,15 +285,15 @@ async function load() {
   color: var(--text-secondary);
 }
 
-.leaf-4 { background: rgba(56, 189, 248, 0.12); border-color: rgba(56, 189, 248, 0.5); color: #38bdf8; }
-.leaf-6 { background: rgba(249, 115, 22, 0.12); border-color: rgba(249, 115, 22, 0.5); color: #f97316; }
-.leaf-ky { background: rgba(139, 92, 246, 0.12); border-color: rgba(139, 92, 246, 0.5); color: #a78bfa; }
-.leaf-due { background: rgba(52, 211, 153, 0.12); border-color: rgba(52, 211, 153, 0.6); color: #34d399; cursor: pointer; }
-.leaf-nt-2 { background: rgba(52, 211, 153, 0.12); border-color: rgba(52, 211, 153, 0.5); color: #34d399; }
-.leaf-nt-3 { background: rgba(139, 92, 246, 0.12); border-color: rgba(139, 92, 246, 0.5); color: #a78bfa; }
-.leaf-nt-4 { background: rgba(249, 115, 22, 0.12); border-color: rgba(249, 115, 22, 0.5); color: #f97316; }
+.leaf-4 { background: rgb(var(--sky-rgb) / 0.12); border-color: rgb(var(--sky-rgb) / 0.5); color: var(--sky-text); }
+.leaf-6 { background: rgb(var(--orange-rgb) / 0.12); border-color: rgb(var(--orange-rgb) / 0.5); color: var(--orange-text); }
+.leaf-ky { background: rgb(var(--purple-rgb) / 0.12); border-color: rgb(var(--purple-rgb) / 0.5); color: var(--violet-text); }
+.leaf-due { background: rgb(var(--emerald-rgb) / 0.12); border-color: rgb(var(--emerald-rgb) / 0.6); color: var(--emerald-text); cursor: pointer; }
+.leaf-nt-2 { background: rgb(var(--emerald-rgb) / 0.12); border-color: rgb(var(--emerald-rgb) / 0.5); color: var(--emerald-text); }
+.leaf-nt-3 { background: rgb(var(--purple-rgb) / 0.12); border-color: rgb(var(--purple-rgb) / 0.5); color: var(--violet-text); }
+.leaf-nt-4 { background: rgb(var(--orange-rgb) / 0.12); border-color: rgb(var(--orange-rgb) / 0.5); color: var(--orange-text); }
 .leaf-more { cursor: pointer; }
-.leaf-hot { background: rgba(248, 113, 113, 0.12); border-color: rgba(248, 113, 113, 0.6); color: #f87171; }
+.leaf-hot { background: rgb(var(--coral-rgb) / 0.12); border-color: rgb(var(--coral-rgb) / 0.6); color: var(--coral-text); }
 
 .mm-note-sample {
   margin: 10px 0 0 16px;
@@ -338,8 +338,8 @@ async function load() {
 .rp-summary {
   margin-top: 14px;
   padding: 12px 14px;
-  background: rgba(124, 58, 237, 0.1);
-  border-left: 3px solid #a78bfa;
+  background: rgb(var(--purple-deep-rgb) / 0.1);
+  border-left: 3px solid var(--violet);
   border-radius: 8px;
   font-size: 13px;
   line-height: 1.7;

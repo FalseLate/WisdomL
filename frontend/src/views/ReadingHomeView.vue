@@ -156,7 +156,7 @@ onMounted(load)
 .level-pill.active {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--accent-contrast);
   font-weight: 700;
 }
 
@@ -174,8 +174,8 @@ onMounted(load)
   gap: 12px;
   margin-bottom: 14px;
   padding: 14px 16px;
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.18), rgba(79, 124, 255, 0.12));
-  border: 1px solid rgba(167, 139, 250, 0.55);
+  background: linear-gradient(135deg, rgb(var(--purple-deep-rgb) / 0.18), rgb(var(--indigo-rgb) / 0.12));
+  border: 1px solid rgb(var(--violet-rgb) / 0.55);
   border-radius: 16px;
   cursor: pointer;
 }
@@ -196,9 +196,9 @@ onMounted(load)
   flex-shrink: 0;
   padding: 6px 16px;
   border-radius: 999px;
-  background: rgba(167, 139, 250, 0.2);
-  border: 1px solid rgba(167, 139, 250, 0.6);
-  color: #c4b5fd;
+  background: rgb(var(--violet-rgb) / 0.2);
+  border: 1px solid rgb(var(--violet-rgb) / 0.6);
+  color: var(--violet-soft-text);
   font-size: 13px;
   font-weight: 700;
 }
@@ -251,9 +251,9 @@ onMounted(load)
   border-radius: 999px;
 }
 
-.lv-4 { background: rgba(56, 189, 248, 0.15); color: #38bdf8; }
-.lv-6 { background: rgba(249, 115, 22, 0.15); color: #f97316; }
-.lv-ky { background: rgba(139, 92, 246, 0.15); color: #a78bfa; }
+.lv-4 { background: rgb(var(--sky-rgb) / 0.15); color: var(--sky-text); }
+.lv-6 { background: rgb(var(--orange-rgb) / 0.15); color: var(--orange-text); }
+.lv-ky { background: rgb(var(--purple-rgb) / 0.15); color: var(--violet-text); }
 
 .ac-arrow {
   margin-left: auto;

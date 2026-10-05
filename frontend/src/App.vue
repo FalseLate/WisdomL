@@ -25,52 +25,19 @@
       <span class="glb-sub">你可以去其他页面浏览</span>
     </div>
   </div>
-
-  <!-- 生成完成弹窗 -->
-  <div v-if="notifyStore.showCompleteDialog" class="complete-dialog-overlay" @click.self="notifyStore.dismissResult()">
-    <div class="complete-dialog">
-      <div class="dialog-accent-line"></div>
-      <div class="dialog-icon">📝</div>
-      <div class="dialog-title">出题完成</div>
-      <div class="dialog-stats">
-        <div class="ds-item">
-          <span class="ds-num">{{ notifyStore.result?.total || 0 }}</span>
-          <span class="ds-label">总题数</span>
-        </div>
-        <div class="ds-item">
-          <span class="ds-num cyan">{{ notifyStore.result?.objectiveCount || 0 }}</span>
-          <span class="ds-label">客观题</span>
-        </div>
-        <div class="ds-item">
-          <span class="ds-num magenta">{{ notifyStore.result?.subjectiveCount || 0 }}</span>
-          <span class="ds-label">主观题</span>
-        </div>
-      </div>
-      <p v-if="notifyStore.result?.missingCount > 0" class="dialog-warning">
-        ⚠️ {{ notifyStore.result.missingCount }} 道题答案/解析缺失，可进入刷题后手动重试生成
-      </p>
-      <div class="dialog-actions">
-        <button class="cyber-btn primary" @click="goPractice">📚 立即刷题</button>
-        <button class="cyber-btn ghost" @click="notifyStore.dismissResult()">留在当前页</button>
-      </div>
-    </div>
-  </div>
 </template>
 
 <script setup>
 import { ref, computed } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useNotificationStore } from './stores/notification'
-import { useQuestionsStore } from './stores/questions'
 import { ParticleBackground, SplashScreen } from './components/cyber'
 import A11ySettingsDrawer from './components/cyber/A11ySettingsDrawer.vue'
 import { a11yPanelOpen } from './a11y/settingsPanel.js'
 import PetTutor from './pet-tutor/PetTutor.vue'
 
-const router = useRouter()
 const route = useRoute()
 const notifyStore = useNotificationStore()
-const qStore = useQuestionsStore()
 
 // 记单词流程（/word/*）显示虚拟人陪练
 // 虚拟人出现在 记单词 与 分层阅读 两个英语模块（阅读页用它的查词/解句/朗读入口）
@@ -82,15 +49,6 @@ const petApiBase = import.meta.env.PROD ? '' : 'http://127.0.0.1:8080'
 
 // 开局动画只在首次进入时展示
 const showSplash = ref(true)
-
-function goPractice() {
-  notifyStore.dismissResult()
-  if (qStore.questions.length > 0) {
-    router.push('/question-bank')
-  } else {
-    router.push('/')
-  }
-}
 </script>
 
 <style>
@@ -126,8 +84,8 @@ function goPractice() {
   -webkit-backdrop-filter: blur(12px);
   border-radius: 16px;
   padding: 14px 24px;
-  border: 1px solid rgba(0, 245, 255, 0.3);
-  box-shadow: 0 4px 24px rgba(0, 245, 255, 0.2);
+  border: 1px solid var(--edge-accent);
+  box-shadow: var(--bar-shadow);
   text-align: center;
   min-width: 220px;
 }
@@ -136,8 +94,8 @@ function goPractice() {
   display: inline-block;
   width: 16px;
   height: 16px;
-  border: 2px solid rgba(0, 245, 255, 0.2);
-  border-top-color: #00f5ff;
+  border: 2px solid var(--track-accent);
+  border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
   margin-right: 8px;
@@ -153,7 +111,7 @@ function goPractice() {
 .glb-sub {
   display: block;
   font-size: 11px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   margin-top: 4px;
 }
 
@@ -164,154 +122,5 @@ function goPractice() {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
-}
-
-/* 生成完成弹窗 - 赛博风 */
-.complete-dialog-overlay {
-  position: fixed;
-  inset: 0;
-  background: var(--scrim);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  z-index: 4000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  animation: fadeIn 0.3s ease;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.complete-dialog {
-  position: relative;
-  background: var(--surface-solid);
-  border: 1px solid rgba(0, 245, 255, 0.3);
-  border-radius: 20px;
-  padding: 32px 24px 24px;
-  max-width: 360px;
-  width: 100%;
-  box-shadow: 0 0 40px rgba(0, 245, 255, 0.2), 0 20px 60px rgba(0, 0, 0, 0.5);
-  animation: dialogPop 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  overflow: hidden;
-}
-
-@keyframes dialogPop {
-  from { opacity: 0; transform: scale(0.9) translateY(20px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
-}
-
-.dialog-accent-line {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, #00f5ff, #ff00ff);
-}
-
-.dialog-icon {
-  font-size: 48px;
-  text-align: center;
-  margin-bottom: 12px;
-  filter: drop-shadow(0 0 12px rgba(0, 245, 255, 0.5));
-}
-
-.dialog-title {
-  font-family: 'Orbitron', 'Courier New', monospace;
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text-primary);
-  text-align: center;
-  margin-bottom: 20px;
-  letter-spacing: 2px;
-}
-
-.dialog-stats {
-  display: flex;
-  justify-content: space-around;
-  margin-bottom: 16px;
-  padding: 16px 0;
-  border-top: 1px solid rgba(0, 245, 255, 0.1);
-  border-bottom: 1px solid rgba(0, 245, 255, 0.1);
-}
-
-.ds-item {
-  text-align: center;
-}
-
-.ds-num {
-  display: block;
-  font-family: 'Orbitron', 'Courier New', monospace;
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 4px;
-}
-
-.ds-num.cyan {
-  color: #00f5ff;
-  text-shadow: 0 0 10px rgba(0, 245, 255, 0.5);
-}
-
-.ds-num.magenta {
-  color: #ff00ff;
-  text-shadow: 0 0 10px rgba(255, 0, 255, 0.5);
-}
-
-.ds-label {
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-.dialog-warning {
-  font-size: 12px;
-  color: var(--warning);
-  text-align: center;
-  margin-bottom: 16px;
-  line-height: 1.5;
-}
-
-.dialog-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.cyber-btn {
-  width: 100%;
-  height: 44px;
-  border: none;
-  border-radius: 12px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  font-family: 'Noto Sans SC', sans-serif;
-}
-
-.cyber-btn.primary {
-  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
-  color: var(--accent-contrast);
-  box-shadow: 0 4px 16px rgba(0, 245, 255, 0.3);
-}
-
-.cyber-btn.primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 28px rgba(0, 245, 255, 0.5);
-}
-
-.cyber-btn.ghost {
-  background: transparent;
-  color: var(--accent);
-  border: 1px solid rgba(0, 245, 255, 0.4);
-}
-
-.cyber-btn.ghost:hover {
-  background: rgba(0, 245, 255, 0.1);
-  border-color: #00f5ff;
 }
 </style>

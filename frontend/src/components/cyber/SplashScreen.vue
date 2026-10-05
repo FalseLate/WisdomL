@@ -77,7 +77,7 @@ onMounted(() => {
 .splash-screen {
   position: fixed;
   inset: 0;
-  background: #0a0a0f;
+  background: var(--surface-solid);
   z-index: 9999;
   display: flex;
   flex-direction: column;
@@ -100,7 +100,7 @@ onMounted(() => {
   position: absolute;
   width: 28px;
   height: 28px;
-  border-color: #00f5ff;
+  border-color: var(--accent);
   opacity: 0.6;
 }
 .splash-corner.tl { top: 24px; left: 24px; border-top: 2px solid; border-left: 2px solid; }
@@ -114,8 +114,8 @@ onMounted(() => {
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(90deg, transparent, #00f5ff, transparent);
-  box-shadow: 0 0 12px #00f5ff;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  box-shadow: 0 0 12px var(--accent);
   opacity: 0.5;
   animation: scanMove 2s linear infinite;
 }
@@ -135,14 +135,14 @@ onMounted(() => {
 }
 
 .splash-logo .zhi {
-  color: #00f5ff;
-  text-shadow: 0 0 20px rgba(0, 245, 255, 0.6), 0 0 40px rgba(0, 245, 255, 0.3);
+  color: var(--accent);
+  text-shadow: 0 0 20px rgb(var(--accent-rgb) / 0.6), 0 0 40px rgb(var(--accent-rgb) / 0.3);
   animation: logoPulse 1.5s ease-in-out infinite;
 }
 
 .splash-logo .xi {
-  color: #ff00ff;
-  text-shadow: 0 0 20px rgba(255, 0, 255, 0.6), 0 0 40px rgba(255, 0, 255, 0.3);
+  color: var(--secondary);
+  text-shadow: 0 0 20px rgb(var(--secondary-rgb) / 0.6), 0 0 40px rgb(var(--secondary-rgb) / 0.3);
   animation: logoPulse 1.5s ease-in-out 0.3s infinite;
 }
 
@@ -155,7 +155,7 @@ onMounted(() => {
   font-family: 'Orbitron', 'Courier New', monospace;
   font-size: 10px;
   letter-spacing: 4px;
-  color: #555566;
+  color: var(--text-muted);
   margin-bottom: 40px;
   text-transform: uppercase;
 }
@@ -171,28 +171,28 @@ onMounted(() => {
   font-family: 'Orbitron', 'Courier New', monospace;
   font-size: 9px;
   letter-spacing: 2px;
-  color: #555566;
+  color: var(--text-muted);
   margin-bottom: 8px;
   text-transform: uppercase;
 }
 
 .splash-progress-label .percent {
-  color: #00f5ff;
+  color: var(--accent);
 }
 
 .splash-progress-bar {
   width: 100%;
   height: 3px;
-  background: rgba(0, 245, 255, 0.1);
+  background: rgb(var(--accent-rgb) / 0.1);
   border-radius: 2px;
   overflow: hidden;
 }
 
 .splash-progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #00f5ff, #ff00ff);
+  background: linear-gradient(90deg, var(--accent), var(--secondary));
   border-radius: 2px;
-  box-shadow: 0 0 10px #00f5ff;
+  box-shadow: 0 0 10px var(--accent);
   transition: width 0.1s linear;
   position: relative;
 }
@@ -204,7 +204,7 @@ onMounted(() => {
   top: 0;
   width: 20px;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6));
+  background: linear-gradient(90deg, transparent, rgb(var(--overlay-rgb) / 0.6));
   filter: blur(2px);
 }
 
@@ -213,7 +213,7 @@ onMounted(() => {
   font-family: 'Orbitron', 'Courier New', monospace;
   font-size: 9px;
   letter-spacing: 2px;
-  color: #555566;
+  color: var(--text-muted);
   height: 14px;
   text-transform: uppercase;
 }

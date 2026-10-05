@@ -11,7 +11,7 @@
         <div class="summary-info">
           <div class="summary-name">{{ book.name }}</div>
           <div class="summary-sub">{{ book.wordCount }}词 · 核心词汇</div>
-          <van-progress :percentage="progressPct" stroke-width="8" :show-pivot="false" color="#4F7CFF" track-color="rgba(255,255,255,0.08)" />
+          <van-progress :percentage="progressPct" stroke-width="8" :show-pivot="false" color="var(--indigo)" track-color="rgb(var(--overlay-rgb) / 0.08)" />
           <div class="summary-progress">
             <span>已背单词</span>
             <span>{{ myProgress.learned }}/{{ myProgress.total }}</span>
@@ -195,7 +195,7 @@ function goStudy(mode) {
 }
 
 .cover-text {
-  color: #fff;
+  color: var(--text-on-solid-brand);
   font-size: 17px;
   font-weight: 800;
   line-height: 1.4;

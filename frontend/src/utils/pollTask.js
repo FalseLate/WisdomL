@@ -1,37 +1,42 @@
 import request from './request.js'
 
 /**
- * 轮询任务状态
- * @param {string} taskId - 后端返回的任务ID
- * @param {number} intervalMs - 轮询间隔（毫秒），默认2秒
- * @param {number} maxAttempts - 最大轮询次数，默认150次（约5分钟）
- * @returns {Promise<object>} - 最终任务结果
+ * 轮询后端异步任务直到完成。
+ *
+ * @param {string} taskId 后端任务 ID
+ * @param {Object} [opts]
+ * @param {number} [opts.intervalMs=2000] 轮询间隔
+ * @param {number} [opts.maxMs=180000]     总时长上限（3 分钟，超过就是真出问题了，别静默挂着）
+ * @param {number} [opts.maxErrors=5]      连续网络失败次数上限（旧版只 console.warn 会一路吞到 5 分钟）
+ * @param {AbortSignal} [opts.signal]      调用方组件卸载时 abort，避免离开页面后还在轮询、以及"回来发现什么都没弹"
+ * @returns {Promise<object>} 完成时的任务结果
  */
-export function pollTask(taskId, intervalMs = 2000, maxAttempts = 150) {
+export function pollTask(taskId, { intervalMs = 2000, maxMs = 180000, maxErrors = 5, signal = null } = {}) {
   return new Promise((resolve, reject) => {
-    let attempts = 0
+    if (!taskId) { reject(new Error('任务创建失败：后端没有返回任务 ID')); return }
 
-    const timer = setInterval(async () => {
-      attempts++
-      if (attempts > maxAttempts) {
-        clearInterval(timer)
-        reject(new Error('任务超时，请稍后重试'))
-        return
-      }
+    const startedAt = Date.now()
+    let errors = 0
+    let timer = null
 
+    const stop = () => { if (timer) clearInterval(timer); timer = null }
+    const fail = (msg) => { stop(); reject(new Error(msg)) }
+
+    if (signal) {
+      if (signal.aborted) { fail('已取消生成'); return }
+      signal.addEventListener('abort', () => fail('已取消生成'), { once: true })
+    }
+
+    timer = setInterval(async () => {
+      if (Date.now() - startedAt > maxMs) { fail(`生成超时（超过 ${Math.round(maxMs / 60000)} 分钟），请稍后重试`); return }
       try {
         const data = await request.get('/task/' + taskId)
-
-        if (data.status === 'completed') {
-          clearInterval(timer)
-          resolve(data)
-        } else if (data.status === 'failed') {
-          clearInterval(timer)
-          reject(new Error(data.error || '任务失败'))
-        }
-        // pending 或 running → 继续轮询
+        errors = 0
+        if (data.status === 'completed') { stop(); resolve(data); return }
+        if (data.status === 'failed') { stop(); reject(new Error(data.error || '任务失败')); return }
+        // pending / running → 继续等
       } catch (e) {
-        console.warn('轮询出错，继续重试:', e.message)
+        if (++errors >= maxErrors) { fail(`查询任务状态连续失败：${e.message || e}`); return }
       }
     }, intervalMs)
   })

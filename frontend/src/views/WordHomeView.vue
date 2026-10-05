@@ -174,10 +174,10 @@ function goContinue() {
   padding: 22px 18px;
   border-radius: 16px;
   background:
-    linear-gradient(135deg, rgba(0, 245, 255, 0.08), rgba(255, 0, 255, 0.06)),
+    linear-gradient(135deg, rgb(var(--accent-rgb) / 0.08), rgb(var(--secondary-rgb) / 0.06)),
     var(--bg-card);
-  border: 1px solid rgba(0, 245, 255, 0.35);
-  color: #fff;
+  border: 1px solid rgb(var(--accent-rgb) / 0.35);
+  color: var(--text-on-brand);
   overflow: hidden;
   box-shadow: inset 0 0 30px rgba(0, 245, 255, 0.05), 0 0 24px rgba(0, 245, 255, 0.08);
 }
@@ -202,7 +202,7 @@ function goContinue() {
   width: 150px;
   height: 150px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(0, 245, 255, 0.22), transparent 70%);
+  background: radial-gradient(circle, rgb(var(--accent-rgb) / 0.22), transparent 70%);
 }
 
 .banner-title {
@@ -212,7 +212,7 @@ function goContinue() {
   font-size: 17px;
   font-weight: 800;
   letter-spacing: 2px;
-  background: linear-gradient(90deg, #00f5ff, #ff00ff);
+  background: linear-gradient(90deg, var(--accent), var(--secondary));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -223,7 +223,7 @@ function goContinue() {
   z-index: 1;
   margin-top: 8px;
   font-size: 13px;
-  color: rgba(232, 232, 240, 0.72);
+  color: rgb(var(--paper-rgb) / 0.72);
   letter-spacing: 1px;
 }
 
@@ -234,7 +234,7 @@ function goContinue() {
   z-index: 1;
   font-family: var(--font-display);
   font-size: 11px;
-  color: rgba(0, 245, 255, 0.6);
+  color: var(--accent-dim);
   letter-spacing: 1px;
 }
 
@@ -264,7 +264,7 @@ function goContinue() {
   position: absolute;
   width: 14px;
   height: 14px;
-  border: 2px solid rgba(0, 245, 255, 0.55);
+  border: 2px solid rgb(var(--accent-rgb) / 0.55);
   transition: all var(--transition-fast);
 }
 
@@ -297,13 +297,13 @@ function goContinue() {
 
 /* 第二张卡用品红系，与青色形成撞色 */
 .entry-card.accent {
-  background: linear-gradient(135deg, rgba(255, 0, 255, 0.07), rgba(0, 245, 255, 0.05));
+  background: linear-gradient(135deg, rgb(var(--secondary-rgb) / 0.07), rgb(var(--accent-rgb) / 0.05));
   border-color: var(--secondary-border);
 }
 
 .entry-card.accent::before,
 .entry-card.accent::after {
-  border-color: rgba(255, 0, 255, 0.55);
+  border-color: rgb(var(--secondary-rgb) / 0.55);
 }
 
 .entry-card.accent:hover {
@@ -402,7 +402,7 @@ function goContinue() {
   margin-top: 20px;
   padding: 16px 0;
   background:
-    linear-gradient(135deg, rgba(0, 245, 255, 0.04), rgba(255, 0, 255, 0.03)),
+    linear-gradient(135deg, rgb(var(--accent-rgb) / 0.04), rgb(var(--secondary-rgb) / 0.03)),
     var(--bg-card);
   border: 1px solid var(--accent-border);
   border-radius: 16px;
@@ -441,7 +441,7 @@ function goContinue() {
 
 /* 底部导航：深空玻璃 + 霓虹高亮（覆盖 van-tabbar 默认白底） */
 .word-tabbar {
-  --van-tabbar-background: rgba(10, 10, 15, 0.88);
+  --van-tabbar-background: rgb(var(--ink-rgb) / 0.88);
   background: var(--van-tabbar-background);
   backdrop-filter: blur(12px);
   border-top: 1px solid var(--accent-border);

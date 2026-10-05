@@ -313,8 +313,8 @@ onMounted(async () => {
 }
 
 .sentence.long {
-  background: rgba(249, 115, 22, 0.14);
-  border-bottom: 2px solid #f97316;
+  background: rgb(var(--orange-rgb) / 0.14);
+  border-bottom: 2px solid var(--orange);
   border-radius: 4px;
   padding: 1px 2px;
 }
@@ -330,7 +330,7 @@ onMounted(async () => {
 
 /* 生词本命中词：标黄 + 虚线下划线 */
 .word.in-vocab {
-  background: rgba(255, 193, 7, 0.28);
+  background: rgb(var(--amber-rgb) / 0.28);
   box-shadow: inset 0 -2px 0 rgba(255, 152, 0, 0.55);
   border-radius: 3px;
 }
@@ -523,6 +523,6 @@ onMounted(async () => {
 .rate-pill.active {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--accent-contrast);
 }
 </style>

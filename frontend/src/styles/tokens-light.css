@@ -1,0 +1,152 @@
+/* ============================================================
+   浅色 token 表
+   取值依据：Vercel Geist 浅色（画布 #FAFAFA / 卡片 #FFF / 正文 #171717 / 次级 #4D4D4D，
+   层次用 ring shadow 而非发光）与 Linear 2026 改版说明（中性灰从偏冷蓝转向"仍清脆但更低饱和"的暖灰）。
+   深色靠霓虹发光分层，浅色必须换成中性描边 + 极轻阴影，强调色只点缀在可操作处。
+   与 tokens-dark.css 一一对应：少一个变量就是浅色的一处漏跟随。
+   ============================================================ */
+:root[data-theme="light"] {
+  /* 背景 */
+  --bg-base: #fafafa;
+  --bg-elevated: #ffffff;
+  --bg-hover: rgba(0, 0, 0, 0.04);
+  --bg-card: #ffffff;
+  --surface-bar: rgba(255, 255, 255, 0.92);
+  --surface-solid: #ffffff;
+  --accent-contrast: #ffffff;
+  --hairline: rgba(0, 0, 0, 0.08);
+  --scrim: rgba(15, 23, 32, 0.32);
+
+  --edge-accent: rgba(0, 0, 0, 0.1);
+  --track-accent: rgba(10, 101, 112, 0.2);
+  --bar-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  --btn-primary-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+  --btn-primary-shadow-hover: 0 6px 16px rgba(0, 0, 0, 0.22);
+  --btn-gradient-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  --btn-gradient-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.16);
+
+  --icon-rest-opacity: 0.75;
+
+  --success-deep: #085c33;
+  --danger-deep: #8f1d18;
+  --warning-deep: #5f4700;
+  --success-border: rgba(10, 107, 60, 0.35);
+  --danger-border: rgba(179, 38, 30, 0.35);
+  --warning-border: rgba(122, 92, 0, 0.35);
+
+  /* 首页大标题：浅底必须换成深色阶，否则第一行直接看不见 */
+  --hero-from: #171717;
+  --hero-mid: #0a6570;
+
+  --accent: #0a6570;
+  --accent-soft: rgba(10, 101, 112, 0.1);
+  --accent-border: rgba(0, 0, 0, 0.1);
+  --accent-glow: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.05);
+  /* deep 一律是"比 accent 更暗"的一端：浅色若取更亮的青，白字渐变会掉到 4.5:1 边缘 */
+  --accent-deep: #07525c;
+  --secondary-deep: #6a1a6c;
+
+  --secondary: #7d2a80;
+  --secondary-soft: rgba(125, 42, 128, 0.08);
+  --secondary-border: rgba(0, 0, 0, 0.1);
+
+  --success: #0a6b3c;
+  --success-soft: rgba(10, 107, 60, 0.1);
+  --warning: #7a5c00;
+  --warning-soft: rgba(122, 92, 0, 0.1);
+  --danger: #b3261e;
+  --danger-soft: rgba(179, 38, 30, 0.1);
+
+  --text-primary: #171717;
+  --text-secondary: #4d4d4d;
+  --text-muted: #6b6b6b;
+
+  /* ---------- 效果层：浅色不靠发光，靠描边与实心环 ---------- */
+  --grid-line: rgba(0, 0, 0, 0.035);
+  --nav-bar-bg: rgba(255, 255, 255, 0.9);
+  --nav-bar-border: rgba(0, 0, 0, 0.08);
+  /* Geist 的 ring shadow：0 0 0 1px 承担描边且不产生布局位移，再叠一层极轻环境阴影 */
+  --elev-card: 0 0 0 1px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-tutorial: var(--elev-card);
+  /* 游标要一眼可辨：外发光换成同心实环 */
+  --ring-cycle: 0 0 0 2px var(--accent-soft), 0 0 0 3px var(--accent);
+  --ring-scan: 0 0 0 3px var(--success-soft);
+  /* 关键帧也吃 token：浅色脉冲是"环在扩散"，不是"光在呼吸" */
+  --pulse-lo: 0 0 0 2px var(--success-soft);
+  --pulse-hi: 0 0 0 5px var(--success-soft);
+  --shadow-bar: 0 1px 3px rgba(0, 0, 0, 0.12);
+  --shadow-submit: 0 1px 3px rgba(0, 0, 0, 0.12);
+  --shadow-submit-hover: 0 4px 12px rgba(0, 0, 0, 0.18);
+  /* 照片、彩色封面这类"图片永远不是页面底色"的表面上的遮罩与文字：两主题都保持深底白字 */
+  --scrim-on-image: rgba(0, 0, 0, 0.7);
+}
+
+/* ============================================================
+   队友品牌色的浅色版：同色相但加深到白底 AA（≥4.5:1）。
+   三元组用于 wash/border（浅色 = 深色调的半透明，落在白底上是干净的淡色块），
+   -text 用于文字（直接给加深后的实色）。
+   ============================================================ */
+:root[data-theme="light"] {
+  --accent-rgb: 10 101 112;
+  --accent-dim: #0a6570;
+  --secondary-rgb: 125 42 128;
+  --danger-rgb: 179 38 30;
+  /* 紫罗兰 #a78bfa(2.9:1) → #6d28d9(6.9:1) */
+  --violet: #6d28d9;
+  --violet-rgb: 109 40 217;
+  --violet-text: #6d28d9;
+  --violet-soft-text: #6d28d9;
+  --purple-rgb: 109 40 217;
+  --purple-deep-rgb: 91 33 182;
+  /* 天蓝 #38bdf8(2.5:1) → #0369a1(5.6:1) */
+  --sky-rgb: 3 105 161;
+  --sky-text: #0369a1;
+  --indigo-rgb: 29 78 216;
+  /* 翠绿 #34d399(2.6:1) → #047857(5.3:1) */
+  --emerald-rgb: 4 120 87;
+  --emerald-text: #047857;
+  --emerald-soft-text: #047857;
+  /* 橙 #f97316(3.0:1) → #c2410c(5.0:1) */
+  --orange: #c2410c;
+  --orange-rgb: 194 65 12;
+  --orange-text: #c2410c;
+  --orange-soft-rgb: 194 65 12;
+  --orange-soft-text: #c2410c;
+  /* 珊瑚红 #f87171(3.0:1) → #b3261e(6.9:1) */
+  --coral-rgb: 179 38 30;
+  --coral-text: #b3261e;
+  --amber-rgb: 138 109 0;
+  /* 他们写死的深色面板底 / 浅色文字，在浅底上要反过来 */
+  --ink-rgb: 255 255 255;
+  --paper-rgb: 23 23 23;
+  /* 浅色里品牌底本身变浅，所以品牌底上的文字改深；叠加层从"加白"变"加黑" */
+  --text-on-brand: #171717;
+  --overlay-rgb: 0 0 0;
+  --indigo: #1d4ed8;
+  --warning-rgb: 122 92 0;
+  --success-rgb: 10 107 60;
+  --secondary-bright: #7d2a80;
+  --text-on-solid-brand: #ffffff;
+  --spinner-track: rgba(255, 255, 255, 0.45);
+  --tag-single: #3730a3;
+  --tag-single-rgb: 55 48 163;
+  --tag-single-text: #3730a3;
+  --tag-multiple: #6d28d9;
+  --tag-multiple-rgb: 109 40 217;
+  --tag-multiple-text: #6d28d9;
+  --tag-subjective: #c2410c;
+  --tag-subjective-rgb: 194 65 12;
+  --tag-subjective-text: #c2410c;
+}
+
+/* GestureHUD 浅色版：外框换成白玻璃，视口内的骨架反而提亮（压在摄像画面上要够跳） */
+:root[data-theme="light"] {
+  --hud-shadow: 0 6px 20px rgba(0, 0, 0, 0.14), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  --hud-dim: #8a8a8a;
+  --hud-off: #d4d4d4;
+  --hud-error: #c2410c;
+  --hud-debug-text: #5a6b7a;
+  --hud-armed-text: #7a5c00;
+  --hud-skel-line: #7df9ff;
+  --hud-skel-joint: #ff9bf0;
+}

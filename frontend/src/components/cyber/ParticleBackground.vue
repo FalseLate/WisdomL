@@ -12,6 +12,8 @@ const isLoaded = ref(false)
 let particlesInstance = null
 let loadRetries = []
 let unsubSettings = null
+/** 上一次真正生效的档位，用于跳过重复的销毁重建 */
+let currentMode = null
 /** 在飞的 load() 可能在 teardown() 之后才落地，用世代号丢弃过期容器 */
 let generation = 0
 
@@ -23,6 +25,10 @@ const PALETTE = {
 
 function applyMode() {
   const mode = motionMode()          // 'off' | 'calm' | 'neon'
+  // 同档位直接跳过：onSettingsChange 在任意设置落盘时都会回调，
+  // 不做短路的会在"加载还在飞"时再 load 一次，然后被世代号丢弃 —— 白闪一下
+  if (mode === currentMode) return
+  currentMode = mode
   if (mode === 'off') { teardown(); return }
   if (particlesInstance) { teardown(); }
   start(mode)
@@ -34,7 +40,10 @@ function start(mode) {
   let tries = 0
   const timer = setInterval(() => {
     if (window.tsParticles) { clearInterval(timer); initParticles(mode) }
-    else if (++tries >= 3) { clearInterval(timer); isLoaded.value = true }
+    else if (++tries >= 3) {
+      clearInterval(timer); isLoaded.value = true
+      currentMode = null   // 放弃过一次，下次设置变化还要允许重试
+    }
   }, 300)
   loadRetries.push(timer)
 }
@@ -141,8 +150,10 @@ function initParticles(mode) {
     // retina_detect 只吃布尔（实测 v2.12 的 {enable,value:{max}} 对象形式被忽略，pixelRatio 仍等于设备 DPR）。
     // 3 倍屏手机开 retina = 9 倍像素填充，是移动端最大开销；DPR>2 的设备直接按 1x 画（2px 圆点+1px 连线看不出差别）
     retina_detect: (window.devicePixelRatio || 1) <= 2,
-    // v1 的 fps_limit 也能被兼容层认出来，但按 v2 正名写；实测此前满帧跑是因为限帧窗口太宽
-    fpsLimit: 60
+    // v1 的 fps_limit 也能被兼容层认出来，但按 v2 正名写。
+    // 120 只在 120Hz 屏上真的更顺（60Hz 屏仍然被 vsync 卡在 60，不会变快也不会变慢）；
+    // 代价是高刷屏上绘制次数翻倍，所以 DPR>2 的手机依旧按 1x 画来抵消填充
+    fpsLimit: 120
   }).then(container => {
     // 期间可能已经切过档并 teardown()：丢弃这个过期容器，否则它会带着旧配色复活
     if (gen !== generation) {

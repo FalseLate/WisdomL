@@ -66,21 +66,21 @@ const customStyle = computed(() => {
 /* success 绿色 */
 .cyber-tag.success {
   color: var(--success);
-  background: rgba(0, 255, 136, 0.1);
-  border-color: rgba(0, 255, 136, 0.3);
+  background: var(--success-soft);
+  border-color: var(--success-border);
 }
 
 /* warning 黄色 */
 .cyber-tag.warning {
   color: var(--warning);
-  background: rgba(249, 240, 2, 0.1);
-  border-color: rgba(249, 240, 2, 0.3);
+  background: var(--warning-soft);
+  border-color: var(--warning-border);
 }
 
 /* danger 红色 */
 .cyber-tag.danger {
   color: var(--danger);
-  background: rgba(255, 68, 68, 0.1);
-  border-color: rgba(255, 68, 68, 0.3);
+  background: var(--danger-soft);
+  border-color: var(--danger-border);
 }
 </style>

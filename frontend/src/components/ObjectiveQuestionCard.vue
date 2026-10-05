@@ -238,7 +238,7 @@ defineExpose({
 .fav-btn {
   font-size: 18px;
   cursor: pointer;
-  opacity: 0.5;
+  opacity: var(--icon-rest-opacity);
   transition: all 0.2s;
 }
 

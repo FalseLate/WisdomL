@@ -1,114 +1,9 @@
-/* ===== 赛博朋克全局设计变量 (taste-skill: one palette, one radius system) ===== */
-:root {
-  /* 背景 */
-  --bg-base: #0a0a0f;
-  --bg-elevated: rgba(255, 255, 255, 0.03);
-  --bg-hover: rgba(0, 245, 255, 0.06);
-  --bg-card: rgba(255, 255, 255, 0.04);
-  /* 导航/标签栏底、不透明面板底、强调色之上的文字色、发丝分隔线 */
-  --surface-bar: rgba(10, 10, 15, 0.92);
-  --surface-solid: #0a0a0f;
-  --accent-contrast: #000;
-  --hairline: rgba(0, 245, 255, 0.15);
-  /* 弹窗遮罩：浅底上纯黑 70% 会压成脏灰，浅色分支减淡 */
-  --scrim: rgba(0, 0, 0, 0.7);
-  --success-deep: #00cc6a;
-  --danger-deep: #cc0000;
-  --warning-deep: #e0d000;
-  --success-border: rgba(0, 255, 136, 0.3);
-  --danger-border: rgba(255, 68, 68, 0.4);
-  --warning-border: rgba(249, 240, 2, 0.3);
-  /* 首页大标题的白→浅青渐变：浅底必须换成深色阶，否则第一行直接看不见 */
-  --hero-from: #ffffff;
-  --hero-mid: #a0faff;
-
-  /* 主色：霓虹青 */
-  --accent: #00f5ff;
-  --accent-soft: rgba(0, 245, 255, 0.15);
-  --accent-border: rgba(0, 245, 255, 0.2);
-  --accent-glow: 0 0 12px rgba(0, 245, 255, 0.4), 0 0 32px rgba(0, 245, 255, 0.15);
-  --accent-deep: #00c8d4;
-  --secondary-deep: #cc00cc;
-
-  /* 辅色：品红 */
-  --secondary: #ff00ff;
-  --secondary-soft: rgba(255, 0, 255, 0.12);
-  --secondary-border: rgba(255, 0, 255, 0.2);
-
-  /* 状态色 */
-  --success: #00ff88;
-  --success-soft: rgba(0, 255, 136, 0.12);
-  --warning: #f9f002;
-  --warning-soft: rgba(249, 240, 2, 0.12);
-  --danger: #ff4444;
-  --danger-soft: rgba(255, 68, 68, 0.12);
-
-  /* 文字 */
-  --text-primary: #e8e8f0;
-  --text-secondary: #8a8a9a;
-  --text-muted: #555566;
-
-  /* 圆角统一 (taste-skill: shape consistency lock) */
-  --radius-card: 16px;
-  --radius-button: 12px;
-  --radius-pill: 999px;
-  --radius-sm: 8px;
-
-  /* 字体 */
-  --font-display: 'Orbitron', 'Courier New', monospace;
-  --font-body: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-
-  /* 动效 */
-  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --transition-fast: 0.2s var(--ease-out);
-  --transition-normal: 0.35s var(--ease-out);
-}
-
-/* ===== 浅色主题（全站） =====
-   取值依据：Vercel Geist 浅色（画布 #FAFAFA / 卡片 #FFF / 正文 #171717 / 次级 #4D4D4D，
-   层次用 ring shadow 而非描边）与 Linear 2026 改版说明（中性灰从偏冷蓝调转向"仍清脆但更低饱和"的暖灰）。
-   深色那版靠霓虹发光分层，浅色必须换成中性描边 + 极轻阴影，强调色只点缀在可操作处。 */
-:root[data-theme="light"] {
-  --bg-base: #fafafa;
-  --bg-elevated: #ffffff;
-  --bg-hover: rgba(0, 0, 0, 0.04);
-  --bg-card: #ffffff;
-  --surface-bar: rgba(255, 255, 255, 0.92);
-  --surface-solid: #ffffff;
-  --accent-contrast: #ffffff;
-  --hairline: rgba(0, 0, 0, 0.08);
-  --scrim: rgba(15, 23, 32, 0.32);
-  --success-deep: #085c33;
-  --danger-deep: #8f1d18;
-  --warning-deep: #5f4700;
-  --success-border: rgba(10, 107, 60, 0.35);
-  --danger-border: rgba(179, 38, 30, 0.35);
-  --warning-border: rgba(122, 92, 0, 0.35);
-  --hero-from: #171717;
-  --hero-mid: #0a6570;
-
-  --accent: #0a6570;
-  --accent-soft: rgba(10, 101, 112, 0.1);
-  --accent-border: rgba(0, 0, 0, 0.1);
-  --accent-glow: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.05);
-  --accent-deep: #0d8291;
-  --secondary-deep: #6a1a6c;
-
-  --secondary: #7d2a80;
-  --secondary-soft: rgba(125, 42, 128, 0.08);
-  --secondary-border: rgba(0, 0, 0, 0.1);
-
-  --success: #0a6b3c;
-  --success-soft: rgba(10, 107, 60, 0.1);
-  --warning: #7a5c00;
-  --warning-soft: rgba(122, 92, 0, 0.1);
-  --danger: #b3261e;
-  --danger-soft: rgba(179, 38, 30, 0.1);
-
-  --text-primary: #171717;
-  --text-secondary: #4d4d4d;
-  --text-muted: #6b6b6b;
-}
+/* ============================================================
+   全局结构样式（taste-skill: one palette, one radius system）
+   颜色/阴影/圆角/字体一律来自 token，两张 token 表在：
+     styles/tokens-dark.css（深色，主形态）  styles/tokens-light.css（浅色）
+   本文件不允许出现裸 hex —— 由 npm run theme:check 把关。
+   ============================================================ */
 
 /* ===== 全局重置 ===== */
 * {
@@ -132,14 +27,29 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Vant 组件跟随主题：默认主色是 #1989fa 蓝，压在霓虹青主题上既跳、对比度又只有 3.5:1（两套主题都不达 AA），
+   统一换成我们的强调色（深色 14:1、浅色 6.5:1）。
+   两个必须一起改的坑：
+   ① 实心 primary 的文字默认写死白 → 白字压霓虹青只有 1.35:1；
+   ② plain 按钮的底色默认是纯白 var(--van-white)，主色一改就变成"白底青字"1.35:1，
+      而且白色孤岛压在深色页面上本来就不该存在 → 改成透明，只留描边与文字色。 */
+:root {
+  --van-primary-color: var(--accent);
+  --van-button-primary-background: var(--accent);
+  --van-button-primary-border-color: var(--accent);
+  --van-button-primary-color: var(--accent-contrast);
+  --van-button-plain-background: transparent;
+  --van-tabbar-item-text-color: var(--text-secondary);
+}
+
 /* 全局网格背景 (taste-skill: subtle, not decorative crosshair) */
 body::before {
   content: '';
   position: fixed;
   inset: 0;
   background-image:
-    linear-gradient(rgba(0, 245, 255, 0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 245, 255, 0.02) 1px, transparent 1px);
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
   background-size: 48px 48px;
   pointer-events: none;
   z-index: 0;
@@ -167,6 +77,7 @@ body::before {
   position: relative;
   overflow: hidden;
   transition: all var(--transition-normal);
+  box-shadow: var(--elev-card);
 }
 
 .card:hover {
@@ -180,19 +91,19 @@ body::before {
 .gradient-btn {
   background: linear-gradient(135deg, var(--accent), var(--secondary)) !important;
   border: none !important;
-  color: #000 !important;
+  color: var(--accent-contrast) !important;
   font-weight: 700 !important;
   height: 48px !important;
   font-size: 16px !important;
   letter-spacing: 2px !important;
   border-radius: var(--radius-pill) !important;
-  box-shadow: 0 4px 20px rgba(0, 245, 255, 0.3) !important;
+  box-shadow: var(--btn-gradient-shadow) !important;
   transition: all var(--transition-fast) !important;
 }
 
 .gradient-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 32px rgba(0, 245, 255, 0.5) !important;
+  box-shadow: var(--btn-gradient-shadow-hover) !important;
 }
 
 .gradient-btn:active {
@@ -268,6 +179,27 @@ body::before {
   background: var(--accent);
 }
 
+/* ===== 主题切换动画（View Transitions）=====
+   深浅是两套视觉语言，硬切会闪眼：从点击处做一次圆形扩散。
+   原点与半径由 utils/theme.js 写在 :root 的 --vt-x/--vt-y/--vt-r 上；
+   浏览器不支持或用户要求减少动效时，JS 直接跳过整个过渡，不做假动画。 */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-new(root) {
+    animation: theme-reveal 0.42s var(--ease-out) both;
+  }
+}
+
+@keyframes theme-reveal {
+  from { clip-path: circle(0 at var(--vt-x, 100%) var(--vt-y, 0)); }
+  to { clip-path: circle(var(--vt-r, 150vmax) at var(--vt-x, 100%) var(--vt-y, 0)); }
+}
+
 /* ===== 减少动效 (taste-skill: mandatory for motion > 3) ===== */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -277,14 +209,14 @@ body::before {
   }
 }
 
-/* ===== 全局顶栏（van-nav-bar）深色化：覆盖 Vant 默认白底，贴合赛博背景 ===== */
+/* ===== 全局顶栏（van-nav-bar）：颜色全部走 token，两主题各自取值 ===== */
 .van-nav-bar {
-  --van-nav-bar-background: rgba(18, 18, 28, 0.9);
-  --van-nav-bar-title-text-color: #e8e8f0;
-  --van-nav-bar-text-color: #00f5ff;
-  --van-nav-bar-icon-color: #00f5ff;
-  background: rgba(18, 18, 28, 0.9);
+  --van-nav-bar-background: var(--nav-bar-bg);
+  --van-nav-bar-title-text-color: var(--text-primary);
+  --van-nav-bar-text-color: var(--accent);
+  --van-nav-bar-icon-color: var(--accent);
+  background: var(--nav-bar-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(0, 245, 255, 0.2);
+  border-bottom: 1px solid var(--nav-bar-border);
 }

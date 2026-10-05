@@ -1,0 +1,21 @@
+/* ============================================================
+   与主题无关的不变量：圆角、字体、缓动曲线。
+   单独一份的用意：让 theme-check 能强制「tokens-dark 与 tokens-light 键集完全一致」——
+   少一个键就是浅色的一处漏跟随，而它只会"悄悄退回深色值"，肉眼最难发现。
+   ============================================================ */
+:root {
+  /* 圆角：一套 shape language，两主题共用 */
+  --radius-card: 16px;
+  --radius-button: 12px;
+  --radius-pill: 999px;
+  --radius-sm: 8px;
+
+  /* 字体 */
+  --font-display: 'Orbitron', 'Courier New', monospace;
+  --font-body: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  /* 动效 */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-fast: 0.2s var(--ease-out);
+  --transition-normal: 0.35s var(--ease-out);
+}

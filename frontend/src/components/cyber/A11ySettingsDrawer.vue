@@ -56,8 +56,8 @@
 
           <div class="drawer-foot">
             <span v-if="dirty" class="dirty-tip">● 有改动未应用</span>
-            <button class="cyber-btn primary" :disabled="!dirty" @click="apply">应用设置</button>
-            <button class="cyber-btn ghost" @click="restore">恢复默认</button>
+            <button class="drawer-btn primary" :disabled="!dirty" @click="apply">应用设置</button>
+            <button class="drawer-btn ghost" @click="restore">恢复默认</button>
           </div>
           <p class="note">改动需点「应用设置」才生效；全部设置仅存于浏览器本地，不上传服务器。</p>
         </div>
@@ -185,7 +185,7 @@ function close() {
   letter-spacing: 2px;
   text-shadow: 0 0 8px rgba(0, 245, 255, 0.5);
 }
-.drawer-close { cursor: pointer; color: var(--text-muted); font-size: 16px; }
+.drawer-close { cursor: pointer; color: var(--text-secondary); font-size: 16px; }
 .drawer-close:hover { color: var(--danger); }
 .drawer-body { overflow-y: auto; padding: 12px 18px 24px; flex: 1; }
 section { margin-bottom: 18px; }
@@ -206,7 +206,7 @@ h4 {
   font-size: 13px;
 }
 .row select, .row input[type="number"] { margin-left: auto; }
-.row.map code { min-width: 150px; color: var(--text-muted); font-size: 12px; }
+.row.map code { min-width: 150px; color: var(--text-secondary); font-size: 12px; }
 .row.map code em { font-style: normal; color: var(--accent); margin-left: 8px; }
 .grp { color: var(--secondary); font-size: 11px; margin-top: 8px; font-family: monospace; text-transform: uppercase; }
 select {
@@ -219,29 +219,51 @@ select {
 }
 input[type="checkbox"] { accent-color: var(--accent); width: 15px; height: 15px; }
 .drawer-foot { display: flex; align-items: center; gap: 12px; margin: 12px 0; flex-wrap: wrap; }
-.cyber-btn {
-  padding: 6px 16px;
-  background: var(--accent-soft);
+/* 底部按钮以前复用 App.vue 的全局 .cyber-btn：同名、同特异性，谁生效取决于样式打包顺序，
+   浅色下就出现过「应用设置」白字配白底完全看不见。现在类名独立、配色自持，顺序不再参与判定。 */
+.drawer-btn {
+  width: 100%;
+  height: 44px;
+  padding: 0 16px;
   border: 1px solid var(--accent-border);
+  border-radius: var(--radius-button);
+  background: var(--accent-soft);
   color: var(--accent);
-  border-radius: 4px;
-  cursor: pointer;
+  font-family: var(--font-body);
   font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
 }
-.cyber-btn:hover { background: var(--accent-soft); }
-.cyber-btn:disabled {
-  opacity: 0.4;
+.drawer-btn.primary {
+  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+  border-color: transparent;
+  color: var(--accent-contrast);
+  box-shadow: var(--btn-primary-shadow);
+}
+.drawer-btn.primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: var(--btn-primary-shadow-hover);
+}
+.drawer-btn.primary:disabled {
+  /* 以前靠 opacity:.4 表达禁用，浅底下等于白字淡底＝读不出来；
+     禁用感改成靠中性底色与文字色，两种主题都保证「应用设置」四个字可见 */
+  background: var(--bg-elevated);
+  border-color: var(--hairline);
+  color: var(--text-secondary);
+  box-shadow: none;
   cursor: not-allowed;
-  background: var(--bg-hover);
 }
-.cyber-btn.ghost {
+.drawer-btn.ghost {
   background: transparent;
   border-color: var(--secondary-border);
-  color: #ff66ff;
+  color: var(--secondary-bright);
 }
-.cyber-btn.ghost:hover { background: var(--secondary-soft); }
+.drawer-btn.ghost:hover { background: var(--secondary-soft); }
+/* 半亮品红在白底上对比不足（2.6:1），浅色换深紫红 */
+[data-theme="light"] .drawer-btn.ghost { color: var(--secondary); }
 .dirty-tip { color: var(--warning); font-size: 12px; margin-right: auto; }
-.note { color: var(--text-muted); font-size: 11px; line-height: 1.6; }
+.note { color: var(--text-secondary); font-size: 11px; line-height: 1.6; }
 </style>
 
 <style>
@@ -257,7 +279,10 @@ input[type="checkbox"] { accent-color: var(--accent); width: 15px; height: 15px;
 .a11y-confirm .van-dialog__confirm,
 .a11y-confirm .van-dialog__confirm:active { color: var(--accent); }
 .a11y-confirm .van-dialog__cancel,
-.a11y-confirm .van-dialog__cancel:active { color: #ff66ff; }
+.a11y-confirm .van-dialog__cancel:active { color: var(--secondary-bright); }
+/* 浅底上 #ff66ff 太亮，取消键换成可辨的深紫红 */
+[data-theme="light"] .a11y-confirm .van-dialog__cancel,
+[data-theme="light"] .a11y-confirm .van-dialog__cancel:active { color: var(--secondary); }
 .a11y-confirm.van-hairline--top::after { border-top-color: var(--hairline); }
 .a11y-toast { z-index: 10500 !important; }
 </style>

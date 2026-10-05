@@ -326,7 +326,7 @@ import { showFailToast, showSuccessToast, showConfirmDialog, showToast } from 'v
 import request from '../utils/request.js'
 import { classify } from '../utils/questionType.js'
 import { loadDraftStore, writeDraftAnswers, clearDraftStore } from '../utils/practiceDraft.js'
-import { appearance, toggleTheme } from '../utils/theme.js'
+import { appearance, toggleTheme, originFromEvent } from '../utils/theme.js'
 import GestureHUD from '../components/cyber/GestureHUD.vue'
 import { a11yPanelOpen } from '../a11y/settingsPanel.js'
 import ErrorTypeTagger from '../components/ErrorTypeTagger.vue'
@@ -738,7 +738,7 @@ function toggleGesture() {
 // ===== 背景主题切换（只作用于懒人模式作用域，队友页面不受影响）=====
 // 主题状态来自 theme.js 的单一来源，别页切换后这里不会变脏
 const isLight = computed(() => appearance.theme === 'light')
-function switchTheme() { toggleTheme() }
+function switchTheme(e) { toggleTheme(originFromEvent(e)) }
 
 function toggleScan() {
   if (!gestureEnabled.value) {
@@ -837,6 +837,7 @@ onUnmounted(() => {
   border: 1px solid var(--accent-border);
   border-radius: var(--radius-card);
   backdrop-filter: blur(12px);
+  box-shadow: var(--elev-card);
 }
 
 .lp-type-tag {
@@ -847,9 +848,9 @@ onUnmounted(() => {
   border-radius: var(--radius-pill);
   letter-spacing: 1px;
 }
-.lp-type-tag.type-single { background: rgba(102, 126, 234, 0.15); color: #667eea; border: 1px solid rgba(102, 126, 234, 0.3); }
-.lp-type-tag.type-multiple { background: rgba(153, 68, 255, 0.15); color: #9944ff; border: 1px solid rgba(153, 68, 255, 0.3); }
-.lp-type-tag.type-subjective { background: rgba(255, 140, 0, 0.15); color: #ff8c00; border: 1px solid rgba(255, 140, 0, 0.3); }
+.lp-type-tag.type-single { background: rgb(var(--tag-single-rgb) / 0.15); color: var(--tag-single-text); border: 1px solid rgb(var(--tag-single-rgb) / 0.3); }
+.lp-type-tag.type-multiple { background: rgb(var(--tag-multiple-rgb) / 0.15); color: var(--tag-multiple-text); border: 1px solid rgb(var(--tag-multiple-rgb) / 0.3); }
+.lp-type-tag.type-subjective { background: rgb(var(--tag-subjective-rgb) / 0.15); color: var(--tag-subjective-text); border: 1px solid rgb(var(--tag-subjective-rgb) / 0.3); }
 
 .lp-progress {
   font-family: var(--font-display);
@@ -937,6 +938,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   transition: all 0.3s var(--ease-out);
+  box-shadow: var(--elev-card);
 }
 
 .lp-card.card-enter {
@@ -974,6 +976,7 @@ onUnmounted(() => {
   border-radius: var(--radius-button);
   cursor: pointer;
   transition: all 0.2s var(--ease-out);
+  box-shadow: var(--elev-card);
 }
 
 .lp-option:hover {
@@ -994,7 +997,7 @@ onUnmounted(() => {
 
 .lp-option.wrong {
   border-color: var(--danger);
-  background: rgba(255, 68, 68, 0.1);
+  background: rgb(var(--danger-rgb) / 0.1);
 }
 
 .opt-key {
@@ -1017,7 +1020,7 @@ onUnmounted(() => {
 }
 
 .lp-option.wrong .opt-key {
-  background: rgba(255, 68, 68, 0.15);
+  background: rgb(var(--danger-rgb) / 0.15);
   color: var(--danger);
 }
 
@@ -1060,9 +1063,9 @@ onUnmounted(() => {
   margin-top: 12px;
   padding: 8px 12px;
   font-size: 12px;
-  color: #ff8c00;
-  background: rgba(255, 140, 0, 0.1);
-  border: 1px solid rgba(255, 140, 0, 0.3);
+  color: var(--tag-subjective-text);
+  background: rgb(var(--tag-subjective-rgb) / 0.1);
+  border: 1px solid rgb(var(--tag-subjective-rgb) / 0.3);
   border-radius: var(--radius-sm);
 }
 
@@ -1146,7 +1149,7 @@ onUnmounted(() => {
   letter-spacing: 2px;
   cursor: pointer;
   transition: all 0.25s var(--ease-out);
-  box-shadow: 0 4px 16px rgba(249, 240, 2, 0.3);
+  box-shadow: var(--shadow-submit);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1154,7 +1157,7 @@ onUnmounted(() => {
 }
 .lp-submit-btn:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 8px 28px rgba(249, 240, 2, 0.5);
+  box-shadow: var(--shadow-submit-hover);
 }
 .lp-submit-btn:disabled {
   opacity: 0.6;
@@ -1164,7 +1167,7 @@ onUnmounted(() => {
 .btn-spinner {
   width: 16px;
   height: 16px;
-  border: 2px solid rgba(0, 0, 0, 0.2);
+  border: 2px solid var(--spinner-track);
   border-top-color: var(--accent-contrast);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
@@ -1181,6 +1184,7 @@ onUnmounted(() => {
   border-radius: var(--radius-card);
   backdrop-filter: blur(12px);
   overflow: hidden;
+  box-shadow: var(--elev-card);
 }
 
 .lp-nav-toggle {
@@ -1222,9 +1226,9 @@ onUnmounted(() => {
   border: 1px solid;
 }
 
-.nav-dot.type-single { border-color: rgba(102, 126, 234, 0.3); color: #667eea; }
-.nav-dot.type-multiple { border-color: rgba(153, 68, 255, 0.3); color: #9944ff; }
-.nav-dot.type-subjective { border-color: rgba(255, 140, 0, 0.3); color: #ff8c00; }
+.nav-dot.type-single { border-color: rgb(var(--tag-single-rgb) / 0.3); color: var(--tag-single-text); }
+.nav-dot.type-multiple { border-color: rgb(var(--tag-multiple-rgb) / 0.3); color: var(--tag-multiple-text); }
+.nav-dot.type-subjective { border-color: rgb(var(--tag-subjective-rgb) / 0.3); color: var(--tag-subjective-text); }
 
 .nav-dot.done {
   background: var(--accent-soft);
@@ -1244,7 +1248,7 @@ onUnmounted(() => {
 }
 
 .nav-dot.wrong {
-  background: rgba(255, 68, 68, 0.15);
+  background: rgb(var(--danger-rgb) / 0.15);
   border-color: var(--danger);
   color: var(--danger);
 }
@@ -1291,6 +1295,7 @@ onUnmounted(() => {
   border: 1px solid var(--accent-border);
   border-radius: var(--radius-card);
   backdrop-filter: blur(12px);
+  box-shadow: var(--elev-card);
 }
 
 .result-title {
@@ -1346,9 +1351,9 @@ onUnmounted(() => {
   border: 1px solid var(--success-border);
 }
 .result-badge.wrong {
-  background: rgba(255, 68, 68, 0.15);
+  background: rgb(var(--danger-rgb) / 0.15);
   color: var(--danger);
-  border: 1px solid rgba(255, 68, 68, 0.3);
+  border: 1px solid rgb(var(--danger-rgb) / 0.3);
 }
 
 .lp-subjective-result {
@@ -1473,7 +1478,7 @@ onUnmounted(() => {
   padding: 24px;
   max-width: 340px;
   width: 100%;
-  box-shadow: 0 0 40px var(--accent-soft);
+    box-shadow: var(--shadow-tutorial);
 }
 
 .tutorial-title {
@@ -1531,11 +1536,11 @@ onUnmounted(() => {
 /* ===== 无障碍：步进选答/扫描游标高亮（霓虹风格） ===== */
 .lp-option.cycle-cursor {
   border-color: var(--accent);
-  box-shadow: 0 0 12px rgba(0, 245, 255, 0.35), inset 0 0 8px rgba(0, 245, 255, 0.12);
+  box-shadow: var(--ring-cycle);
 }
-.lp-option.scan-cursor, .lp-submit-btn.scan-cursor {
+.lp-option.scan-cursor, .lp-arrow.scan-cursor, .lp-submit-btn.scan-cursor {
   border: 2px solid var(--success);
-  box-shadow: 0 0 14px rgba(0, 255, 136, 0.4);
+  box-shadow: var(--ring-scan);
 }
 .cycle-badge {
   margin-left: auto;
@@ -1577,7 +1582,7 @@ onUnmounted(() => {
   background: var(--surface-bar);
   border: 1px solid var(--success-border);
   border-radius: 10px;
-  box-shadow: 0 0 18px rgba(0, 255, 136, 0.2);
+  box-shadow: var(--shadow-bar);
   backdrop-filter: blur(8px);
   font-family: 'Courier New', monospace;
 }
@@ -1622,8 +1627,8 @@ onUnmounted(() => {
   animation: scanPulse 0.9s ease-in-out infinite;
 }
 @keyframes scanPulse {
-  0%, 100% { box-shadow: 0 0 10px rgba(0, 255, 136, 0.35); }
-  50% { box-shadow: 0 0 22px rgba(0, 255, 136, 0.75); }
+  0%, 100% { box-shadow: var(--pulse-lo); }
+  50% { box-shadow: var(--pulse-hi); }
 }
 
 /* 手机端：底部操作条换行、HUD 由自身媒体查询收缩 */

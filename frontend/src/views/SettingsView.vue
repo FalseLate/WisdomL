@@ -13,7 +13,7 @@
               v-for="t in THEME_OPTIONS" :key="t.value"
               class="seg-btn" :class="{ on: appearance.theme === t.value }"
               role="radio" :aria-checked="appearance.theme === t.value"
-              @click="setTheme(t.value)"
+              @click="setTheme(t.value, originFromEvent($event))"
             >{{ t.label }}</button>
           </div>
         </div>
@@ -28,7 +28,7 @@
             >{{ m.label }}</button>
           </div>
         </div>
-        <p class="set-tip">「自动」= 深色用霓虹青、浅色用中性灰。浅色底上青色粒子本来就看不清，嫌干扰可以直接选「关闭」。</p>
+        <p class="set-tip">「自动」= 深色用霓虹青粒子，浅色直接关闭粒子（青色在浅底上看不清，还白耗电）。浅色想要背景动效应选「中性」或「霓虹」。</p>
       </section>
 
       <!-- ===== 无障碍与手势 ===== -->
@@ -60,7 +60,7 @@
 import { useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import { CyberNavbar } from '../components/cyber'
-import { appearance, setTheme, setMotion } from '../utils/theme.js'
+import { appearance, setTheme, setMotion, originFromEvent } from '../utils/theme.js'
 import { a11yPanelOpen } from '../a11y/settingsPanel.js'
 
 const router = useRouter()
@@ -106,6 +106,7 @@ function replayTutorial() {
   border-radius: var(--radius-card);
   padding: 16px;
   margin-bottom: 14px;
+  box-shadow: var(--elev-card);
 }
 
 .set-title {
@@ -138,7 +139,7 @@ function replayTutorial() {
 .set-tip {
   font-size: 11px;
   line-height: 1.6;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   margin-top: 8px;
 }
 

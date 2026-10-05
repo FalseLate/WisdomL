@@ -7,7 +7,7 @@
       <div class="banner-info">
         <div class="banner-name">{{ myPlan.book?.name || '当前词书' }}</div>
         <div class="banner-progress">
-          <van-progress :percentage="progressPct" stroke-width="6" :show-pivot="false" color="#4F7CFF" />
+          <van-progress :percentage="progressPct" stroke-width="6" :show-pivot="false" color="var(--indigo)" />
           <div class="banner-num">已背 {{ myPlan.learned }} / {{ myPlan.total }}</div>
         </div>
       </div>
@@ -194,7 +194,9 @@ function goPlan(level) {
 .cate-pill.active {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  /* 原来是写死的白字：白字压在霓虹青上只有 2.9:1（深色下也不合格），
+     换成"强调色之上的文字"token，深色纯黑 12:1、浅色纯白 6.5:1 */
+  color: var(--accent-contrast);
   font-weight: 700;
 }
 
@@ -225,7 +227,7 @@ function goPlan(level) {
 }
 
 .cover-text {
-  color: #fff;
+  color: var(--text-on-solid-brand);
   font-size: 18px;
   font-weight: 800;
   line-height: 1.4;

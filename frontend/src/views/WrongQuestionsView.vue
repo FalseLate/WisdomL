@@ -353,14 +353,14 @@ async function removeWrong(id) {
 
 .wrong-card {
   background: var(--bg-card);
-  border: 1px solid rgba(255, 68, 68, 0.2);
+  border: 1px solid rgb(var(--danger-rgb) / 0.2);
   border-radius: var(--radius-card);
   backdrop-filter: blur(12px);
   padding: 16px;
   margin-bottom: 12px;
   transition: all 0.3s var(--ease-out);
 }
-.wrong-card.mastered { border-color: rgba(0, 255, 136, 0.35); }
+.wrong-card.mastered { border-color: rgb(var(--success-rgb) / 0.35); }
 
 .wrong-header {
   display: flex;
@@ -475,8 +475,8 @@ async function removeWrong(id) {
   font-size: 13px;
   line-height: 1.5;
 }
-.redo-feedback.ok { background: rgba(0,255,136,0.1); color: var(--success); border: 1px solid rgba(0,255,136,0.3); }
-.redo-feedback.bad { background: rgba(255,68,68,0.1); color: var(--danger); border: 1px solid rgba(255,68,68,0.3); }
+.redo-feedback.ok { background: rgb(var(--success-rgb) / 0.1); color: var(--success); border: 1px solid rgb(var(--success-rgb) / 0.3); }
+.redo-feedback.bad { background: rgb(var(--danger-rgb) / 0.1); color: var(--danger); border: 1px solid rgb(var(--danger-rgb) / 0.3); }
 .redo-feedback.info { background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-border); }
 
 .ai-eval-box {

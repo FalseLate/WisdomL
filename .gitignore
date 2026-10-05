@@ -26,6 +26,9 @@ backend/.classpath
 backend/.project
 backend/.settings/
 backend/.vscode/
+# AgentScope 多智能体的运行时工作区（会话 transcript、memory flush、消息队列、_sweep.marker）。
+# 后端每次启动自己重建，且每次跑都会改写 _sweep.marker → 跟踪它等于让工作区永远是脏的
+backend/workspace-harness/
 
 # ============================================
 # frontend 内部忽略

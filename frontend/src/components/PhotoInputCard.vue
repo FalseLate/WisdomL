@@ -182,8 +182,8 @@ function doGenerate() {
   bottom: 0;
   left: 0;
   right: 0;
-  background: rgba(0, 0, 0, 0.7);
-  color: #fff;
+  background: var(--scrim-on-image);
+  color: var(--text-on-solid-brand);
   font-size: 10px;
   padding: 2px 4px;
   overflow: hidden;
@@ -197,8 +197,8 @@ function doGenerate() {
   right: 2px;
   width: 18px;
   height: 18px;
-  background: rgba(255, 68, 68, 0.9);
-  color: #fff;
+  background: rgb(var(--danger-rgb) / 0.9);
+  color: var(--text-on-solid-brand);
   border-radius: 50%;
   font-size: 10px;
   display: flex;

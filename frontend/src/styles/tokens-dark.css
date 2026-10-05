@@ -1,0 +1,171 @@
+/* ============================================================
+   深色 token 表（主形态）
+   这里只允许出现「变量定义」，不允许出现选择器技巧与颜色字面量之外的东西。
+   组件侧规则：结构样式里禁止裸 hex，一律 var(--token)；
+   需要"两主题换手法"的（发光 vs 描边、脉冲 vs 实心环）也一律走 token，
+   由 styles/tokens-light.css 给出浅色的另一套值。
+   ============================================================ */
+:root,
+:root[data-theme="dark"] {
+  /* 背景 */
+  --bg-base: #0a0a0f;
+  --bg-elevated: rgba(255, 255, 255, 0.03);
+  --bg-hover: rgba(0, 245, 255, 0.06);
+  --bg-card: rgba(255, 255, 255, 0.04);
+  /* 导航/标签栏底、不透明面板底、强调色之上的文字色、发丝分隔线 */
+  --surface-bar: rgba(10, 10, 15, 0.92);
+  --surface-solid: #0a0a0f;
+  --accent-contrast: #000;
+  --hairline: rgba(0, 245, 255, 0.15);
+  /* 弹窗遮罩：浅底上纯黑 70% 会压成脏灰，浅色分支减淡 */
+  --scrim: rgba(0, 0, 0, 0.7);
+
+  /* 全局浮动条 / 赛博按钮的霓虹层次 */
+  --edge-accent: rgba(0, 245, 255, 0.3);
+  --track-accent: rgba(0, 245, 255, 0.2);
+  --bar-shadow: 0 4px 24px rgba(0, 245, 255, 0.2);
+  --btn-primary-shadow: 0 4px 16px rgba(0, 245, 255, 0.3);
+  --btn-primary-shadow-hover: 0 8px 28px rgba(0, 245, 255, 0.5);
+  --btn-gradient-shadow: 0 4px 20px rgba(0, 245, 255, 0.3);
+  --btn-gradient-shadow-hover: 0 8px 32px rgba(0, 245, 255, 0.5);
+
+  /* 收藏/删除这类"平时淡一些、hover 才亮"的图标 */
+  --icon-rest-opacity: 0.5;
+
+  --success-deep: #00cc6a;
+  --danger-deep: #cc0000;
+  --warning-deep: #e0d000;
+  --success-border: rgba(0, 255, 136, 0.3);
+  --danger-border: rgba(255, 68, 68, 0.4);
+  --warning-border: rgba(249, 240, 2, 0.3);
+
+  /* 首页大标题的白→浅青渐变 */
+  --hero-from: #ffffff;
+  --hero-mid: #a0faff;
+
+  /* 主色：霓虹青 */
+  --accent: #00f5ff;
+  --accent-soft: rgba(0, 245, 255, 0.15);
+  --accent-border: rgba(0, 245, 255, 0.2);
+  --accent-glow: 0 0 12px rgba(0, 245, 255, 0.4), 0 0 32px rgba(0, 245, 255, 0.15);
+  --accent-deep: #00c8d4;
+  --secondary-deep: #cc00cc;
+
+  /* 辅色：品红 */
+  --secondary: #ff00ff;
+  --secondary-soft: rgba(255, 0, 255, 0.12);
+  --secondary-border: rgba(255, 0, 255, 0.2);
+
+  /* 状态色 */
+  --success: #00ff88;
+  --success-soft: rgba(0, 255, 136, 0.12);
+  --warning: #f9f002;
+  --warning-soft: rgba(249, 240, 2, 0.12);
+  --danger: #ff4444;
+  --danger-soft: rgba(255, 68, 68, 0.12);
+
+  /* 文字：--text-muted 原来是 #555566，压在 #0a0a0f 上只有 2.71:1，
+     而它用在导航标签/统计标签/箭头这类"承载信息"的位置 → 提到 AA 以上，仍比 secondary 暗一档 */
+  --text-primary: #e8e8f0;
+  --text-secondary: #8a8a9a;
+  --text-muted: #82828f;
+
+
+  /* ---------- 效果层：深色靠霓虹发光与外溢光晕分层 ---------- */
+  /* 全局扫描网格线 */
+  --grid-line: rgba(0, 245, 255, 0.02);
+  /* 顶栏 */
+  --nav-bar-bg: rgba(18, 18, 28, 0.9);
+  --nav-bar-border: rgba(0, 245, 255, 0.2);
+  /* 卡片层次：深色是半透明玻璃，本身不额外加阴影 */
+  --elev-card: none;
+  /* 教程卡片是深色里唯一自带大光晕的面板 */
+  --shadow-tutorial: 0 0 40px var(--accent-soft);
+  /* 游标环：命中/循环游标用外发光 */
+  --ring-cycle: 0 0 12px rgba(0, 245, 255, 0.35), inset 0 0 8px rgba(0, 245, 255, 0.12);
+  --ring-scan: 0 0 14px rgba(0, 255, 136, 0.4);
+  /* 扫描脉冲关键帧（关键帧里也能用 var，按元素解析） */
+  --pulse-lo: 0 0 10px rgba(0, 255, 136, 0.35);
+  --pulse-hi: 0 0 22px rgba(0, 255, 136, 0.75);
+  /* 扫描状态条与交卷按钮的投影 */
+  --shadow-bar: 0 0 18px rgba(0, 255, 136, 0.2);
+  --shadow-submit: 0 4px 16px rgba(249, 240, 2, 0.3);
+  --shadow-submit-hover: 0 8px 28px rgba(249, 240, 2, 0.5);
+  /* 照片、彩色封面这类"图片永远不是页面底色"的表面上的遮罩与文字：两主题都保持深底白字 */
+  --scrim-on-image: rgba(0, 0, 0, 0.7);
+}
+
+/* ============================================================
+   队友模块的品牌色阶（violet / sky / emerald / orange / coral / indigo …）
+   深色取值 = 他们原来写的字面量，逐字节相同；浅色在 tokens-light.css 给同色相的加深版。
+   用「rgb 三元组」而不是每个 alpha 一个 token：rgba(H,α) 写成 rgb(var(--x-rgb) / α)，
+   一个 token 覆盖该色相的所有强度。由 styles/theme-migrate.cjs 扫描生成，勿手改深色列。
+   ============================================================ */
+:root,
+:root[data-theme="dark"] {
+  --accent-rgb: 0 245 255;
+  --accent-dim: rgba(0, 245, 255, 0.6);
+  --secondary-rgb: 255 0 255;
+  --danger-rgb: 255 68 68;
+  --violet: #a78bfa;
+  --violet-rgb: 167 139 250;
+  --violet-text: #a78bfa;
+  --violet-soft-text: #c4b5fd;
+  --purple-rgb: 139 92 246;
+  --purple-deep-rgb: 124 58 237;
+  --sky-rgb: 56 189 248;
+  --sky-text: #38bdf8;
+  --indigo-rgb: 79 124 255;
+  --emerald-rgb: 52 211 153;
+  --emerald-text: #34d399;
+  --emerald-soft-text: #86efac;
+  --orange: #f97316;
+  --orange-rgb: 249 115 22;
+  --orange-text: #f97316;
+  --orange-soft-rgb: 251 146 60;
+  --orange-soft-text: #fb923c;
+  --coral-rgb: 248 113 113;
+  --coral-text: #f87171;
+  --amber-rgb: 255 193 7;
+  --ink-rgb: 10 10 15;
+  --paper-rgb: 232 232 240;
+  /* 品牌底上的文字（深色用纯白）、以及"往白底上加一层微光"的半透明叠加 */
+  --text-on-brand: #fff;
+  --overlay-rgb: 255 255 255;
+  --indigo: #4f7cff;
+  --warning-rgb: 249 240 2;
+  --success-rgb: 0 255 136;
+  /* 比 --secondary 更亮一档的品红，只用在深色玻璃面板上的"取消/恢复默认"文字 */
+  --secondary-bright: #ff66ff;
+  /* 饱和品牌渐变之上的文字：两套主题里品牌渐变都是深色，所以恒为白 */
+  --text-on-solid-brand: #fff;
+  --spinner-track: rgba(0, 0, 0, 0.2);
+  /* 题型标签三色（客观/多选/主观） */
+  --tag-single: #667eea;
+  --tag-single-rgb: 102 126 234;
+  --tag-single-text: #667eea;
+  --tag-multiple: #9944ff;
+  --tag-multiple-rgb: 153 68 255;
+  --tag-multiple-text: #9944ff;
+  --tag-subjective: #ff8c00;
+  --tag-subjective-rgb: 255 140 0;
+  --tag-subjective-text: #ff8c00;
+}
+
+/* ============================================================
+   GestureHUD 专用
+   小窗分两层：外框（面板/标题/灯/文字）跟随主题；
+   里面的视频视口永远是深底（摄像头画面本来就是暗的），
+   所以骨架线在浅色下反而要"更亮的青"，否则压在画面看不清。
+   ============================================================ */
+:root,
+:root[data-theme="dark"] {
+  --hud-shadow: 0 4px 24px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 245, 255, 0.1);
+  --hud-dim: #555;
+  --hud-off: #333;
+  --hud-error: #ff8800;
+  --hud-debug-text: #6a7a8a;
+  --hud-armed-text: #c9c24a;
+  --hud-skel-line: #00f5ff;
+  --hud-skel-joint: #ff00ff;
+}

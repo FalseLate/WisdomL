@@ -8,7 +8,7 @@
           <div class="pc-name">{{ plan.book?.name || '当前词书' }}</div>
           <div class="pc-count">已背 {{ plan.learned }} / {{ plan.total }} 词</div>
         </div>
-        <van-progress :percentage="progressPct" stroke-width="8" :show-pivot="false" color="linear-gradient(90deg, #00f5ff, #ff00ff)" track-color="rgba(255,255,255,0.08)" />
+        <van-progress :percentage="progressPct" stroke-width="8" :show-pivot="false" color="linear-gradient(90deg, var(--accent), var(--secondary))" track-color="rgb(var(--overlay-rgb) / 0.08)" />
         <van-button type="primary" round block class="pc-btn" @click="goStudy">
           继续学习
         </van-button>
@@ -107,10 +107,10 @@ function goStudy() {
   position: relative;
   padding: 18px 16px;
   background:
-    linear-gradient(135deg, rgba(0, 245, 255, 0.06), rgba(255, 0, 255, 0.04)),
+    linear-gradient(135deg, rgb(var(--accent-rgb) / 0.06), rgb(var(--secondary-rgb) / 0.04)),
     var(--bg-card);
   backdrop-filter: blur(8px);
-  border: 1px solid rgba(0, 245, 255, 0.3);
+  border: 1px solid rgb(var(--accent-rgb) / 0.3);
   border-radius: 16px;
   box-shadow: inset 0 0 24px rgba(0, 245, 255, 0.04), 0 0 20px rgba(0, 245, 255, 0.06);
   overflow: hidden;
@@ -125,7 +125,7 @@ function goStudy() {
   width: 140px;
   height: 140px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(0, 245, 255, 0.16), transparent 70%);
+  background: radial-gradient(circle, rgb(var(--accent-rgb) / 0.16), transparent 70%);
   pointer-events: none;
 }
 
@@ -257,7 +257,7 @@ function goStudy() {
 
 /* 底部导航：深空玻璃 + 霓虹高亮（覆盖 van-tabbar 默认白底） */
 .word-tabbar {
-  --van-tabbar-background: rgba(10, 10, 15, 0.88);
+  --van-tabbar-background: rgb(var(--ink-rgb) / 0.88);
   background: var(--van-tabbar-background);
   backdrop-filter: blur(12px);
   border-top: 1px solid var(--accent-border);

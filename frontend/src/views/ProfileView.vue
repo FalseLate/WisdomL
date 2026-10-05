@@ -238,8 +238,8 @@ function handleLogout() {
   transform: translateX(-50%);
   width: 100%;
   box-sizing: border-box;
-  background: rgba(0, 0, 0, 0.6);
-  color: #fff;
+  background: var(--scrim-on-image);
+  color: var(--text-on-solid-brand);
   font-size: 10px;
   padding: 1px 10px;
   text-align: center;
@@ -325,7 +325,7 @@ function handleLogout() {
   gap: 12px;
   padding: 14px 16px;
   cursor: pointer;
-  border-bottom: 1px solid rgba(0, 245, 255, 0.06);
+  border-bottom: 1px solid rgb(var(--accent-rgb) / 0.06);
   transition: all 0.2s;
 }
 
