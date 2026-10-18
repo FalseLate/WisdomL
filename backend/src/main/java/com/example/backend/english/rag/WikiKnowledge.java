@@ -22,8 +22,11 @@ public class WikiKnowledge {
     private String exampleSentence;  // 多条例句以换行分隔
     private String errorTypeIds;     // 绑定错因标签，逗号分隔1-5
     private Integer level;           // 难度1-5
+    private Integer noteType;        // 手动笔记子类型：1知识点 2词汇 3长难句 4批注；非手动为 null
+    private String tags;             // 主题标签，逗号分隔
+    private String links;            // 双向链接目标条目 id 的 JSON 数组字符串
     private String embeddingJson;    // 向量化JSON数组
-    private Integer hitCount;        // 私人条目被检索命中次数，达阈值自动升级为公共
+    private Integer hitCount;        // 私人条目被检索命中次数（仅热度统计，不再升公共）
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -43,6 +46,12 @@ public class WikiKnowledge {
     public void setErrorTypeIds(String errorTypeIds) { this.errorTypeIds = errorTypeIds; }
     public Integer getLevel() { return level; }
     public void setLevel(Integer level) { this.level = level; }
+    public Integer getNoteType() { return noteType; }
+    public void setNoteType(Integer noteType) { this.noteType = noteType; }
+    public String getTags() { return tags; }
+    public void setTags(String tags) { this.tags = tags; }
+    public String getLinks() { return links; }
+    public void setLinks(String links) { this.links = links; }
     public String getEmbeddingJson() { return embeddingJson; }
     public void setEmbeddingJson(String embeddingJson) { this.embeddingJson = embeddingJson; }
     public Integer getHitCount() { return hitCount; }

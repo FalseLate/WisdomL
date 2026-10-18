@@ -140,4 +140,30 @@ public class HarnessAgentConfig {
                         .build())
                 .build();
     }
+
+    /**
+     * 通用对话助手：像豆包那样回答任何问题，跟随用户语言，不限字数、允许分点（不朗读）。
+     * 与口语陪练分开——只有口语练习才强制英文+短句+朗读。英语相关问题要答得准确完整。
+     */
+    @Bean
+    public HarnessAgent assistantAgent(OpenAIChatModel zhipuChatModel) {
+        Path workspace = Paths.get(workspacePath);
+        return HarnessAgent.builder()
+                .name("assistant-agent")
+                .sysPrompt("""
+                        你是一个知识渊博、友好的通用助手。
+                        - 用与用户提问相同的语言回答（中文问中文答，英文问英文答）。
+                        - 回答准确、条理清晰，必要时分点或举例，不刻意简短。
+                        - 涉及英语学习问题（语法、词义、搭配、翻译、写作、句型）时，给出准确完整的解释；
+                          不确定就点明，并给出最可能的答案，不要含糊其辞。
+                        - 若输入里带有【参考资料】，优先据此作答，以与用户所学体系一致。
+                        """)
+                .model(zhipuChatModel)
+                .workspace(workspace)
+                .compaction(CompactionConfig.builder()
+                        .triggerMessages(30)
+                        .keepMessages(10)
+                        .build())
+                .build();
+    }
 }

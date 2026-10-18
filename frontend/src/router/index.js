@@ -95,6 +95,12 @@ const routes = [
     component: () => import('../views/ReadingArticleView.vue'),
     meta: { requiresAuth: true }
   },
+  {
+    path: '/tutor/chat',
+    name: 'TutorChat',
+    component: () => import('../views/TutorChatView.vue'),
+    meta: { requiresAuth: true }
+  },
   { path: '/:pathMatch(.*)*', redirect: '/' }
 ]
 

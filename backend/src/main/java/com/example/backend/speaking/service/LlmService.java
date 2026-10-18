@@ -35,10 +35,13 @@ public class LlmService {
     public static final String MODE_CHAT = "chat";
     public static final String MODE_TRANSLATE = "translate";
     public static final String MODE_STORY = "story";
+    public static final String MODE_ASSISTANT = "assistant";
 
     private final HarnessAgent oralPracticeAgent;
     private final HarnessAgent storyAgent;
+    private final HarnessAgent assistantAgent;
     private final OpenAIChatModel zhipuChatModel;
+    private final com.example.backend.english.rag.WikiKnowledgeService wikiKnowledgeService;
 
     /** 翻译系统提示词：中英互译，只输出译文，不闲聊 */
     private static final String TRANSLATE_SYS_PROMPT = """
@@ -51,12 +54,14 @@ public class LlmService {
     public String normalizeMode(String mode) {
         if (MODE_TRANSLATE.equalsIgnoreCase(mode)) return MODE_TRANSLATE;
         if (MODE_STORY.equalsIgnoreCase(mode)) return MODE_STORY;
+        if (MODE_ASSISTANT.equalsIgnoreCase(mode)) return MODE_ASSISTANT;
         return MODE_CHAT;
     }
 
-    /** 翻译模式不朗读、不驱动虚拟人，chat/story（及未知）模式正常走 TTS */
+    /** 翻译/通用对话不朗读；口语练习、故事正常走 TTS */
     public boolean ttsEnabled(String mode) {
-        return !MODE_TRANSLATE.equals(normalizeMode(mode));
+        String m = normalizeMode(mode);
+        return !MODE_TRANSLATE.equals(m) && !MODE_ASSISTANT.equals(m);
     }
 
     /** 按 mode 路由 LLM 调用，统一返回文本增量流 */
@@ -72,7 +77,29 @@ public class LlmService {
             return agentStream(storyAgent, dto.getSessionId() + "-story", dto.getUserInput())
                     .map(delta -> delta.replaceAll("[^\\x20-\\x7E\\n\\r\\t]", ""));
         }
+        if (MODE_ASSISTANT.equals(mode)) {
+            // 通用对话：检索公共知识库注入以保证英语问答准确，独立会话记忆，不朗读（见 ttsEnabled）
+            return agentStream(assistantAgent, dto.getSessionId() + "-assistant", withKnowledge(dto.getUserInput()));
+        }
         return agentStream(oralPracticeAgent, dto.getSessionId(), dto.getUserInput());
+    }
+
+    /** 助手模式：检索公共知识库注入，提升英语问答准确性；RAG 不可用则原样返回 */
+    private String withKnowledge(String input) {
+        try {
+            var hits = wikiKnowledgeService.search(input, null, 4, null);
+            if (hits.isEmpty()) return input;
+            StringBuilder kb = new StringBuilder();
+            for (var h : hits) {
+                var k = h.knowledge();
+                kb.append("- ").append(k.getTitle()).append("：")
+                  .append(k.getContent() == null ? "" : k.getContent()).append("\n");
+            }
+            return input + "\n\n【参考资料（据此保证英语知识准确）】\n" + kb;
+        } catch (Exception e) {
+            log.warn("助手 RAG 检索失败，降级为纯模型作答: {}", e.getMessage());
+            return input;
+        }
     }
 
     /** 有状态 HarnessAgent，按 sessionId 记忆会话 */

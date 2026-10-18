@@ -12,7 +12,7 @@
 
   <!-- 记单词（/word/*）/阅读（/reading/*）/我的Wiki（/wiki/*）页面常驻的 AI 口语陪练虚拟人（pet-tutor 模块）：
        挂在 App 层按路由显隐，页面切换时不会重新加载模型 -->
-  <PetTutor v-if="showPetTutor" :api-base="petApiBase" session-id="word-quiz-user" />
+  <PetTutor v-if="showPetTutor" :api-base="petApiBase" session-id="word-quiz-user" @open-full-chat="router.push('/tutor/chat')" />
 
   <!-- 无障碍与手势设置面板：全站只挂这一份，设置页与懒人模式都通过 a11yPanelOpen 打开 -->
   <A11ySettingsDrawer :visible="a11yPanelOpen" @close="a11yPanelOpen = false" />
@@ -29,7 +29,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useNotificationStore } from './stores/notification'
 import { ParticleBackground, SplashScreen } from './components/cyber'
 import A11ySettingsDrawer from './components/cyber/A11ySettingsDrawer.vue'
@@ -37,6 +37,7 @@ import { a11yPanelOpen } from './a11y/settingsPanel.js'
 import PetTutor from './pet-tutor/PetTutor.vue'
 
 const route = useRoute()
+const router = useRouter()
 const notifyStore = useNotificationStore()
 
 // 记单词流程（/word/*）显示虚拟人陪练
