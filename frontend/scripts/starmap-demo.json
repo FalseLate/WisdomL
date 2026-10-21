@@ -1,0 +1,700 @@
+{
+  "account": {
+    "username": "demo_star",
+    "password": "Demo123456",
+    "nickname": "星图演示"
+  },
+  "topics": [
+    {
+      "key": "circ",
+      "title": "内科学 · 循环系统",
+      "color": null
+    },
+    {
+      "key": "resp",
+      "title": "内科学 · 呼吸系统",
+      "color": "--coral-text"
+    },
+    {
+      "key": "exam",
+      "title": "应试习惯",
+      "color": "--orange"
+    },
+    {
+      "key": "pharm",
+      "title": "药理学",
+      "color": null,
+      "pin": {
+        "x": -70,
+        "y": 78,
+        "z": -150
+      }
+    }
+  ],
+  "points": [
+    {
+      "key": "fail_cause",
+      "topic": "circ",
+      "title": "心衰的病因与诱因"
+    },
+    {
+      "key": "nyha",
+      "topic": "circ",
+      "title": "NYHA 心功能分级"
+    },
+    {
+      "key": "quad",
+      "topic": "circ",
+      "title": "慢性心衰四联用药"
+    },
+    {
+      "key": "acute_lv",
+      "topic": "circ",
+      "title": "急性左心衰抢救流程",
+      "merged": true
+    },
+    {
+      "key": "htn_dx",
+      "topic": "circ",
+      "title": "高血压诊断与分级",
+      "color": "--violet"
+    },
+    {
+      "key": "digoxin",
+      "topic": "pharm",
+      "title": "洋地黄中毒的识别"
+    },
+    {
+      "key": "diuretic",
+      "topic": "pharm",
+      "title": "利尿剂的电解质风险"
+    },
+    {
+      "key": "copd",
+      "topic": "resp",
+      "title": "慢阻肺分级与吸入药"
+    },
+    {
+      "key": "blood_gas",
+      "topic": "resp",
+      "title": "呼吸衰竭的血气判读"
+    },
+    {
+      "key": "cor_pulmonale",
+      "topic": "resp",
+      "title": "慢性肺源性心脏病"
+    },
+    {
+      "key": "pneumothorax",
+      "topic": "resp",
+      "title": "气胸的识别与处理",
+      "hierLine": 0
+    },
+    {
+      "key": "audit_miss",
+      "topic": "exam",
+      "title": "审题漏掉限定条件"
+    },
+    {
+      "key": "unit_swap",
+      "topic": "exam",
+      "title": "单位与数值换算失误"
+    },
+    {
+      "key": "time_budget",
+      "topic": "exam",
+      "title": "难题耗时没有止损"
+    },
+    {
+      "key": "af",
+      "topic": "circ",
+      "title": "房颤的抗凝选择"
+    },
+    {
+      "key": "mi_ecg",
+      "topic": "circ",
+      "title": "心肌梗死的心电图演变"
+    },
+    {
+      "key": "as_murmur",
+      "topic": "circ",
+      "title": "主动脉瓣狭窄的杂音"
+    },
+    {
+      "key": "pneumonia",
+      "topic": "resp",
+      "title": "社区获得性肺炎的抗菌药"
+    },
+    {
+      "key": "asthma",
+      "topic": "resp",
+      "title": "支气管哮喘的阶梯治疗"
+    },
+    {
+      "key": "pe",
+      "topic": "resp",
+      "title": "肺栓塞的 Wells 评分"
+    },
+    {
+      "key": "elim",
+      "topic": "exam",
+      "title": "选项排除法用错"
+    },
+    {
+      "key": "verify",
+      "topic": "exam",
+      "title": "计算题没回代验算"
+    },
+    {
+      "key": "beta",
+      "topic": "pharm",
+      "title": "β 受体阻滞剂的禁忌"
+    },
+    {
+      "key": "acei",
+      "topic": "pharm",
+      "title": "ACEI 的干咳与高钾"
+    },
+    {
+      "key": "warfarin",
+      "topic": "pharm",
+      "title": "华法林 INR 监测"
+    },
+    {
+      "key": "orphan",
+      "topic": null,
+      "title": "临时起搏的适应证",
+      "color": "--sky-text"
+    }
+  ],
+  "questions": [
+    {
+      "key": "q1",
+      "stem": "慢性心衰最常见的诱因是（单选）",
+      "answer": "B",
+      "userAnswer": "C",
+      "answerTime": 38,
+      "options": [
+        "A 感染",
+        "B 呼吸道感染",
+        "C 心律失常",
+        "D 过度劳累"
+      ],
+      "points": [
+        "fail_cause",
+        "nyha"
+      ],
+      "et": [
+        "knowledge"
+      ],
+      "note": "诱因和病因两张表混了",
+      "redo": true
+    },
+    {
+      "key": "q2",
+      "stem": "NYHA Ⅲ 级应优先启动的药物组合是（单选）",
+      "answer": "A",
+      "userAnswer": "D",
+      "answerTime": 96,
+      "options": [
+        "A ACEI+β受体阻滞剂+MRA+SGLT2i",
+        "B 强心+利尿",
+        "C 单用利尿剂",
+        "D 先观察"
+      ],
+      "points": [
+        "nyha",
+        "quad",
+        "audit_miss"
+      ],
+      "et": [
+        "audit",
+        "strategy"
+      ],
+      "note": "没注意题干里的Ⅲ级"
+    },
+    {
+      "key": "q3",
+      "stem": "急性左心衰伴血压下降的首选措施（单选）",
+      "answer": "C",
+      "userAnswer": "A",
+      "answerTime": 120,
+      "options": [
+        "A 半坐位并高流量吸氧",
+        "B 大量补液",
+        "C 先纠正容量与血流动力学再谈用药",
+        "D 口服地高辛"
+      ],
+      "points": [
+        "acute_lv",
+        "quad",
+        "nyha"
+      ],
+      "et": [
+        "strategy"
+      ],
+      "note": "顺序错了：先稳血流动力学"
+    },
+    {
+      "key": "q4",
+      "stem": "洋地黄中毒最常见的心电图表现（单选）",
+      "answer": "B",
+      "userAnswer": "A",
+      "answerTime": 95,
+      "options": [
+        "A 高尖 T 波",
+        "B 室性期前收缩二联律",
+        "C 短 PR 间期",
+        "D U 波明显"
+      ],
+      "points": [
+        "digoxin",
+        "htn_dx"
+      ],
+      "et": [
+        "knowledge"
+      ],
+      "redo": true
+    },
+    {
+      "key": "q5",
+      "stem": "呋塞米长期使用最易出现的电解质紊乱（单选）",
+      "answer": "A",
+      "userAnswer": "C",
+      "answerTime": 44,
+      "options": [
+        "A 低钾低氯性碱中毒",
+        "B 高钾",
+        "C 高钠",
+        "D 低钙为主"
+      ],
+      "points": [
+        "diuretic",
+        "digoxin"
+      ],
+      "et": [
+        "knowledge",
+        "math"
+      ]
+    },
+    {
+      "key": "q6",
+      "stem": "慢阻肺合并Ⅱ型呼衰时的氧疗设定（单选）",
+      "answer": "B",
+      "userAnswer": "D",
+      "answerTime": 88,
+      "options": [
+        "A 高浓度面罩",
+        "B 低流量持续吸氧",
+        "C 间歇高流量",
+        "D 不需氧疗"
+      ],
+      "points": [
+        "copd",
+        "blood_gas"
+      ],
+      "et": [
+        "knowledge"
+      ],
+      "redo": true
+    },
+    {
+      "key": "q7",
+      "stem": "肺心病患者血气示 pH 7.30、PaCO2 68、HCO3 26，判断为（单选）",
+      "answer": "A",
+      "userAnswer": "B",
+      "answerTime": 130,
+      "options": [
+        "A 呼吸性酸中毒失代偿",
+        "B 代谢性酸中毒",
+        "C 呼酸合并代碱",
+        "D 正常"
+      ],
+      "points": [
+        "blood_gas",
+        "cor_pulmonale",
+        "unit_swap"
+      ],
+      "et": [
+        "math",
+        "audit"
+      ],
+      "note": "PaCO2 高就该往呼酸想，算错方向"
+    },
+    {
+      "key": "q8",
+      "stem": "突发一侧胸痛伴呼吸音消失，首选处理（单选）",
+      "answer": "C",
+      "userAnswer": "A",
+      "answerTime": 52,
+      "options": [
+        "A 强心利尿",
+        "B 雾化",
+        "C 胸腔穿刺减压",
+        "D 观察"
+      ],
+      "points": [
+        "pneumothorax",
+        "copd",
+        "blood_gas"
+      ],
+      "et": [
+        "knowledge"
+      ]
+    },
+    {
+      "key": "q9",
+      "stem": "关于气胸的影像与体征，下列正确的是（单选）",
+      "answer": "D",
+      "userAnswer": "A",
+      "answerTime": 61,
+      "options": [
+        "A 气管向患侧移位",
+        "B 患侧呼吸音增强",
+        "C 叩诊浊音",
+        "D 患侧叩诊鼓音、呼吸音消失"
+      ],
+      "points": [
+        "pneumothorax",
+        "blood_gas"
+      ],
+      "et": [
+        "knowledge"
+      ]
+    },
+    {
+      "key": "q10",
+      "stem": "一道 3 分的题思考超过 5 分钟，正确做法（单选）",
+      "answer": "B",
+      "userAnswer": "D",
+      "answerTime": 200,
+      "options": [
+        "A 继续推",
+        "B 标记后跳过，做完再回",
+        "C 直接放弃整卷",
+        "D 抄前一题答案"
+      ],
+      "points": [
+        "time_budget",
+        "audit_miss"
+      ],
+      "et": [
+        "habit"
+      ],
+      "note": "一道题耗到 3 分多"
+    },
+    {
+      "key": "q11",
+      "stem": "非瓣膜性房颤 CHA2DS2-VASc 2 分的抗凝方案（单选）",
+      "answer": "A",
+      "userAnswer": "B",
+      "answerTime": 50,
+      "options": [
+        "A 正确项",
+        "B 干扰项",
+        "C 干扰项",
+        "D 干扰项"
+      ],
+      "points": [
+        "af",
+        "warfarin"
+      ],
+      "et": [
+        "knowledge"
+      ],
+      "redo": true
+    },
+    {
+      "key": "q12",
+      "stem": "急性前壁心梗最早出现的心电图改变（单选）",
+      "answer": "A",
+      "userAnswer": "B",
+      "answerTime": 50,
+      "options": [
+        "A 正确项",
+        "B 干扰项",
+        "C 干扰项",
+        "D 干扰项"
+      ],
+      "points": [
+        "mi_ecg",
+        "fail_cause"
+      ],
+      "et": [
+        "knowledge"
+      ],
+      "redo": false
+    },
+    {
+      "key": "q13",
+      "stem": "主动脉瓣狭窄杂音的典型部位与传导（单选）",
+      "answer": "A",
+      "userAnswer": "B",
+      "answerTime": 50,
+      "options": [
+        "A 正确项",
+        "B 干扰项",
+        "C 干扰项",
+        "D 干扰项"
+      ],
+      "points": [
+        "as_murmur",
+        "nyha"
+      ],
+      "et": [
+        "audit"
+      ],
+      "redo": true
+    },
+    {
+      "key": "q14",
+      "stem": "青年社区获得性肺炎门诊首选（单选）",
+      "answer": "A",
+      "userAnswer": "B",
+      "answerTime": 50,
+      "options": [
+        "A 正确项",
+        "B 干扰项",
+        "C 干扰项",
+        "D 干扰项"
+      ],
+      "points": [
+        "pneumonia",
+        "copd"
+      ],
+      "et": [
+        "knowledge"
+      ],
+      "redo": true
+    },
+    {
+      "key": "q15",
+      "stem": "哮喘急性发作首选的缓解药（单选）",
+      "answer": "A",
+      "userAnswer": "B",
+      "answerTime": 50,
+      "options": [
+        "A 正确项",
+        "B 干扰项",
+        "C 干扰项",
+        "D 干扰项"
+      ],
+      "points": [
+        "asthma",
+        "copd"
+      ],
+      "et": [
+        "strategy"
+      ],
+      "redo": true
+    },
+    {
+      "key": "q16",
+      "stem": "术后突发胸痛气促，先算哪个评分（单选）",
+      "answer": "A",
+      "userAnswer": "B",
+      "answerTime": 50,
+      "options": [
+        "A 正确项",
+        "B 干扰项",
+        "C 干扰项",
+        "D 干扰项"
+      ],
+      "points": [
+        "pe",
+        "blood_gas",
+        "audit_miss"
+      ],
+      "et": [
+        "audit",
+        "strategy"
+      ],
+      "redo": false
+    },
+    {
+      "key": "q17",
+      "stem": "四个选项里两个互斥时，正确的排除顺序（单选）",
+      "answer": "A",
+      "userAnswer": "B",
+      "answerTime": 50,
+      "options": [
+        "A 正确项",
+        "B 干扰项",
+        "C 干扰项",
+        "D 干扰项"
+      ],
+      "points": [
+        "elim",
+        "audit_miss"
+      ],
+      "et": [
+        "habit"
+      ],
+      "redo": true
+    },
+    {
+      "key": "q18",
+      "stem": "药物剂量按体重算完不回代，错在哪（单选）",
+      "answer": "A",
+      "userAnswer": "B",
+      "answerTime": 50,
+      "options": [
+        "A 正确项",
+        "B 干扰项",
+        "C 干扰项",
+        "D 干扰项"
+      ],
+      "points": [
+        "verify",
+        "unit_swap"
+      ],
+      "et": [
+        "math",
+        "habit"
+      ],
+      "redo": false
+    },
+    {
+      "key": "q19",
+      "stem": "合并哮喘的心衰患者不宜用哪类药（单选）",
+      "answer": "A",
+      "userAnswer": "B",
+      "answerTime": 50,
+      "options": [
+        "A 正确项",
+        "B 干扰项",
+        "C 干扰项",
+        "D 干扰项"
+      ],
+      "points": [
+        "beta",
+        "asthma",
+        "quad"
+      ],
+      "et": [
+        "knowledge"
+      ],
+      "redo": true
+    },
+    {
+      "key": "q20",
+      "stem": "ACEI 联用保钾利尿剂最需警惕（单选）",
+      "answer": "A",
+      "userAnswer": "B",
+      "answerTime": 50,
+      "options": [
+        "A 正确项",
+        "B 干扰项",
+        "C 干扰项",
+        "D 干扰项"
+      ],
+      "points": [
+        "acei",
+        "diuretic",
+        "quad"
+      ],
+      "et": [
+        "knowledge",
+        "audit"
+      ],
+      "redo": false
+    }
+  ],
+  "edges": [
+    {
+      "from": "nyha",
+      "to": "quad",
+      "rel": "先修",
+      "reason": "分级决定用药强度，先会分级才谈四联",
+      "kind": "custom"
+    },
+    {
+      "from": "blood_gas",
+      "to": "cor_pulmonale",
+      "rel": "依赖",
+      "reason": "肺心病的酸碱判断完全建立在血气读数上",
+      "kind": "custom"
+    },
+    {
+      "from": "digoxin",
+      "to": "diuretic",
+      "rel": "关联",
+      "reason": "低钾会放大洋地黄中毒风险，这两条我总一起错",
+      "kind": "custom"
+    }
+  ],
+  "styles": [
+    {
+      "target": "cooc",
+      "pair": [
+        "fail_cause",
+        "nyha"
+      ],
+      "style": {
+        "lineStyle": "dashed",
+        "color": "--violet",
+        "width": 2.5,
+        "opacity": 0.9
+      }
+    },
+    {
+      "target": "cooc",
+      "pair": [
+        "copd",
+        "blood_gas"
+      ],
+      "style": {
+        "lineStyle": "dotted",
+        "color": "--sky-text",
+        "width": 2.75
+      }
+    },
+    {
+      "target": "hier",
+      "pair": [
+        "exam",
+        "time_budget"
+      ],
+      "style": {
+        "color": "--orange",
+        "width": 2,
+        "lineStyle": "solid"
+      }
+    },
+    {
+      "target": "edge",
+      "key": "digoxin-diuretic",
+      "style": {
+        "lineStyle": "dotted",
+        "color": "--coral-text",
+        "width": 2.25,
+        "arrow": true,
+        "opacity": 0.85
+      }
+    },
+    {
+      "target": "edge",
+      "key": "nyha-quad",
+      "style": {
+        "color": "--secondary",
+        "width": 2.5,
+        "lineStyle": "dashed",
+        "arrow": true
+      }
+    }
+  ],
+  "veto": {
+    "pair": [
+      "pneumothorax",
+      "copd"
+    ],
+    "why": "这两条我自己清楚没关系，删掉演示否决"
+  },
+  "hidden": {
+    "target": "cooc",
+    "pair": [
+      "acute_lv",
+      "quad"
+    ]
+  }
+}

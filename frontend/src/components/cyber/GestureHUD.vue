@@ -202,6 +202,10 @@ const faceDebug = computed(() => {
 })
 
 // ============ 通道同步：设置变化/挂载时按开关 open/close（开哪条加载哪条模型） ============
+// 模型初始化要几秒，用户往往在这期间就切走了页面。HUD 实例死亡后必须停止继续 open，
+// 否则 ChannelManager 单例会带着三路推理和摄像头在后台永跑（整站卡顿）。
+let hudAlive = false
+
 async function syncChannels() {
   if (!props.visible) return
   const all = loadSettings()
@@ -212,6 +216,7 @@ async function syncChannels() {
   channelError.value = ''
   const errs = []
   for (const name of ['hand', 'head', 'arm']) {
+    if (!hudAlive) break
     try {
       if (s[name] && !manager.channels.has(name)) await manager.open(name)
       else if (!s[name] && manager.channels.has(name)) await manager.close(name)
@@ -219,6 +224,7 @@ async function syncChannels() {
       errs.push(`${name}: ${e.message}`)
     }
   }
+  if (!hudAlive) { manager.closeAll(); return }
   loading.value = false
   if (errs.length) {
     const msg = errs.join('；')
@@ -233,10 +239,8 @@ function retryChannels() {
   syncChannels()
 }
 
-async function closeAllChannels() {
-  for (const name of ['hand', 'head', 'arm']) {
-    try { await manager.close(name) } catch { /* noop */ }
-  }
+function closeAllChannels() {
+  return manager.closeAll()
 }
 
 // ============ 画面绘制：镜像视频帧 + 三套骨架（霓虹风格沿用原 HUD） ============
@@ -432,6 +436,7 @@ watch(() => props.visible, (val) => {
 })
 
 onMounted(() => {
+  hudAlive = true
   loadLayout()
   window.addEventListener('resize', onWindowResize)
   manager.onState = (s) => {
@@ -455,6 +460,9 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  hudAlive = false
+  // manager 是模块单例，路由切换不销毁它；这里不清空回调，泄漏的帧循环会每帧写死组件的 reactive
+  manager.onState = () => {}
   cancelAnimationFrame(drawRaf)
   clearTimeout(firedTimer)
   if (resizeRaf) cancelAnimationFrame(resizeRaf)

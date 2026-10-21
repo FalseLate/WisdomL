@@ -274,3 +274,33 @@ export function candidateToGesture(key) {
   if (key === 'clear' || key === 'prev' || key === 'next') return { type: key }
   return null
 }
+
+/**
+ * 发射门控：区分「手势一直比着」和「又比了一次」。
+ * 投票出的 stable 是电平信号，直接每帧进总线的话，多选题的 toggle 会被反复翻转
+ * （持续伸 2 指 = 每过一个冷却期就把 B 选中/取消一次，永远确认不了）。
+ * 破坏性动作（选答、清空）只认上升沿：必须经过一个中立帧（松手/握拳/丢手）才允许再发。
+ * prev/next 是翻页，语义等价于按住方向键连打，保持连发（节奏由 actionBus 冷却控制）。
+ */
+export const REPEATABLE_CANDIDATES = ['prev', 'next']
+
+export function createEmitGate(repeatable = REPEATABLE_CANDIDATES) {
+  const canRepeat = new Set(repeatable)
+  let latched = null
+  return {
+    /**
+     * @param {string|null} stable 本帧的稳定手势（投票器产出）
+     * @returns {string|null} 本帧允许发进总线的手势；null 表示不发
+     */
+    push(stable) {
+      // 握拳也算中立帧：它由两阶段提交状态机单独处理，同时它是「松开了选答手势」的证据
+      if (!stable || stable === 'fist') { latched = null; return null }
+      if (canRepeat.has(stable)) return stable
+      if (latched === stable) return null
+      latched = stable
+      return stable
+    },
+    reset() { latched = null },
+    get latched() { return latched }
+  }
+}

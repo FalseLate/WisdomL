@@ -95,6 +95,12 @@ const routes = [
     component: () => import('../views/ReadingArticleView.vue'),
     meta: { requiresAuth: true }
   },
+  {
+    path: '/knowledge-universe',
+    name: 'KnowledgeUniverse',
+    component: () => import('../views/StarMapView.vue'),
+    meta: { requiresAuth: true }
+  },
   { path: '/:pathMatch(.*)*', redirect: '/' }
 ]
 

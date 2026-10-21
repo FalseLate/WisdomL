@@ -96,13 +96,40 @@
               <div class="func-desc">PDF / Word 按章节出题</div>
             </div>
 
-            <!-- AI MIND -->
-            <div class="func-card" style="--card-accent: var(--success); --card-glow: var(--success-soft); --icon-bg: var(--success-soft); --icon-border: var(--success-border);"
-              @click="openAiMind">
-              <div class="func-tag tag-new">NEW</div>
-              <div class="func-icon">🧠</div>
-              <div class="func-name">AI MIND</div>
-              <div class="func-desc">学习图谱 · 知识点总结与周报</div>
+            <!-- 知识星图：深空星座节点 + 轨道，SVG 自绘，不依赖 emoji -->
+            <div class="func-card" style="--card-accent: var(--violet); --card-glow: var(--accent-soft); --icon-bg: var(--accent-soft); --icon-border: var(--accent-border);"
+              @click="goStarMap">
+              <div class="func-icon func-icon-galaxy" aria-hidden="true">
+                <svg viewBox="0 0 32 32" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                  <defs>
+                    <linearGradient id="home-starmap-grad" x1="4" y1="4" x2="28" y2="28">
+                      <stop offset="0" style="stop-color: var(--accent)" />
+                      <stop offset=".55" style="stop-color: var(--sky-text)" />
+                      <stop offset="1" style="stop-color: var(--violet)" />
+                    </linearGradient>
+                  </defs>
+                  <ellipse cx="16" cy="16" rx="13" ry="5.2" transform="rotate(-24 16 16)"
+                           stroke="url(#home-starmap-grad)" stroke-width=".9" stroke-dasharray="2 4" opacity=".55" />
+                  <g stroke="url(#home-starmap-grad)" stroke-width="1.15" opacity=".9">
+                    <path d="M6.5 21.5 12.8 11.8 20 16.1 25.2 7.8 27 18.2 20 16.1 18.2 24.2 12.8 11.8" />
+                  </g>
+                  <g fill="url(#home-starmap-grad)">
+                    <circle cx="6.5" cy="21.5" r="1.5" />
+                    <circle cx="12.8" cy="11.8" r="2.1" />
+                    <circle cx="20" cy="16.1" r="1.35" />
+                    <circle cx="25.2" cy="7.8" r="1.9" />
+                    <circle cx="27" cy="18.2" r="1.1" />
+                    <circle cx="18.2" cy="24.2" r="1.35" />
+                  </g>
+                  <g fill="var(--accent)" opacity=".75">
+                    <circle cx="4.2" cy="8.2" r=".7" />
+                    <circle cx="23.4" cy="25.5" r=".8" />
+                    <circle cx="29.2" cy="12.6" r=".55" />
+                  </g>
+                </svg>
+              </div>
+              <div class="func-name">知识星图</div>
+              <div class="func-desc">3D 知识宇宙 · 星系 / 知识点关联</div>
             </div>
           </div>
         </section>
@@ -113,9 +140,11 @@
             <div class="section-name"><span class="bar"></span>学习中心</div>
           </div>
           <div class="quick-grid">
-            <div class="quick-item" @click="$router.push('/question-bank')">
-              <div class="quick-icon">📎</div>
-              <div class="quick-label">题库</div>
+            <!-- 题库在底部导航已有独立入口，学习中心不再重复放卡片，这一格给 AI MIND -->
+            <div class="quick-item" @click="openAiMind" title="学习图谱 · 知识点总结与周报">
+              <div class="quick-tag tag-new">NEW</div>
+              <div class="quick-icon">🧠</div>
+              <div class="quick-label">AI MIND</div>
             </div>
             <div class="quick-item" @click="$router.push('/wrong-questions')">
               <div class="quick-icon">❌</div>
@@ -342,6 +371,15 @@
         </div>
       </div>
     </div>
+
+    <!-- 进入知识星图的跃迁过渡：纯 CSS 星流，不阻塞路由 -->
+    <Transition name="warp-fade">
+      <div v-if="warping" class="warp-mask" role="status" aria-live="polite" aria-label="正在进入知识星图">
+        <div class="warp-core"></div>
+        <span v-for="i in 36" :key="i" class="warp-star" :style="warpStarStyle(i)"></span>
+        <div class="warp-title">正在穿越知识星海</div>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -454,6 +492,32 @@ onMounted(async () => {
 })
 
 onUnmounted(clearPollSignals)
+onUnmounted(() => { if (warpTimer) clearTimeout(warpTimer) })
+
+const warping = ref(false)
+let warpTimer = 0
+
+function warpStarStyle(i) {
+  const angle = (i * 137.508) % 360
+  return {
+    '--a': `${angle}deg`,
+    '--dist': `${260 + (i % 6) * 95}px`,
+    '--delay': `${(i % 9) * 13}ms`,
+    '--len': `${11 + (i % 4) * 6}px`,
+    '--w': `${i % 5 === 0 ? 2.4 : 1.3}px`
+  }
+}
+
+function goStarMap() {
+  if (warping.value) return
+  const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  if (reduce) { router.push('/knowledge-universe'); return }
+  warping.value = true
+  warpTimer = window.setTimeout(() => {
+    warpTimer = 0
+    router.push('/knowledge-universe')
+  }, 560)
+}
 
 function openGenerate(tab) {
   const tabMap = { text: 0, photo: 1, file: 2 }
@@ -1066,6 +1130,16 @@ const goWordQuiz = () => {
   background: var(--icon-bg, var(--accent-soft));
   border: 1px solid var(--icon-border, var(--accent-border));
 }
+.func-icon-galaxy svg {
+  width: 30px;
+  height: 30px;
+  filter: drop-shadow(0 0 7px var(--accent-soft)) drop-shadow(0 0 13px var(--secondary-soft));
+  transition: transform .35s var(--ease-out), filter .35s var(--ease-out);
+}
+.func-card:hover .func-icon-galaxy svg {
+  transform: rotate(-8deg) scale(1.08);
+  filter: drop-shadow(0 0 11px var(--accent));
+}
 
 .func-name {
   font-family: var(--font-display);
@@ -1115,6 +1189,7 @@ const goWordQuiz = () => {
 }
 
 .quick-item {
+  position: relative;
   padding: 16px 6px;
   border-radius: var(--radius-button);
   background: var(--bg-elevated);
@@ -1123,6 +1198,16 @@ const goWordQuiz = () => {
   text-align: center;
   cursor: pointer;
   transition: all 0.25s var(--ease-out);
+}
+.quick-tag {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: .04em;
 }
 
 .quick-item:hover {
@@ -1677,5 +1762,94 @@ const goWordQuiz = () => {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+/* ===== 进入知识星图的跃迁过渡 ===== */
+.warp-fade-enter-active, .warp-fade-leave-active { transition: opacity .16s ease; }
+.warp-fade-enter-from, .warp-fade-leave-to { opacity: 0; }
+.warp-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  overflow: hidden;
+  background-color: var(--bg-base);
+  background-image:
+    radial-gradient(circle at 50% 50%, var(--accent-soft) 0%, transparent 42%),
+    radial-gradient(circle at 50% 50%, var(--secondary-soft) 0%, transparent 66%);
+  pointer-events: auto;
+}
+.warp-mask::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 120px;
+  height: 120px;
+  margin: -60px 0 0 -60px;
+  border-radius: 50%;
+  border: 1px solid var(--accent-border);
+  box-shadow: 0 0 40px var(--accent-soft), inset 0 0 30px var(--secondary-soft);
+  animation: warp-pulse .56s cubic-bezier(.2,.7,.2,1) forwards;
+  will-change: transform, opacity;
+}
+.warp-core {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin: -3.5px 0 0 -3.5px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 16px var(--accent), 0 0 42px var(--violet);
+  animation: warp-core .56s cubic-bezier(.2,.7,.2,1) forwards;
+  will-change: transform, opacity;
+}
+.warp-star {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--w, 1.4px);
+  height: var(--len, 14px);
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--accent), transparent);
+  transform-origin: 50% 0;
+  opacity: 0;
+  animation: warp-star .56s cubic-bezier(.22,.61,.36,1) var(--delay, 0ms) forwards;
+  will-change: transform, opacity;
+}
+.warp-title {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(50% + 54px);
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: .32em;
+  color: var(--accent);
+  opacity: 0;
+  animation: warp-title .5s ease-out .08s forwards;
+}
+@keyframes warp-core {
+  0% { transform: scale(.4); opacity: .4; }
+  35% { transform: scale(2.4); opacity: 1; }
+  100% { transform: scale(.2); opacity: 0; }
+}
+@keyframes warp-pulse {
+  0% { transform: scale(.2); opacity: .9; }
+  100% { transform: scale(9); opacity: 0; }
+}
+@keyframes warp-star {
+  0% { opacity: 0; transform: rotate(var(--a, 0deg)) translateY(18px) scaleY(.2); }
+  18% { opacity: .9; }
+  100% { opacity: 0; transform: rotate(var(--a, 0deg)) translateY(var(--dist, 300px)) scaleY(1.9); }
+}
+@keyframes warp-title {
+  0% { opacity: 0; transform: translateY(4px); }
+  100% { opacity: .9; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .warp-mask { display: none; }
 }
 </style>

@@ -5,6 +5,7 @@
  *  2. 整体旋转 45° 后分类一致（旋转不变性）
  *  3. 迟滞：伸直/弯曲临界序列不反复横跳
  *  4. 两阶段握拳提交：完整流程 / 单握不提交 / 超时取消
+ *  5. 发射门控：持续比同一选答手势只发一次（多选题闪烁回归）
  */
 
 import {
@@ -13,7 +14,8 @@ import {
   createGeoState,
   analyzeFrame,
   createVoter,
-  createSubmitArmer
+  createSubmitArmer,
+  createEmitGate
 } from '../src/utils/gestureGeometry.js'
 
 let pass = 0
@@ -294,6 +296,37 @@ console.log('\n[4] 两阶段握拳提交状态机（注入时钟）')
   let gotSubmit = false
   for (; t <= 2600; t += 33) { const r = armer.frame('fist', t); if (r.event === 'submit') gotSubmit = true }
   assert(!gotSubmit, '取消后短暂再握拳（不足第一握1.5s）不会误提交')
+}
+
+console.log('\n[5] 发射门控：持续比同一个选答手势只发一次（多选题 A/B 闪烁回归）')
+{
+  const gate = createEmitGate()
+  let emitted = 0
+  for (let f = 0; f < 40; f++) if (gate.push('select:B') === 'select:B') emitted++
+  assert(emitted === 1, `持续 select:B 40 帧只发 1 次（实际 ${emitted}）`)
+
+  let second = 0
+  gate.push(null)
+  for (let f = 0; f < 20; f++) if (gate.push('select:B') === 'select:B') second++
+  assert(second === 1, `松开（中立帧）后再比 select:B 允许第二次（实际 ${second}）`)
+
+  gate.push('fist')
+  assert(gate.push('select:B') === 'select:B', '握拳帧也算松开，两阶段提交不阻断后续选答')
+  assert(gate.push('select:C') === 'select:C', '不松手直接换手势（2指->3指）立刻发新的')
+
+  let clears = 0
+  for (let f = 0; f < 30; f++) if (gate.push('clear') === 'clear') clears++
+  assert(clears === 1, `持续 clear 30 帧只发 1 次（实际 ${clears}）`)
+
+  gate.reset()
+  let navs = 0
+  for (let f = 0; f < 30; f++) if (gate.push('prev') === 'prev') navs++
+  assert(navs === 30, `prev 属翻页，持续比保持连发（实际 ${navs}/30）`)
+
+  const g2 = createEmitGate()
+  g2.push('select:A')
+  g2.reset()
+  assert(g2.push('select:A') === 'select:A', 'reset（手移出画面）后同一手势可再发')
 }
 
 console.log(`\n========== 结果：${pass} passed, ${fail} failed ==========`)

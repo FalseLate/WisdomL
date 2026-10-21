@@ -27,6 +27,11 @@ public class GenerateTask {
     private LocalDateTime completedAt;
     private List<Map<String, Object>> objectiveQuestions = new ArrayList<>();
     private List<Map<String, Object>> subjectiveQuestions = new ArrayList<>();
+    /**
+     * 通用结果出口：出题链路不用它（永远为 null），其它异步任务（如星图的错题反推知识点）
+     * 往里塞自己的进度与产出，这样轮询接口 /api/task/{id} 不必为每个新功能开一条新路径。
+     */
+    private Map<String, Object> result;
 
     public GenerateTask() {}
 
@@ -79,4 +84,7 @@ public class GenerateTask {
 
     public List<Map<String, Object>> getSubjectiveQuestions() { return subjectiveQuestions; }
     public void setSubjectiveQuestions(List<Map<String, Object>> subjectiveQuestions) { this.subjectiveQuestions = subjectiveQuestions; }
+
+    public Map<String, Object> getResult() { return result; }
+    public void setResult(Map<String, Object> result) { this.result = result; }
 }
