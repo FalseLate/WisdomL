@@ -26,21 +26,12 @@ export function generateReading() {
   })
 }
 
-// AI 自动错因识别：返回 { errorTypeIds: '1,3', reason: '...' }
-export function autoTagError(questionId) {
-  return request({
-    url: '/english/wrong/auto-tag',
-    method: 'POST',
-    data: { questionId }
-  })
-}
-
-// Act 沉淀：把错题知识缺口提炼成我的私人 Wiki 条目（同题去重）
-export function absorbWiki(questionId) {
+// Act 沉淀：按用户勾选的错因提炼成我的私人 Wiki 条目（同题去重）
+export function absorbWiki(questionId, errorTypeIds) {
   return request({
     url: '/wiki/absorb',
     method: 'POST',
-    data: { questionId }
+    data: { questionId, errorTypeIds }
   })
 }
 
@@ -57,6 +48,33 @@ export function removeMyWiki(id) {
   return request({
     url: `/wiki/mine/${id}`,
     method: 'DELETE'
+  })
+}
+
+// 手动新增/更新私人笔记：payload = {id?, noteType, title, content, exampleSentence?, tags?, links?[id...]}
+// 无 id 为新增，带 id 为更新；返回 { code, id }
+export function saveNote(payload) {
+  return request({
+    url: '/wiki/note',
+    method: 'POST',
+    data: payload
+  })
+}
+
+// 笔记详情：返回 { code, data: { id, noteType, title, content, exampleSentence, tags, errorTypeIds, links:[{id,title,noteType}], backlinks:[...] } }
+export function getNoteDetail(id) {
+  return request({
+    url: `/wiki/note/${id}`,
+    method: 'GET'
+  })
+}
+
+// 阅读题解析：payload = {question, options:{A..}, picked, correct}，返回 { code, data:{explanation, sources} }
+export function explainQuestion(payload) {
+  return request({
+    url: '/english/explain',
+    method: 'POST',
+    data: payload
   })
 }
 

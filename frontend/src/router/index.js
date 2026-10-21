@@ -101,6 +101,13 @@ const routes = [
     component: () => import('../views/StarMapView.vue'),
     meta: { requiresAuth: true }
   },
+  {
+    path: '/tutor/chat',
+    name: 'TutorChat',
+    component: () => import('../views/TutorChatView.vue'),
+    meta: { requiresAuth: true }
+  },
+
   { path: '/:pathMatch(.*)*', redirect: '/' }
 ]
 

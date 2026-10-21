@@ -57,14 +57,10 @@
             :class="{ active: hasErrorType(item, t.id) }"
             @click="toggleErrorType(item, t.id)"
           >{{ t.name }}</span>
-          <span class="etype-pill ai-tag" :class="{ busy: item._aiBusy }" @click="aiTag(item)">
-            {{ item._aiBusy ? '识别中…' : '🤖 AI 识别' }}
-          </span>
           <span class="etype-pill ai-tag" :class="{ busy: item._absorbBusy }" @click="absorb(item)">
             {{ item._absorbBusy ? '提炼中…' : item._absorbed ? '📌 已入我的Wiki' : '📌 提炼笔记' }}
           </span>
         </div>
-        <div class="wc-ai-reason" v-if="item._aiReason">AI 分析：{{ item._aiReason }}</div>
         <div class="wc-ai-reason absorb" v-if="item._absorbedTitle">已沉淀笔记：{{ item._absorbedTitle }}（在我的Wiki里可查看）</div>
 
         <!-- 操作：错题练习跳转专用练习页（变式 + 同类型题循环攻克） -->
@@ -85,7 +81,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { showSuccessToast, showFailToast } from 'vant'
 import { getEnglishWrongList, saveErrorTypes } from '../api/englishWrong'
-import { autoTagError, absorbWiki } from '../api/englishAgent'
+import { absorbWiki } from '../api/englishAgent'
 
 const router = useRouter()
 const list = ref([])
@@ -133,7 +129,7 @@ async function load() {
       list.value = (res.data || []).map(item => {
         let q = null
         try { q = JSON.parse(item.questionContent) } catch (e) { /* 内容解析失败按无题处理 */ }
-        return { ...item, _q: q, _aiBusy: false, _aiReason: null, _absorbBusy: false, _absorbed: false, _absorbedTitle: '' }
+        return { ...item, _q: q, _absorbBusy: false, _absorbed: false, _absorbedTitle: '' }
       })
     } else {
       showFailToast(res.msg || '加载失败')
@@ -162,33 +158,17 @@ async function toggleErrorType(item, tid) {
   }
 }
 
-// ===== AI 自动错因识别（阶段2）：结果落扩展表，识别后仍可手动覆盖 =====
-async function aiTag(item) {
-  if (item._aiBusy) return
-  item._aiBusy = true
-  try {
-    const res = await autoTagError(item.questionId)
-    if (res.code === 200) {
-      item.errorTypeIds = res.errorTypeIds
-      item._aiReason = res.reason
-      showSuccessToast('AI 已标记错因，可手动调整')
-      absorb(item)   // Act 闭环：识别完错因自动提炼知识笔记，失败不影响错因展示
-    } else {
-      showFailToast(res.msg || 'AI 识别失败')
-    }
-  } catch (e) {
-    showFailToast('AI 识别失败，可手动勾选')
-  } finally {
-    item._aiBusy = false
-  }
-}
-
-// ===== Act 沉淀：把错题知识缺口提炼成私人 Wiki 条目（同题去重，已沉淀的题不重复写） =====
+// ===== Act 沉淀：按用户勾选的错因提炼成私人 Wiki 条目（同题去重，已沉淀的题不重复写） =====
 async function absorb(item) {
   if (item._absorbBusy || item._absorbed) return
+  const etypes = (item.errorTypeIds || '').split(',').filter(Boolean).join(',')
+  if (!etypes) {
+    showFailToast('请先在上方勾选错因，再提炼笔记')
+    return
+  }
   item._absorbBusy = true
   try {
-    const res = await absorbWiki(item.questionId)
+    const res = await absorbWiki(item.questionId, etypes)
     if (res.code === 200) {
       item._absorbed = true
       item._absorbedTitle = res.title

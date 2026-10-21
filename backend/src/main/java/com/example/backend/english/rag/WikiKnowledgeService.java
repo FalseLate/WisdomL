@@ -30,6 +30,11 @@ public class WikiKnowledgeService {
     @Value("${rag.top-k:5}")
     private int defaultTopK;
 
+    @Value("${rag.similarity-threshold:0.55}")
+    private double similarityThreshold;   // 向量模式最低原始相似度
+
+    private static final double PRIVATE_WEIGHT = 1.2;   // 私有条目软加权系数
+
     @Resource
     private WikiKnowledgeMapper knowledgeMapper;
 
@@ -88,27 +93,28 @@ public class WikiKnowledgeService {
 
         List<SearchHit> hits = new ArrayList<>();
         for (WikiKnowledge item : candidates) {
-            double score;
+            boolean priv = item.getUserId() != null;
+            double raw;
             if (queryVec != null) {
                 float[] vec = ensureEmbedding(item);
                 if (vec == null) continue;
-                score = cosine(queryVec, vec);
+                raw = cosine(queryVec, vec);
+                if (raw < similarityThreshold) continue;   // 阈值卡原始相似度，不硬凑
             } else {
-                score = keywordScore(query, item);
-                if (score <= 0) continue;
+                raw = keywordScore(query, item);           // 关键词降级模式不做阈值（量纲不同）
+                if (raw <= 0) continue;
             }
-            hits.add(new SearchHit(item, score));
+            double weighted = priv ? raw * PRIVATE_WEIGHT : raw;   // 私有软加权，仅用于排序
+            hits.add(new SearchHit(item, weighted, raw));
         }
-        // 私人沉淀优先（同相关度时更懂用户），再按相似度降序
-        hits.sort(Comparator
-                .comparing((SearchHit h) -> h.knowledge().getUserId() != null ? 0 : 1)
-                .thenComparing(Comparator.comparingDouble(SearchHit::getScore).reversed()));
+        // 按加权分降序（取代旧的"私有硬排在最前"）
+        hits.sort(Comparator.comparingDouble(SearchHit::getScore).reversed());
         List<SearchHit> top = hits.subList(0, Math.min(k, hits.size()));
         countHits(top);
         return top;
     }
 
-    /** 阶段4 反哺公共库：私人条目每被检索命中一次计数+1，满 5 次说明对大家都有用，自动升级为公共条目 */
+    /** 私人条目命中计数：仅作热度统计，不再自动升级为公共（保持私/公单向流动） */
     private void countHits(List<SearchHit> top) {
         for (SearchHit hit : top) {
             WikiKnowledge k = hit.knowledge();
@@ -118,17 +124,7 @@ public class WikiKnowledgeService {
                 WikiKnowledge update = new WikiKnowledge();
                 update.setId(k.getId());
                 update.setHitCount(newCount);
-                if (newCount >= 5) {
-                    update.setUserId(null);   // 升级为公共（MyBatis-Plus 默认跳过 null，需 UpdateWrapper 置空）
-                    knowledgeMapper.update(null, Wrappers.<WikiKnowledge>lambdaUpdate()
-                            .eq(WikiKnowledge::getId, k.getId())
-                            .set(WikiKnowledge::getUserId, null)
-                            .set(WikiKnowledge::getHitCount, newCount));
-                    log.info("私人知识点[{}] 命中{}次，已反哺为公共条目", k.getTitle(), newCount);
-                    k.setUserId(null);
-                } else {
-                    knowledgeMapper.updateById(update);
-                }
+                knowledgeMapper.updateById(update);
                 k.setHitCount(newCount);
             } catch (Exception e) {
                 log.warn("命中计数失败 id={}: {}", k.getId(), e.getMessage());
@@ -199,9 +195,11 @@ public class WikiKnowledgeService {
         return na == 0 || nb == 0 ? 0 : dot / (Math.sqrt(na) * Math.sqrt(nb));
     }
 
-    /** 检索命中：知识点 + 相似度分 */
-    public record SearchHit(WikiKnowledge knowledge, double score) {
+    /** 检索命中：知识点 + 加权分(排序用) + 原始相似度 */
+    public record SearchHit(WikiKnowledge knowledge, double score, double rawScore) {
         public double getScore() { return score; }
+        public double getRawScore() { return rawScore; }
+        public boolean isPrivate() { return knowledge.getUserId() != null; }
     }
 
     /**
@@ -218,6 +216,34 @@ public class WikiKnowledgeService {
         item.setEmbeddingJson(null);   // 向量留待首次检索时懒生成
         knowledgeMapper.insert(item);
         return item.getId();
+    }
+
+    /** 手动笔记：新增（归属当前用户，向量留空待首次检索懒生成） */
+    public long insertNote(WikiKnowledge item) {
+        item.setEmbeddingJson(null);
+        knowledgeMapper.insert(item);
+        return item.getId();
+    }
+
+    /** 手动笔记：按 id 更新（显式写每列，支持清空；SQL 层再带 user_id 双保险） */
+    public void updateNote(WikiKnowledge item) {
+        knowledgeMapper.update(null, Wrappers.<WikiKnowledge>lambdaUpdate()
+                .eq(WikiKnowledge::getId, item.getId())
+                .eq(WikiKnowledge::getUserId, item.getUserId())
+                .set(WikiKnowledge::getNoteType, item.getNoteType())
+                .set(WikiKnowledge::getTitle, item.getTitle())
+                .set(WikiKnowledge::getContent, item.getContent())
+                .set(WikiKnowledge::getExampleSentence, item.getExampleSentence())
+                .set(WikiKnowledge::getTags, item.getTags())
+                .set(WikiKnowledge::getLinks, item.getLinks())
+                .set(WikiKnowledge::getKnowledgeType, item.getKnowledgeType())
+                .set(WikiKnowledge::getEmbeddingJson, ""));   // 内容变了，清向量待检索时重算
+    }
+
+    /** 取属于该用户的私人条目；不存在或非本人返回 null（链接校验/更新鉴权用） */
+    public WikiKnowledge findOwned(long id, long userId) {
+        WikiKnowledge k = knowledgeMapper.selectById(id);
+        return (k != null && k.getUserId() != null && k.getUserId().equals(userId)) ? k : null;
     }
 
     /** 某用户的私人条目（新的沉淀在前） */

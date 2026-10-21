@@ -169,7 +169,7 @@ const props = defineProps({
   sessionId: { type: String, default: DEFAULT_SESSION_ID }     // 会话 id（多用户接入时宿主须传唯一值）
 })
 // 对外事件：宿主的英语练习模块可监听记录学习数据
-const emit = defineEmits(['chat-sent', 'reply-done'])
+const emit = defineEmits(['chat-sent', 'reply-done', 'open-full-chat'])
 
 const messages = ref([])
 // 故事标签页独立的会话消息——不和对话共用，互不污染
@@ -261,11 +261,9 @@ async function uploadSpeech(blob) {
 
 // ========== 点击角色 → 迷你功能栏（吸附人物左手边，深色玻璃圆钮，悬停出文字） ==========
 const RAIL_ITEMS = [
-  { key: 'mic',              icon: '🎤', label: '按住说话' },
-  { key: 'translate',        icon: '🔤', label: '帮我翻译' },
-  { key: 'story',            icon: '📖', label: '讲个短故事' },
   { key: 'lookup-word',      icon: '🔍', label: '查单词' },
   { key: 'analyze-sentence', icon: '🧩', label: '解句子' },
+  { key: 'chat-full',        icon: '💬', label: '全屏聊天' },
   { key: 'close',            icon: '✕',  label: '收起' }
 ]
 const menu = ref({ show: false })
@@ -279,6 +277,8 @@ function railMicDown() {
 }
 function pickFeature(key) {
   menu.value.show = false
+  // 全屏聊天：交给宿主路由跳转（PetTutor 保持自包含，不依赖 vue-router）
+  if (key === 'chat-full') { emit('open-full-chat'); return }
   // 查词/解句已是全局能力（挂 document 层，任何页面可用），不再依赖阅读页联动
   if (key === 'lookup-word') { enterToolMode('word'); return }
   if (key === 'analyze-sentence') { enterToolMode('sentence'); return }

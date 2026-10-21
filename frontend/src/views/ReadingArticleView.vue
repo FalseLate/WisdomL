@@ -39,7 +39,13 @@
             >{{ 'ABCD'[oi] }}. {{ opt }}</div>
           </div>
           <div class="q-explain" v-if="q._picked !== null">
-            {{ q._picked === q.answer ? '✅ 回答正确' : `❌ 正确答案：${'ABCD'[q.answer]}` }} · {{ q.explain }}
+            {{ q._picked === q.answer ? '✅ 回答正确' : `❌ 正确答案：${'ABCD'[q.answer]}` }}
+            <template v-if="q.explain"> · {{ q.explain }}</template>
+            <div class="q-ai">
+              <span v-if="!q._explain && !q._explainLoading" class="q-explain-btn" @click="askExplain(q)">解析</span>
+              <span v-if="q._explainLoading" class="q-explain-loading">解析中…</span>
+              <div v-if="q._explain" class="q-explain-text">💡 {{ q._explain }}</div>
+            </div>
           </div>
         </div>
         <div class="quiz-score" v-if="allAnswered">得分：{{ quizScore }} / {{ questions.length }}</div>
@@ -97,6 +103,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { showSuccessToast, showFailToast } from 'vant'
 import { getReadingArticle, getReadingDone, finishReadingQuiz } from '../api/reading'
 import { getMyCollectList } from '../api/word'
+import { explainQuestion } from '../api/englishAgent'
 import { authState } from '../utils/auth.js'
 import request from '../utils/request'
 
@@ -220,6 +227,31 @@ function pickOption(q, oi) {
   if (allAnswered.value) submitQuiz()
 }
 
+// 点击「解析」：调 AI 讲解，结果缓存到该题，不重复请求
+async function askExplain(q) {
+  if (q._explainLoading || q._explain) return
+  q._explainLoading = true
+  try {
+    const options = {}
+    q.options.forEach((o, i) => { options['ABCD'[i]] = o })
+    const res = await explainQuestion({
+      question: q.stem,
+      options,
+      picked: 'ABCD'[q._picked],
+      correct: 'ABCD'[q.answer]
+    })
+    if (res.code === 200) {
+      q._explain = res.data.explanation || '（暂无解析）'
+    } else {
+      showFailToast(res.msg || '解析失败')
+    }
+  } catch (e) {
+    showFailToast('解析失败，请重试')
+  } finally {
+    q._explainLoading = false
+  }
+}
+
 async function submitQuiz() {
   const wrongs = questions.value
     .map((q, qi) => ({ q, qi }))
@@ -235,8 +267,7 @@ async function submitQuiz() {
       wrongs
     })
     if (res.code === 200) {
-      quizDone.value = true
-      // 当前会话保留已答状态的得分展示；下次进入题目即隐藏
+      // 本会话不收起题目：保留 ✅/❌ 与「解析」按钮可继续点；下次进入才隐藏（见 onMounted getReadingDone）
       if (wrongs.length) showSuccessToast(`错题已加入错题本（${wrongs.length} 道）`)
     }
   } catch (err) { /* 交卷失败不影响本次答题展示，下次做完可再交 */ }
@@ -432,6 +463,28 @@ onMounted(async () => {
   margin: 0 2px;
 }
 
+
+.q-ai { margin-top: 8px; }
+.q-explain-btn {
+  display: inline-block;
+  font-size: 12px;
+  padding: 3px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  cursor: pointer;
+}
+.q-explain-loading { font-size: 12px; color: var(--text-muted); }
+.q-explain-text {
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  padding: 10px 12px;
+  border-radius: 8px;
+  border-left: 3px solid var(--accent);
+}
 
 /* 解析卡片 */
 .analyze-card {

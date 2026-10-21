@@ -260,4 +260,74 @@ public class EnglishAgentController {
         }
         return res;
     }
+
+    // ================= 解析（阅读做完题当场讲解，可融入私人笔记知识点） =================
+
+    /**
+     * 阅读题解析：POST /api/english/explain
+     * body { question, options, picked, correct }
+     * 检索相关笔记（私有×1.2、阈值0.55）注入提示词；若有相关的个人笔记，让模型把它当知识点自然融进解析。
+     */
+    @PostMapping("/explain")
+    public Map<String, Object> explain(@RequestBody Map<String, Object> body) {
+        Map<String, Object> res = new HashMap<>();
+        Long userId = jwtAuth.getCurrentUserId();
+        String question = str(body.get("question"));
+        if (question == null || question.isBlank()) {
+            res.put("code", 400); res.put("msg", "缺少题干"); return res;
+        }
+        String picked = str(body.get("picked"));
+        String correct = str(body.get("correct"));
+        Object opts = body.get("options");
+
+        // 检索上下文：题干 + 选项拼成查询
+        StringBuilder q = new StringBuilder(question);
+        if (opts != null) q.append(' ').append(opts);
+        List<WikiKnowledgeService.SearchHit> hits;
+        try {
+            hits = wikiKnowledgeService.search(q.toString(), null, 4, userId);
+        } catch (Exception e) {
+            hits = List.of();
+        }
+
+        StringBuilder kb = new StringBuilder();
+        List<Map<String, Object>> sources = new ArrayList<>();
+        for (WikiKnowledgeService.SearchHit h : hits) {
+            var k = h.knowledge();
+            boolean priv = h.isPrivate();
+            kb.append(priv ? "- [我的笔记] " : "- [公共] ").append(k.getTitle())
+              .append('：').append(k.getContent() == null ? "" : k.getContent()).append('\n');
+            Map<String, Object> s = new HashMap<>();
+            s.put("title", k.getTitle());
+            s.put("isPrivate", priv);
+            s.put("score", Math.round(h.getRawScore() * 100) / 100.0);
+            sources.add(s);
+        }
+
+        try {
+            String sys = "你是英语老师，给这道阅读题写一段解析。要求："
+                    + "1) 说清正确答案为什么对、用户所选错在哪（点破思维误区）；"
+                    + "2) 若【参考资料】里有相关的『我的笔记』，把它当作一个知识点自然融进解析提一句（如“这正对应你之前笔记里的……”），没有相关的就不硬凑；"
+                    + "3) 中文，简洁，3-5 句，不要复述全文。";
+            String user = "题目：" + question
+                    + (opts == null ? "" : "\n选项：" + opts)
+                    + "\n用户答案：" + (picked == null ? "未选" : picked)
+                    + "\n正确答案：" + correct
+                    + (kb.length() == 0 ? "\n（无相关历史笔记）" : "\n参考资料：\n" + kb);
+            String text = agentChatService.chat(sys, user, 600);
+            Map<String, Object> data = new HashMap<>();
+            data.put("explanation", text);
+            data.put("sources", sources);
+            res.put("code", 200);
+            res.put("data", data);
+        } catch (Exception e) {
+            log.warn("解析生成失败: {}", e.getMessage());
+            res.put("code", 500);
+            res.put("msg", "解析失败，请重试");
+            res.put("sources", sources);
+        }
+        return res;
+    }
+
+    private static String str(Object v) { return v == null ? null : String.valueOf(v); }
 }

@@ -280,3 +280,43 @@ ALTER TABLE user_wrong_question
 -- ALTER TABLE starmap_topic
 --     ADD INDEX idx_starmap_topic_galaxy (user_id, galaxy_id);
 
+
+
+-- ============================================================
+-- WisdomL 私人 Wiki 手动笔记 + 双向链接：给 wiki_public_knowledge 增加 3 列
+-- PR-1 迁移。幂等：逐列判断，缺失才加，重复执行安全（别人环境同步用）。
+-- 适用 MySQL 8.x。执行前 USE 到你的库（如 xmdb）。纯加可空列，不动存量数据。
+-- ============================================================
+
+SET @db := DATABASE();
+
+-- note_type
+SET @s := (SELECT IF(
+  (SELECT COUNT(*) FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA=@db AND TABLE_NAME='wiki_public_knowledge' AND COLUMN_NAME='note_type')=0,
+  'ALTER TABLE `wiki_public_knowledge` ADD COLUMN `note_type` tinyint DEFAULT NULL COMMENT ''手动笔记子类型：1知识点 2词汇 3长难句 4个人批注；非手动条目为 NULL''',
+  'SELECT ''[skip] note_type 已存在'' AS msg'));
+PREPARE st FROM @s; EXECUTE st; DEALLOCATE PREPARE st;
+
+-- tags
+SET @s := (SELECT IF(
+  (SELECT COUNT(*) FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA=@db AND TABLE_NAME='wiki_public_knowledge' AND COLUMN_NAME='tags')=0,
+  'ALTER TABLE `wiki_public_knowledge` ADD COLUMN `tags` varchar(255) DEFAULT NULL COMMENT ''主题标签，逗号分隔，供标签优先检索用''',
+  'SELECT ''[skip] tags 已存在'' AS msg'));
+PREPARE st FROM @s; EXECUTE st; DEALLOCATE PREPARE st;
+
+-- links
+SET @s := (SELECT IF(
+  (SELECT COUNT(*) FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA=@db AND TABLE_NAME='wiki_public_knowledge' AND COLUMN_NAME='links')=0,
+  'ALTER TABLE `wiki_public_knowledge` ADD COLUMN `links` varchar(1024) DEFAULT NULL COMMENT ''双向链接：目标条目 id 的 JSON 数组，如 [3,17]''',
+  'SELECT ''[skip] links 已存在'' AS msg'));
+PREPARE st FROM @s; EXECUTE st; DEALLOCATE PREPARE st;
+
+-- 校验：应列出 note_type / tags / links 三行
+SELECT COLUMN_NAME, DATA_TYPE, COLUMN_COMMENT
+FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA=@db AND TABLE_NAME='wiki_public_knowledge'
+  AND COLUMN_NAME IN ('note_type','tags','links')
+ORDER BY COLUMN_NAME;
