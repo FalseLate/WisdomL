@@ -96,35 +96,65 @@
               <div class="func-desc">PDF / Word 按章节出题</div>
             </div>
 
-            <!-- 知识星图：深空星座节点 + 轨道，SVG 自绘，不依赖 emoji -->
+            <!-- 知识星图：深空星球 + 星轨，SVG 自绘，不依赖 emoji -->
             <div class="func-card" style="--card-accent: var(--violet); --card-glow: var(--accent-soft); --icon-bg: var(--accent-soft); --icon-border: var(--accent-border);"
               @click="goStarMap">
               <div class="func-icon func-icon-galaxy" aria-hidden="true">
-                <svg viewBox="0 0 32 32" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <svg viewBox="0 0 40 40" fill="none" focusable="false">
                   <defs>
-                    <linearGradient id="home-starmap-grad" x1="4" y1="4" x2="28" y2="28">
-                      <stop offset="0" style="stop-color: var(--accent)" />
-                      <stop offset=".55" style="stop-color: var(--sky-text)" />
-                      <stop offset="1" style="stop-color: var(--violet)" />
+                    <radialGradient id="home-planet-fill" cx="32%" cy="26%" r="82%">
+                      <stop offset="0" style="stop-color:var(--planet-highlight)" />
+                      <stop offset=".26" style="stop-color:var(--sky-text)" />
+                      <stop offset=".58" style="stop-color:var(--accent)" />
+                      <stop offset=".82" style="stop-color:var(--planet-deep)" />
+                      <stop offset="1" style="stop-color:var(--planet-shadow)" />
+                    </radialGradient>
+                    <linearGradient id="home-orbit-grad" x1="4" y1="31" x2="36" y2="9" gradientUnits="userSpaceOnUse">
+                      <stop offset="0" style="stop-color:var(--sky-text)" />
+                      <stop offset=".52" style="stop-color:var(--accent)" />
+                      <stop offset="1" style="stop-color:var(--violet)" />
                     </linearGradient>
+                    <linearGradient id="home-trail-grad" x1="4" y1="30" x2="35" y2="24" gradientUnits="userSpaceOnUse">
+                      <stop offset="0" style="stop-color:var(--sky-text);stop-opacity:.1" />
+                      <stop offset=".55" style="stop-color:var(--accent);stop-opacity:.9" />
+                      <stop offset="1" style="stop-color:var(--violet);stop-opacity:1" />
+                    </linearGradient>
+                    <clipPath id="home-planet-clip"><circle cx="20" cy="20" r="8.6" /></clipPath>
+                    <filter id="home-planet-glow" x="-60%" y="-60%" width="220%" height="220%">
+                      <feGaussianBlur stdDeviation="2.4" result="b" />
+                      <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+                    </filter>
                   </defs>
-                  <ellipse cx="16" cy="16" rx="13" ry="5.2" transform="rotate(-24 16 16)"
-                           stroke="url(#home-starmap-grad)" stroke-width=".9" stroke-dasharray="2 4" opacity=".55" />
-                  <g stroke="url(#home-starmap-grad)" stroke-width="1.15" opacity=".9">
-                    <path d="M6.5 21.5 12.8 11.8 20 16.1 25.2 7.8 27 18.2 20 16.1 18.2 24.2 12.8 11.8" />
+
+                  <circle cx="20" cy="20" r="12.6" fill="var(--accent)" opacity=".14" filter="url(#home-planet-glow)" />
+
+                  <g class="galaxy-drift">
+                    <ellipse cx="20" cy="20" rx="16.2" ry="6.6" transform="rotate(-28 20 20)"
+                             stroke="url(#home-orbit-grad)" stroke-width=".9" stroke-dasharray="1 3.4" opacity=".62" />
+                    <circle cx="33.8" cy="24.6" r="1.55" fill="#e0f2fe" />
+                    <circle cx="33.8" cy="24.6" r="2.8" fill="var(--sky-text)" opacity=".18" />
                   </g>
-                  <g fill="url(#home-starmap-grad)">
-                    <circle cx="6.5" cy="21.5" r="1.5" />
-                    <circle cx="12.8" cy="11.8" r="2.1" />
-                    <circle cx="20" cy="16.1" r="1.35" />
-                    <circle cx="25.2" cy="7.8" r="1.9" />
-                    <circle cx="27" cy="18.2" r="1.1" />
-                    <circle cx="18.2" cy="24.2" r="1.35" />
+
+                  <path d="M6.7 23.4c4.1-5.6 21.2-6.3 26.7-.6" stroke="url(#home-orbit-grad)" stroke-width="1.15" stroke-linecap="round" opacity=".38" />
+
+                  <circle cx="20" cy="20" r="8.6" fill="url(#home-planet-fill)" stroke="rgba(224,242,254,.45)" stroke-width=".7" />
+                  <g clip-path="url(#home-planet-clip)">
+                    <circle cx="25.2" cy="24.1" r="8" fill="#020617" opacity=".36" />
+                    <path d="M12.4 18.2c4.6-2.8 10.4-2.6 15.2-.6" stroke="#e0f2fe" stroke-width=".75" opacity=".22" />
+                    <path d="M13.4 22.4c3.8-1.9 8.6-1.8 12.4.1" stroke="#e0f2fe" stroke-width=".7" opacity=".16" />
                   </g>
-                  <g fill="var(--accent)" opacity=".75">
-                    <circle cx="4.2" cy="8.2" r=".7" />
-                    <circle cx="23.4" cy="25.5" r=".8" />
-                    <circle cx="29.2" cy="12.6" r=".55" />
+                  <path d="M12.9 17.4a8.6 8.6 0 0 1 11.4-4.7" stroke="#f0f9ff" stroke-width="1.05" stroke-linecap="round" opacity=".8" />
+
+                  <path d="M4.8 29.3c5.2 5.2 18.9 6.8 28.4-1.2" stroke="url(#home-trail-grad)" stroke-width="1.2" stroke-linecap="round" stroke-dasharray="1 3.1" />
+                  <circle cx="33.6" cy="27.6" r="1.35" fill="#f0f9ff" />
+                  <circle cx="33.6" cy="27.6" r="3" fill="var(--sky-text)" opacity=".2" />
+
+                  <path d="M7.2 24.6c4.3 3.9 18.3 4.5 25.6.7" stroke="url(#home-orbit-grad)" stroke-width="1.65" stroke-linecap="round" />
+
+                  <g fill="var(--sky-text)">
+                    <circle class="galaxy-star s1" cx="6.4" cy="7.4" r=".85" />
+                    <circle class="galaxy-star s2" cx="33.2" cy="8.6" r=".65" />
+                    <circle class="galaxy-star s3" cx="7.2" cy="14.1" r=".5" />
                   </g>
                 </svg>
               </div>
@@ -372,14 +402,6 @@
       </div>
     </div>
 
-    <!-- 进入知识星图的跃迁过渡：纯 CSS 星流，不阻塞路由 -->
-    <Transition name="warp-fade">
-      <div v-if="warping" class="warp-mask" role="status" aria-live="polite" aria-label="正在进入知识星图">
-        <div class="warp-core"></div>
-        <span v-for="i in 36" :key="i" class="warp-star" :style="warpStarStyle(i)"></span>
-        <div class="warp-title">正在穿越知识星海</div>
-      </div>
-    </Transition>
   </div>
 </template>
 
@@ -398,6 +420,7 @@ import PhotoInputCard from '../components/PhotoInputCard.vue'
 import FileUploadCard from '../components/FileUploadCard.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import { CyberNavbar, CyberButton } from '../components/cyber'
+import { beginWarp, cancelWarp } from '../starmap/warp.js'
 
 const router = useRouter()
 const qStore = useQuestionsStore()
@@ -492,31 +515,12 @@ onMounted(async () => {
 })
 
 onUnmounted(clearPollSignals)
-onUnmounted(() => { if (warpTimer) clearTimeout(warpTimer) })
-
-const warping = ref(false)
-let warpTimer = 0
-
-function warpStarStyle(i) {
-  const angle = (i * 137.508) % 360
-  return {
-    '--a': `${angle}deg`,
-    '--dist': `${260 + (i % 6) * 95}px`,
-    '--delay': `${(i % 9) * 13}ms`,
-    '--len': `${11 + (i % 4) * 6}px`,
-    '--w': `${i % 5 === 0 ? 2.4 : 1.3}px`
-  }
-}
 
 function goStarMap() {
-  if (warping.value) return
   const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
   if (reduce) { router.push('/knowledge-universe'); return }
-  warping.value = true
-  warpTimer = window.setTimeout(() => {
-    warpTimer = 0
-    router.push('/knowledge-universe')
-  }, 560)
+  beginWarp()
+  router.push('/knowledge-universe').catch(() => cancelWarp())
 }
 
 function openGenerate(tab) {
@@ -1131,14 +1135,32 @@ const goWordQuiz = () => {
   border: 1px solid var(--icon-border, var(--accent-border));
 }
 .func-icon-galaxy svg {
-  width: 30px;
-  height: 30px;
-  filter: drop-shadow(0 0 7px var(--accent-soft)) drop-shadow(0 0 13px var(--secondary-soft));
+  width: 32px;
+  height: 32px;
+  overflow: visible;
+  filter: drop-shadow(0 0 7px var(--accent-soft)) drop-shadow(0 0 15px var(--secondary-soft));
   transition: transform .35s var(--ease-out), filter .35s var(--ease-out);
 }
 .func-card:hover .func-icon-galaxy svg {
-  transform: rotate(-8deg) scale(1.08);
-  filter: drop-shadow(0 0 11px var(--accent));
+  transform: scale(1.08);
+  filter: drop-shadow(0 0 11px var(--accent)) drop-shadow(0 0 20px var(--secondary-soft));
+}
+.func-icon-galaxy .galaxy-drift {
+  transform-origin: 20px 20px;
+  animation: galaxyDrift 26s linear infinite;
+}
+.func-card:hover .func-icon-galaxy .galaxy-drift { animation-duration: 9s; }
+.func-icon-galaxy .galaxy-star { animation: galaxyTwinkle 3.4s ease-in-out infinite; }
+.func-icon-galaxy .s2 { animation-delay: .8s; }
+.func-icon-galaxy .s3 { animation-delay: 1.7s; }
+@keyframes galaxyDrift { to { transform: rotate(360deg); } }
+@keyframes galaxyTwinkle {
+  0%, 100% { opacity: .35; }
+  50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .func-icon-galaxy .galaxy-drift,
+  .func-icon-galaxy .galaxy-star { animation: none; }
 }
 
 .func-name {
@@ -1764,92 +1786,4 @@ const goWordQuiz = () => {
   gap: 10px;
 }
 
-/* ===== 进入知识星图的跃迁过渡 ===== */
-.warp-fade-enter-active, .warp-fade-leave-active { transition: opacity .16s ease; }
-.warp-fade-enter-from, .warp-fade-leave-to { opacity: 0; }
-.warp-mask {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  overflow: hidden;
-  background-color: var(--bg-base);
-  background-image:
-    radial-gradient(circle at 50% 50%, var(--accent-soft) 0%, transparent 42%),
-    radial-gradient(circle at 50% 50%, var(--secondary-soft) 0%, transparent 66%);
-  pointer-events: auto;
-}
-.warp-mask::before {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 120px;
-  height: 120px;
-  margin: -60px 0 0 -60px;
-  border-radius: 50%;
-  border: 1px solid var(--accent-border);
-  box-shadow: 0 0 40px var(--accent-soft), inset 0 0 30px var(--secondary-soft);
-  animation: warp-pulse .56s cubic-bezier(.2,.7,.2,1) forwards;
-  will-change: transform, opacity;
-}
-.warp-core {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 7px;
-  height: 7px;
-  margin: -3.5px 0 0 -3.5px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 16px var(--accent), 0 0 42px var(--violet);
-  animation: warp-core .56s cubic-bezier(.2,.7,.2,1) forwards;
-  will-change: transform, opacity;
-}
-.warp-star {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: var(--w, 1.4px);
-  height: var(--len, 14px);
-  border-radius: 999px;
-  background: linear-gradient(180deg, var(--accent), transparent);
-  transform-origin: 50% 0;
-  opacity: 0;
-  animation: warp-star .56s cubic-bezier(.22,.61,.36,1) var(--delay, 0ms) forwards;
-  will-change: transform, opacity;
-}
-.warp-title {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: calc(50% + 54px);
-  text-align: center;
-  font-family: var(--font-display);
-  font-size: 11px;
-  letter-spacing: .32em;
-  color: var(--accent);
-  opacity: 0;
-  animation: warp-title .5s ease-out .08s forwards;
-}
-@keyframes warp-core {
-  0% { transform: scale(.4); opacity: .4; }
-  35% { transform: scale(2.4); opacity: 1; }
-  100% { transform: scale(.2); opacity: 0; }
-}
-@keyframes warp-pulse {
-  0% { transform: scale(.2); opacity: .9; }
-  100% { transform: scale(9); opacity: 0; }
-}
-@keyframes warp-star {
-  0% { opacity: 0; transform: rotate(var(--a, 0deg)) translateY(18px) scaleY(.2); }
-  18% { opacity: .9; }
-  100% { opacity: 0; transform: rotate(var(--a, 0deg)) translateY(var(--dist, 300px)) scaleY(1.9); }
-}
-@keyframes warp-title {
-  0% { opacity: 0; transform: translateY(4px); }
-  100% { opacity: .9; transform: translateY(0); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .warp-mask { display: none; }
-}
 </style>

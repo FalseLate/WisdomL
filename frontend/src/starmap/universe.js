@@ -31,6 +31,9 @@ const PLANET_RING_GEO = new THREE.RingGeometry(1.26, 1.72, 128)
 const ORBIT_RING_GEO = new THREE.RingGeometry(0.996, 1, 128)
 const HOME_PHI = 1.04
 const BLOOM = { strength: 0.55, radius: 0.66, threshold: 0.29 }
+/** 线拾取：屏幕空间容差 + 曲线分段数。分段距离而不是只比采样点，长线中间才不会有点不到的空隙 */
+const EDGE_PICK_PX = 10
+const EDGE_PICK_SEGMENTS = 24
 
 /** 显示档：只影响观感，不碰布局。quality 是新增的降级档，auto 会看帧率自己降。 */
 export const DISPLAY_DEFAULTS = Object.freeze({
@@ -1331,6 +1334,7 @@ export function createUniverse({
   const ray = new THREE.Raycaster()
   const ndc = new THREE.Vector2()
   const sp = new THREE.Vector3()
+  const edgeMid = new THREE.Vector3()
 
   function clusterKeys(key) {
     const set = new Set([key])
@@ -1808,19 +1812,44 @@ export function createUniverse({
     if (starHits.length) return { node: starHits[0].object.userData.node.key, edge: null }
 
     let best = null
-    let bestD = 9
+    let bestD2 = Infinity
     if (!ignoreEdges) {
+      const mx = clientX - rect.left
+      const my = clientY - rect.top
+      const tanHalf = Math.tan((camera.fov * Math.PI) / 360)
       for (const [, obj] of edgeObjs) {
         if (!obj.mesh.visible) continue
-        for (let i = 0; i <= 18; i++) {
-          obj.curve.getPoint(i / 18, sp)
+        const selected = state.selectedEdge === obj.e.styleKey
+        const tubeR = edgeRadius(obj.e) * (selected ? 3.1 : 1)
+        obj.curve.getPoint(0.5, edgeMid)
+        const dist = camera.position.distanceTo(edgeMid)
+        const pxPerWorld = rect.height / (2 * Math.max(0.001, dist) * tanHalf)
+        const tol = Math.max(EDGE_PICK_PX, tubeR * pxPerWorld + 4)
+        const tol2 = tol * tol
+        let prevX = 0, prevY = 0, hasPrev = false
+        let minD2 = Infinity
+        for (let i = 0; i <= EDGE_PICK_SEGMENTS; i++) {
+          obj.curve.getPoint(i / EDGE_PICK_SEGMENTS, sp)
           sp.project(camera)
-          if (sp.z > 1) continue
-          const dx = (sp.x * 0.5 + 0.5) * rect.width - (clientX - rect.left)
-          const dy = (-sp.y * 0.5 + 0.5) * rect.height - (clientY - rect.top)
-          const d = Math.hypot(dx, dy)
-          if (d < bestD) { bestD = d; best = obj.e.styleKey }
+          if (sp.z > 1) { hasPrev = false; continue }
+          const sx = (sp.x * 0.5 + 0.5) * rect.width
+          const sy = (-sp.y * 0.5 + 0.5) * rect.height
+          if (hasPrev) {
+            // 鼠标到“投影后的线段”的距离；只比采样点会在长线中间留下空隙
+            const vx = sx - prevX
+            const vy = sy - prevY
+            const wx = mx - prevX
+            const wy = my - prevY
+            const len2 = vx * vx + vy * vy
+            const t = len2 > 0 ? Math.max(0, Math.min(1, (wx * vx + wy * vy) / len2)) : 0
+            const dx = mx - (prevX + t * vx)
+            const dy = my - (prevY + t * vy)
+            const d2 = dx * dx + dy * dy
+            if (d2 < minD2) minD2 = d2
+          }
+          prevX = sx; prevY = sy; hasPrev = true
         }
+        if (minD2 <= tol2 && minD2 < bestD2) { bestD2 = minD2; best = obj.e.styleKey }
       }
       if (best) return { node: null, edge: best }
     }
@@ -1975,8 +2004,12 @@ export function createUniverse({
     lastFrame = now
     elapsed += dt
     if (pendingEdgeKeys) {
-      rebuildEdgesTouching(pendingEdgeKeys)
+      const touched = pendingEdgeKeys
       pendingEdgeKeys = null
+      rebuildEdgesTouching(touched)
+      // 普通线已经换了新几何；选中线的高亮管也必须同一帧换，否则拖拽时亮的那层会粘在旧位置
+      const sel = state.selectedEdge ? edgeObjs.get(state.selectedEdge) : null
+      if (sel && (touched.has(sel.e.a) || touched.has(sel.e.b))) paintSelectedEdge(state.palette)
     }
     stepTween(now)
 
@@ -2109,8 +2142,10 @@ export function createUniverse({
       obj.e = next
       const e = state.graph.edges.find(x => x.styleKey === styleKey)
       if (e) Object.assign(e, patch)
-      if (patch.lineStyle !== undefined || patch.width !== undefined || patch.arrow !== undefined) buildEdge(next)
-      else {
+      if (patch.lineStyle !== undefined || patch.width !== undefined || patch.arrow !== undefined) {
+        buildEdge(next)
+        if (state.selectedEdge === styleKey) paintSelectedEdge(state.palette)
+      } else {
         paintEdge(obj)
         if (state.selectedEdge === styleKey) paintSelectedEdge(state.palette)
       }
@@ -2258,6 +2293,15 @@ export function createUniverse({
         const obj = edgeObjs.get(styleKey)
         if (!obj || !obj.mesh.visible) return null
         const v = obj.curve.getPoint(t).project(camera)
+        const rect = canvas.getBoundingClientRect()
+        return { x: (v.x * 0.5 + 0.5) * rect.width, y: (-v.y * 0.5 + 0.5) * rect.height }
+      },
+      selectedEdgeCenter: () => {
+        if (!selEdgeMesh) return null
+        selEdgeMesh.geometry.computeBoundingSphere()
+        const c = selEdgeMesh.geometry.boundingSphere?.center
+        if (!c) return null
+        const v = c.clone().project(camera)
         const rect = canvas.getBoundingClientRect()
         return { x: (v.x * 0.5 + 0.5) * rect.width, y: (-v.y * 0.5 + 0.5) * rect.height }
       },

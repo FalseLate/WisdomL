@@ -52,7 +52,7 @@ const seed = () => ({
     { id: 61, from: 22, to: 24, fromKind: 'point', toKind: 'point', rel: '依赖', reason: '气胸也会引起呼衰，处置前先看血气', conf: 0.7 }
   ],
   pointCandidates: [
-    { id: 71, wrongQuestionId: 904, title: '急性左心衰的体位管理', reason: '题干考抢救措施，体位是第一步', conf: 0.78, qText: '急性左心衰伴血压下降首选措施（单选）' }
+    { id: 71, wrongQuestionId: 904, title: '急性左心衰的体位管理', reason: '急性左心衰抢救先取端坐位并吸氧，体位能减少回心血量、缓解肺淤血；血压下降时还要同时评估灌注，不能只观察。', conf: 0.78, qText: '急性左心衰伴血压下降首选措施（单选）' }
   ],
   // 错题本里还没挂过知识点的题：给"手动挂错题"当候选池
   unlinked: [
@@ -303,7 +303,7 @@ export function createStarMapStore(initial) {
       const c = db.pointCandidates.find(x => x.id === Number(m[1]))
       if (!c) return json(route, { error: 'no such candidate' }, 404)
       const id = ++db.nextId
-      db.points.push({ id, topicId: body.topicId ?? null, hierLine: body.topicId ? 1 : 0, title: c.title, titleKey: norm(c.title), color: null, merged: false, origin: 'AI反推' })
+      db.points.push({ id, topicId: body.topicId ?? null, hierLine: body.topicId ? 1 : 0, title: c.title, titleKey: norm(c.title), note: c.reason || null, color: null, merged: false, origin: 'AI反推' })
       db.refs.push({ q: c.wrongQuestionId, k: [id], et: ['knowledge'], st: 0, wc: 1, txt: c.qText })
       db.pointCandidates = db.pointCandidates.filter(x => x !== c)
       return json(route, { pointId: id })

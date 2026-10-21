@@ -250,12 +250,12 @@
         </div>
       </div>
       <div class="block">
-        <div class="block-title">让 AI 从错题反推知识点</div>
+        <div class="block-title">让 AI 从错题反推没掌握的知识</div>
         <div class="btns">
           <button class="btn primary" type="button" :disabled="analyzing || !unanalyzedQuestions.length" @click="aiPicker = true">自己选错题反推</button>
-          <button class="btn" type="button" :disabled="analyzing || !unanalyzed" @click="act('ai-analyze')">{{ analyzing ? '反推中…' : '自动取下一批 15 题' }}</button>
+          <button class="btn" type="button" :disabled="analyzing || !unanalyzed" @click="act('ai-analyze')">{{ analyzing ? '反推中…' : '自动取下一批 10 题' }}</button>
         </div>
-        <p class="sub mt">{{ unanalyzed ? `有 ${unanalyzed} 道错题还没反推过。` : '错题都反推过了。' }}自己选最多 15 道；AI 只出候选，你确认才进图。</p>
+        <p class="sub mt">{{ unanalyzed ? `有 ${unanalyzed} 道错题还没反推过。` : '错题都反推过了。' }}自己选最多 10 道；AI 逐题反推知识讲解，你确认后才写入笔记。</p>
       </div>
       <CandidateList v-if="pointCandidates.length" :list="pointCandidates" :target="acceptTarget" :topics="topics"
                      @pick-target="targetTopic = $event"
@@ -295,8 +295,8 @@
 
   <StarQuestionPicker v-if="aiPicker"
     title="选择要反推的错题"
-    hint="最多 15 道；AI 会逐题提炼 2～5 个候选知识点，候选不会自动进图，确认后才算。"
-    :questions="aiQuestions" :today-questions="[]" :show-today="false" :multiple="true" :max="15"
+    hint="最多 10 道；AI 会逐题反推 2～5 个没掌握的知识点，每个约100字讲解，确认后才写入笔记。"
+    :questions="aiQuestions" :today-questions="[]" :show-today="false" :multiple="true" :max="10"
     confirm-label="开始反推" @close="aiPicker = false" @confirm="onPickAi" />
 </template>
 
@@ -520,7 +520,7 @@ const Swatches = {
     ])
   }
 }
-/** AI 反推的候选：收进哪颗大球由用户点定，不收就永远不进图 */
+/** AI 反推的知识候选：确认后才进图，并把讲解写进知识点笔记 */
 const CandidateList = {
   props: {
     list: { type: Array, default: () => [] },
@@ -531,7 +531,7 @@ const CandidateList = {
   setup(p, { emit: e }) {
     return () => h('div', { class: 'block' }, [
       h('div', { class: 'block-title' }, `AI 反推的知识点候选（${p.list.length}）· 还没进图`),
-      h('p', { class: 'sub' }, '这些是已经反推过、还没确认进图的候选；AI 不负责分星球，选中目标后才画归属线。'),
+      h('p', { class: 'sub' }, '这些是 AI 从错题反推出的知识讲解，还没进图；确认后写入知识点笔记。同名已有笔记会追加一段，不覆盖你原来的内容。AI 不负责分星球，选中目标后才画归属线。'),
       p.topics.length
         ? h('select', {
             class: 'field', value: p.target || '', 'aria-label': '收进哪颗大球',
@@ -543,10 +543,11 @@ const CandidateList = {
         : h('p', { class: 'sub' }, '还没有大球：先建一个主题，收进来的知识点才连得上归属线。'),
       ...p.list.map(c => h('div', { class: 'link-item ai' }, [
         h('div', { class: 'kind' }, c.title),
-        h('div', { class: 'why' }, c.reason || 'AI 没给理由'),
-        h('div', { class: 'sub' }, `模型自评置信度 ${Math.round((c.conf ?? 0) * 100)}%（未校准，不是准确率）· 依据这道错题：${c.qText || '（题干没记录）'}`),
+        h('div', { class: 'why' }, c.reason || 'AI 没给讲解'),
+        h('div', { class: 'sub' }, `模型自评：该知识点与这道错题的关联把握 ${Math.round((c.conf ?? 0) * 100)}%（未校准，不是准确率）`),
+        h('div', { class: 'sub' }, `来源错题：${c.qText || '（题干没记录）'}`),
         h('div', { class: 'btns' }, [
-          h('button', { class: 'btn primary', type: 'button', onClick: () => e('accept', c.id) }, p.target ? '收进这颗球' : '收进星图（未归类）'),
+          h('button', { class: 'btn primary', type: 'button', onClick: () => e('accept', c.id) }, p.target ? '收进这颗球并写入笔记' : '收进星图（未归类，写入笔记）'),
           h('button', { class: 'btn', type: 'button', onClick: () => e('reject', c.id) }, '忽略')
         ])
       ]))

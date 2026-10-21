@@ -5,6 +5,9 @@
   <!-- 开局加载动画 -->
   <SplashScreen v-if="showSplash" @complete="showSplash = false" />
 
+  <!-- 进入知识星图的跃迁：全局覆盖，等 3D 首帧就绪后再淡出 -->
+  <WarpOverlay />
+
   <!-- 主内容 -->
   <div class="page-wrapper">
     <router-view v-show="!showSplash" />
@@ -32,6 +35,7 @@ import { ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useNotificationStore } from './stores/notification'
 import { ParticleBackground, SplashScreen } from './components/cyber'
+import WarpOverlay from './components/starmap/WarpOverlay.vue'
 import A11ySettingsDrawer from './components/cyber/A11ySettingsDrawer.vue'
 import { a11yPanelOpen } from './a11y/settingsPanel.js'
 import PetTutor from './pet-tutor/PetTutor.vue'

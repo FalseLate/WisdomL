@@ -22,6 +22,9 @@ async function open(page, store) {
   await page.goto('/knowledge-universe', { waitUntil: 'load' })
   await page.waitForSelector('.splash-screen', { state: 'detached', timeout: 9000 }).catch(() => {})
   await page.waitForSelector('.star-label.show', { timeout: 15000 })
+  // 标签出现后线几何还会晚一两帧；拾取类断言前先让场景稳定
+  await page.waitForFunction(() => !!window.__starmap)
+  await page.waitForTimeout(180)
 }
 
 /** 找一条既没被星挡住、又是指定类型的线的屏幕坐标 */
@@ -57,6 +60,81 @@ function nodeClickPoint(page, key) {
     }
     return c
   }, key)
+}
+
+/** 沿曲线均匀取点，统计命中目标线/其他线/节点/落空；offset 是屏幕法向偏移 */
+function edgePickStats(page, styleKey, offset = 0, samples = 22) {
+  return page.evaluate(({ styleKey: key, offset: off, samples: n }) => {
+    const { renderer } = window.__starmap
+    let hit = 0, otherEdge = 0, node = 0, miss = 0, total = 0
+    let prev = null
+    for (let i = 1; i < n; i++) {
+      const p = renderer.debug.edgeScreen(key, i / n)
+      if (!p) continue
+      let x = p.x, y = p.y
+      if (off && prev) {
+        const dx = p.x - prev.x
+        const dy = p.y - prev.y
+        const len = Math.hypot(dx, dy) || 1
+        x += (-dy / len) * off
+        y += (dx / len) * off
+      }
+      prev = p
+      total++
+      const h = renderer.debug.pickAt(x, y)
+      if (h.edge === key) hit++
+      else if (h.edge) otherEdge++
+      else if (h.node) node++
+      else miss++
+    }
+    return { hit, otherEdge, node, miss, total }
+  }, { styleKey, offset, samples })
+}
+
+/** 找屏幕长度最长的可见关联线 */
+function longestEdge(page) {
+  return page.evaluate(() => {
+    const { renderer, store } = window.__starmap
+    let best = null
+    for (const e of store.graph.value.edges) {
+      if (e.type !== 'cooc' && e.type !== 'ai') continue
+      let len = 0
+      let prev = null
+      for (let i = 0; i <= 12; i++) {
+        const p = renderer.debug.edgeScreen(e.styleKey, i / 12)
+        if (!p) { prev = null; continue }
+        if (prev) len += Math.hypot(p.x - prev.x, p.y - prev.y)
+        prev = p
+      }
+      if (len > 20 && (!best || len > best.len)) best = { key: e.styleKey, type: e.type, len }
+    }
+    return best
+  })
+}
+
+/** 找一条中点能选中、且有一个端点可直接拖的线（避开右侧面板覆盖区） */
+function edgeWithDraggableNode(page) {
+  return page.evaluate(() => {
+    const { renderer, store } = window.__starmap
+    for (const e of store.graph.value.edges) {
+      if (e.type !== 'cooc' && e.type !== 'ai') continue
+      const node = store.graph.value.byKey.get(e.a)
+      if (!node || node.kind !== 'star') continue
+      const mid = renderer.debug.edgeScreen(e.styleKey, 0.5)
+      if (!mid || mid.x > 1000) continue
+      if (renderer.debug.pickAt(mid.x, mid.y).edge !== e.styleKey) continue
+      const c = renderer.debug.nodeScreen(e.a)
+      for (const [dx, dy] of [[0, 0], [0, -8], [0, 8], [-8, 0], [8, 0], [0, -14], [0, 14], [-14, 0], [14, 0]]) {
+        const x = c.x + dx, y = c.y + dy
+        const top = document.elementFromPoint(x, y)
+        if (!top || !top.classList?.contains('stage')) continue
+        if (renderer.debug.pickAt(x, y).node === e.a) {
+          return { key: e.styleKey, node: e.a, point: { x, y }, mid }
+        }
+      }
+    }
+    return null
+  })
 }
 
 test('派生层：三种线都在，跨大球也有共现，被否决的共现不再出现', () => {
@@ -145,7 +223,7 @@ test('打开就有骨架：三个大球的标签都在，面板有新建与反�
   await open(page, store)
   await expect(page.locator('.star-label.topic')).toHaveCount(3)
   await expect(page.locator('.panel')).toContainText('我的知识星图')
-  await expect(page.locator('.panel').first()).toContainText('让 AI 从错题反推知识点')
+  await expect(page.locator('.panel').first()).toContainText('让 AI 从错题反推没掌握的知识')
   expect(await page.evaluate(() => !!window.__starmap), '调试出口需要 dev 服务').toBeTruthy()
 })
 
@@ -265,6 +343,19 @@ test('深浅两套：浅色关掉辉光与流动光点，深色都开着', async
   expect(light.canvas.toLowerCase()).toBe(light.bg.toLowerCase())
 })
 
+test('从首页进入：warp 覆盖到 3D 首帧，没有 CALIBRATING 二次黑屏', async ({ page }) => {
+  const store = createStarMapStore()
+  await page.addInitScript(auth)
+  await store.install(page)
+  await page.goto('/', { waitUntil: 'load' })
+  await page.waitForSelector('.splash-screen', { state: 'detached', timeout: 9000 }).catch(() => {})
+  await page.locator('.func-card', { hasText: '知识星图' }).click()
+  await expect(page.locator('.warp-mask')).toBeVisible()
+  await expect(page.getByText('CALIBRATING STAR MAP')).toHaveCount(0)
+  await page.waitForSelector('.star-label.show', { timeout: 15000 })
+  await expect(page.locator('.warp-mask')).toHaveCount(0, { timeout: 5000 })
+})
+
 test('删层级线只关连线，不把它踢出大球（归属与连线是两件事）', async ({ page }) => {
   const store = createStarMapStore()
   await open(page, store)
@@ -286,14 +377,16 @@ test('AI 反推：走现成的任务轮询，候选要确认才进图，收进�
   await page.locator('.panel button', { hasText: '自动取下一批' }).click()
   await expect.poll(() => store.db.pointCandidates.length, { timeout: 15000 }).toBe(1)
   await expect(page.locator('.panel')).toContainText('急性左心衰的体位管理')
+  await expect(page.locator('.panel')).toContainText('该知识点与这道错题的关联把握')
   // 全景下 AI 不替用户归类：默认未归类，用户选了大球才画归属线
   await expect(page.locator('.panel select[aria-label="收进哪颗大球"]')).toHaveCount(1)
-  await page.locator('.panel button', { hasText: '收进星图（未归类）' }).click()
+  await page.locator('.panel button', { hasText: '收进星图（未归类，写入笔记）' }).click()
   await expect.poll(() => store.db.points.length).toBe(before + 1)
   const fresh = store.db.points[store.db.points.length - 1]
   expect(fresh.origin).toBe('AI反推')
   expect(fresh.topicId, '默认应该保持未归类').toBe(null)
   expect(fresh.hierLine).toBe(0)
+  expect(fresh.note, '确认候选后要把约100字知识讲解写进笔记').toContain('端坐位')
 })
 
 test('选中大球时面板直接给出"收进这颗球"，收进来的点带归属线', async ({ page }) => {
@@ -306,11 +399,12 @@ test('选中大球时面板直接给出"收进这颗球"，收进来的点带归
   const before = store.db.points.length
   // 用户明确选目标星球，候选才会带上归属
   await page.locator('.panel select[aria-label="收进哪颗大球"]').selectOption(key)
-  await page.locator('.panel button', { hasText: '收进这颗球' }).click()
+  await page.locator('.panel button', { hasText: '收进这颗球并写入笔记' }).click()
   await expect.poll(() => store.db.points.length).toBe(before + 1)
   const fresh = store.db.points[store.db.points.length - 1]
   expect(fresh.topicId).toBe(Number(key.slice(1)))
   expect(fresh.hierLine).toBe(1)
+  expect(fresh.note).toContain('端坐位')
   // 图上真有一条从这颗大球到它的层级线（写库后是静默重取，要等它回来）
   await expect.poll(() => page.evaluate(([tk, pid]) => window.__starmap.store.graph.value.edges
     .some(e => e.type === 'hier' && e.a === tk && e.b === 'P' + pid), [key, fresh.id]), { message: '收进大球后应该立刻有归属线' })
@@ -682,7 +776,7 @@ test('挂错题选择器：能搜题干、切今日复习；AI 反推能自己�
 
   await page.evaluate(() => window.__starmap.store.clearSelection())
   await page.locator('.panel button', { hasText: '自己选错题反推' }).click()
-  await expect(page.locator('.wq-card')).toContainText('最多 15 道')
+  await expect(page.locator('.wq-card')).toContainText('最多 10 道')
   await expect(page.locator('.wq-row')).not.toHaveCount(0)
   await page.locator('.wq-row').first().click()
   await expect(page.locator('.wq-count')).toContainText('已选 1')
@@ -808,6 +902,108 @@ test('手动挂错题：不烧 AI 额度也能长出共现线，解绑后权重�
   await page.evaluate(() => window.__starmap.store.select('P16'))
   await page.locator('.panel .wq-item', { hasText: '高血压诊断切点' }).locator('button', { hasText: '解绑' }).click()
   await expect.poll(weight).toBe(before)
+})
+
+test('拾取：长线、宽线、同端点双线都不落空', async ({ page }) => {
+  const store = createStarMapStore()
+  await open(page, store)
+  const long = await longestEdge(page)
+  expect(long, '应该有一条可见关联线').toBeTruthy()
+
+  const longStats = await edgePickStats(page, long.key)
+  expect(longStats.total).toBeGreaterThan(10)
+  expect(longStats.miss, '长线曲线中间不该有点不到的空隙').toBe(0)
+  expect((longStats.hit + longStats.otherEdge) / longStats.total, '长线应能稳定命中一条线').toBeGreaterThanOrEqual(0.9)
+
+  // 调粗后中心线仍然全中，偏 6px 也不落空
+  await page.evaluate(k => window.__starmap.store.previewStyle(k, { width: 3 }), long.key)
+  await page.waitForTimeout(200)
+  const wide = await edgePickStats(page, long.key)
+  expect(wide.miss).toBe(0)
+  const off = await edgePickStats(page, long.key, 6)
+  expect(off.miss, '宽线偏离中心 6px 仍应命中').toBeLessThanOrEqual(1)
+  expect(off.hit + off.otherEdge).toBeGreaterThan(0)
+
+  // 同端点再连一条（实际会分槽成近距离双线）：两个中点都不能点空
+  const before = await page.evaluate(() => window.__starmap.store.graph.value.edges.length)
+  const pair = await page.evaluate(() => {
+    const e = window.__starmap.store.graph.value.edges.find(x => x.type === 'cooc')
+    return e ? { a: e.a, b: e.b } : null
+  })
+  expect(pair).toBeTruthy()
+  await page.evaluate(({ a, b }) => window.__starmap.store.createEdge({
+    fromKey: a, toKey: b, rel: '关联', reason: '同端点测试'
+  }), pair)
+  await expect.poll(() => page.evaluate(() => window.__starmap.store.graph.value.edges.length)).toBeGreaterThan(before)
+  const added = await page.evaluate(() => window.__starmap.store.graph.value.edges.find(e => e.reason === '同端点测试')?.styleKey)
+  expect(added).toBeTruthy()
+  for (const key of [long.key, added]) {
+    const mid = await page.evaluate(k => window.__starmap.renderer.debug.edgeScreen(k, 0.5), key)
+    expect(mid).toBeTruthy()
+    const picked = await page.evaluate(([x, y]) => window.__starmap.renderer.debug.pickAt(x, y), [mid.x, mid.y])
+    expect(picked.edge || picked.node, '同端点双线的中点不能点空').toBeTruthy()
+  }
+})
+
+test('选中线拖拽：高亮层与普通线同一帧跟随，不滞留', async ({ page }) => {
+  const store = createStarMapStore()
+  await open(page, store)
+  const target = await edgeWithDraggableNode(page)
+  expect(target, '需要一条中点可选、端点可拖的线').toBeTruthy()
+
+  await page.evaluate(k => window.__starmap.store.selectEdge(k), target.key)
+  await page.waitForTimeout(300)
+  const before = await page.evaluate(k => ({
+    sel: window.__starmap.renderer.debug.selectedEdgeCenter(),
+    curve: window.__starmap.renderer.debug.edgeScreen(k, 0.5)
+  }), target.key)
+  expect(before.sel, '选中线应该有高亮层').toBeTruthy()
+
+  await page.mouse.move(target.point.x, target.point.y)
+  await page.mouse.down()
+  for (let i = 1; i <= 5; i++) {
+    await page.mouse.move(target.point.x + i * 14, target.point.y - i * 4)
+    await page.waitForTimeout(45)
+  }
+  const during = await page.evaluate(k => ({
+    sel: window.__starmap.renderer.debug.selectedEdgeCenter(),
+    curve: window.__starmap.renderer.debug.edgeScreen(k, 0.5)
+  }), target.key)
+  await page.mouse.up()
+
+  expect(during.sel).toBeTruthy()
+  const selMove = Math.hypot(during.sel.x - before.sel.x, during.sel.y - before.sel.y)
+  const curveMove = Math.hypot(during.curve.x - before.curve.x, during.curve.y - before.curve.y)
+  expect(selMove, '拖拽时选中高亮层必须跟着节点走').toBeGreaterThan(10)
+  expect(Math.abs(selMove - curveMove), '高亮层和普通线不能一个走一个停').toBeLessThan(45)
+})
+
+test('远近视角拾取一致：拉远后线中间也不出现点不到的死区', async ({ page }) => {
+  const store = createStarMapStore()
+  await open(page, store)
+  const long = await longestEdge(page)
+  expect(long).toBeTruthy()
+
+  const nearRadius = await page.evaluate(() => window.__starmap.renderer.debug.radius())
+  const near = await edgePickStats(page, long.key)
+  expect(near.miss).toBe(0)
+
+  await page.mouse.move(700, 450)
+  await page.mouse.wheel(0, 600)
+  await page.waitForTimeout(700)
+  const farRadius = await page.evaluate(() => window.__starmap.renderer.debug.radius())
+  expect(farRadius, '滚轮应该拉远了').toBeGreaterThan(nearRadius)
+  const far = await edgePickStats(page, long.key)
+  expect(far.miss, '拉远后线中间不能出现死区').toBe(0)
+  expect((far.hit + far.otherEdge) / far.total).toBeGreaterThanOrEqual(0.8)
+
+  await page.mouse.wheel(0, -1000)
+  await page.waitForTimeout(700)
+  const closeRadius = await page.evaluate(() => window.__starmap.renderer.debug.radius())
+  expect(closeRadius).toBeLessThan(farRadius)
+  const close = await edgePickStats(page, long.key)
+  expect(close.miss).toBe(0)
+  expect((close.hit + close.otherEdge) / close.total).toBeGreaterThanOrEqual(0.8)
 })
 
 test('虚线也吃粗细：调宽后几何半径变大（管道 + alphaMap，不再是 1px 折线）', async ({ page }) => {

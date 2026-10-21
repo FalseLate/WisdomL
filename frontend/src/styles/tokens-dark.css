@@ -169,3 +169,11 @@
   --hud-skel-line: #00f5ff;
   --hud-skel-joint: #ff00ff;
 }
+
+/* 知识星图首页卡片：深空星球的高光与暗部（两主题同一套星体材质） */
+:root,
+:root[data-theme="dark"] {
+  --planet-highlight: #f0f9ff;
+  --planet-deep: #4c1d95;
+  --planet-shadow: #11132b;
+}

@@ -139,15 +139,6 @@
       <button class="btn primary" type="button" @click="quick = { kind: 'topic', title: '', galaxyKey: null }">＋ 建第一颗星球</button>
     </div>
 
-    <Transition name="mask-fade">
-      <div v-if="store.loading.value" class="mask mask-space" role="status" aria-label="正在校准星图">
-        <div class="mask-stars" aria-hidden="true">
-          <span v-for="i in 24" :key="i" class="mask-star" :style="loadingStarStyle(i)"></span>
-        </div>
-        <div class="mask-orbit" aria-hidden="true"></div>
-        <p class="mask-kicker">CALIBRATING STAR MAP</p>
-      </div>
-    </Transition>
     <div v-if="!store.loading.value && store.error.value" class="mask">
       <p>{{ store.error.value }}</p>
       <button class="btn primary" type="button" @click="store.load()">重试</button>
@@ -170,6 +161,7 @@ import { createUniverse } from '../starmap/universe.js'
 import { loadDisplay } from '../starmap/display.js'
 import { normalizeTitle } from '../starmap/graph.js'
 import { PALETTE } from '../starmap/style-lang.js'
+import { beginWarp, finishWarp, cancelWarp } from '../starmap/warp.js'
 
 const store = useStarMap()
 const router = useRouter()
@@ -179,14 +171,14 @@ const labelEl = ref(null)
 const menuEl = ref(null)
 let renderer = null
 
-function loadingStarStyle(i) {
-  return {
-    left: `${(i * 37 + 11) % 100}%`,
-    top: `${(i * 61 + 7) % 100}%`,
-    '--twinkle': `${1.1 + (i % 6) * 0.33}s`,
-    '--delay': `${(i % 8) * 0.17}s`,
-    '--size': `${i % 7 === 0 ? 2.2 : 1.1}px`
-  }
+function afterPaint() {
+  return new Promise(resolve => {
+    let done = false
+    const finish = () => { if (!done) { done = true; resolve() } }
+    requestAnimationFrame(() => requestAnimationFrame(finish))
+    // 隐藏标签页会节流 rAF；别让入场遮罩因此一直挂着
+    setTimeout(finish, 320)
+  })
 }
 
 const q = ref('')
@@ -534,7 +526,7 @@ async function onMenuAction(ev) {
 
 watch(() => appearance.theme, () => renderer?.sync())
 
-onMounted(async () => {
+async function initStarMap() {
   await nextTick()
   renderer = createUniverse({
     canvas: canvasEl.value,
@@ -576,9 +568,22 @@ onMounted(async () => {
   store.refreshUnanalyzed()
   store.loadWrongPool()
   if (import.meta.env.DEV) window.__starmap = { store, renderer, normalizeTitle }
+}
+
+onMounted(async () => {
+  beginWarp()
+  try {
+    await initStarMap()
+  } catch (e) {
+    store.error.value = e?.message || '星图初始化失败'
+  } finally {
+    await afterPaint()
+    finishWarp()
+  }
 })
 
 onUnmounted(() => {
+  cancelWarp()
   window.removeEventListener('keydown', onKey)
   renderer?.dispose()
   renderer = null
@@ -1043,65 +1048,6 @@ onUnmounted(() => {
   font-size: 13px;
   z-index: 30;
 }
-.mask-space {
-  overflow: hidden;
-  background-color: var(--bg-base);
-  background-image:
-    radial-gradient(circle at 50% 50%, var(--accent-soft) 0%, transparent 42%),
-    radial-gradient(circle at 50% 50%, var(--secondary-soft) 0%, transparent 68%);
-}
-.mask-stars { position: absolute; inset: 0; }
-.mask-star {
-  position: absolute;
-  width: var(--size, 1.1px);
-  height: var(--size, 1.1px);
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 5px var(--accent-soft);
-  opacity: .35;
-  animation: mask-twinkle var(--twinkle, 1.4s) ease-in-out var(--delay, 0s) infinite;
-}
-.mask-orbit {
-  position: relative;
-  width: 96px;
-  height: 96px;
-  border: 1px solid var(--accent-border);
-  border-radius: 50%;
-  box-shadow: 0 0 28px var(--accent-soft), inset 0 0 20px var(--secondary-soft);
-  animation: mask-orbit 3.2s linear infinite;
-}
-.mask-orbit::after {
-  content: '';
-  position: absolute;
-  width: 7px;
-  height: 7px;
-  margin: 2px 0 0 45px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 12px var(--accent);
-}
-.mask-kicker {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 10px;
-  letter-spacing: .26em;
-  color: var(--accent);
-  opacity: .75;
-}
-.mask-fade-enter-active, .mask-fade-leave-active { transition: opacity .32s ease; }
-.mask-fade-enter-from, .mask-fade-leave-to { opacity: 0; }
-@keyframes mask-twinkle {
-  0%, 100% { opacity: .18; transform: scale(.8); }
-  50% { opacity: .85; transform: scale(1.25); }
-}
-@keyframes mask-orbit {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .mask-star, .mask-orbit { animation: none; }
-}
-
 @media (max-width: 900px) {
   .universe-hud { display: none; }
 }

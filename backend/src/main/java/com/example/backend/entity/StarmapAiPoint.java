@@ -17,8 +17,9 @@ public class StarmapAiPoint {
     /** AI 反推出的知识点名（failed 时为空串占位） */
     private String title;
     private String titleKey;
-    /** AI 给的依据：这道题为什么考这个点 */
+    /** AI 反推出的知识讲解（约100字）；确认后写入 starmap_point.note */
     private String reason;
+    /** 模型自评：该知识点与这道错题的关联把握 0~1（未校准） */
     private BigDecimal conf;
     /** pending 待确认 / accepted 已落地 / rejected 用户忽略 / failed 分析失败 */
     private String status;

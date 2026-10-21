@@ -32,8 +32,8 @@ public class StarMapAiService {
 
     private static final Logger log = LoggerFactory.getLogger(StarMapAiService.class);
     private static final ObjectMapper mapper = new ObjectMapper();
-    /** 单次批量上限：按实测单题 1.2~1.5k token 估算，一批约 20k */
-    public static final int MAX_PER_RUN = 15;
+    /** 单次批量上限：现在每个点要多写约100字讲解，降到10题控制单批 token */
+    public static final int MAX_PER_RUN = 10;
     /** 喂给 AI 的已有知识点标题白名单长度上限（它是最大的 token 项） */
     private static final int WHITELIST_MAX = 200;
     /** 连续失败多少题就中止整批（多半是额度或网络，继续跑只会浪费） */
@@ -75,7 +75,7 @@ public class StarMapAiService {
         return out;
     }
 
-    /** 用户手选错题：只接受自己的、未删除、未反推过的，顺序按用户传入顺序，最多 15 条 */
+    /** 用户手选错题：只接受自己的、未删除、未反推过的，顺序按用户传入顺序，最多 10 条 */
     public List<UserWrongQuestion> pickSelected(Long userId, List<Long> ids) {
         if (wrongQuestionMapper == null || userId == null || ids == null || ids.isEmpty()) return List.of();
         List<Long> wanted = ids.stream().filter(Objects::nonNull).distinct().limit(MAX_PER_RUN).toList();
@@ -212,12 +212,14 @@ public class StarMapAiService {
             String title = String.valueOf(p.getOrDefault("title", "")).trim();
             String key = StarMapSupport.normalizeTitle(title);
             if (title.isEmpty() || key.isEmpty() || !seen.add(key) || isMetaTitle(title)) continue;
+            Object rawNote = p.containsKey("note") ? p.get("note") : p.get("why");
+            String note = rawNote == null ? "" : String.valueOf(rawNote).trim();
             StarmapAiPoint row = new StarmapAiPoint();
             row.setUserId(userId);
             row.setWrongQuestionId(questionId);
             row.setTitle(title.length() > 120 ? title.substring(0, 120) : title);
             row.setTitleKey(key.length() > 120 ? key.substring(0, 120) : key);
-            row.setReason(cut(String.valueOf(p.getOrDefault("why", "")), 300));
+            row.setReason(cut(note, 300));
             row.setConf(toConf(p.get("conf")));
             row.setStatus("pending");
             aiPointMapper.insert(row);

@@ -698,6 +698,7 @@ public class StarMapController {
         StarmapPoint point = findPointByKey(userId, c.getTitleKey());
         boolean merged = point != null;
         Long topicId = body == null ? null : toLong(body.get("topicId"));
+        String aiNote = c.getReason();
         if (point == null) {
             point = new StarmapPoint();
             point.setUserId(userId);
@@ -705,14 +706,24 @@ public class StarMapController {
             point.setHierLine(topicId == null ? 0 : 1);
             point.setTitle(c.getTitle());
             point.setTitleKey(c.getTitleKey());
+            point.setNote(mergeAiNote(null, aiNote));
             point.setMerged(0);
             point.setOrigin("AI反推");
             pointMapper.insert(point);
-        } else if (topicId != null && point.getTopicId() == null) {
-            // 同名的那颗星本来没归过队：用户这次选了大球就顺手挂上去，不算改他的归属
-            point.setTopicId(topicId);
-            point.setHierLine(1);
-            pointMapper.updateById(point);
+        } else {
+            boolean changed = false;
+            if (topicId != null && point.getTopicId() == null) {
+                // 同名的那颗星本来没归过队：用户这次选了大球就顺手挂上去，不算改他的归属
+                point.setTopicId(topicId);
+                point.setHierLine(1);
+                changed = true;
+            }
+            String mergedNote = mergeAiNote(point.getNote(), aiNote);
+            if (!Objects.equals(mergedNote, point.getNote())) {
+                point.setNote(mergedNote);
+                changed = true;
+            }
+            if (changed) pointMapper.updateById(point);
         }
         boolean already = false;
         for (StarmapPointRef r : refsOfPoint(point.getId())) {
@@ -744,6 +755,22 @@ public class StarMapController {
     }
 
     // ============================ 内部工具 ============================
+
+    /**
+     * AI 讲解回填笔记：新点直接写；老点已经有笔记就追加一段，绝不覆盖用户自己的内容。
+     * 追加后仍受 note 的 1000 字上限约束，超出时只截断新增的那段。
+     */
+    private String mergeAiNote(String oldNote, String aiNote) {
+        String add = aiNote == null ? "" : aiNote.trim();
+        if (add.isEmpty()) return oldNote;
+        String base = oldNote == null ? "" : oldNote.trim();
+        if (base.isEmpty()) return cut(add, 1000);
+        if (base.contains(add)) return base;
+        String marker = "\n\n【错题反推】";
+        int room = 1000 - base.length() - marker.length();
+        if (room <= 0) return base;
+        return base + marker + cut(add, room);
+    }
 
     /** 把某题已确认的知识点标题写回 user_wrong_question.knowledge_points（只是展示缓存） */
     private void refreshKnowledgePoints(Set<Long> questionIds) {

@@ -22,6 +22,7 @@ const EXCEPTIONS = {
   'views/ErrorStatsView.vue': 'echarts 画在 canvas 上，配色在 CHART_COLORS 里按主题分两套',
   'components/cyber/GestureHUD.vue': '小窗里的视频视口恒深底（摄像头画面本来就暗），只保留视口区字面量',
   'components/cyber/SplashScreen.vue': '过场动画的霓虹扫描线',
+  'components/starmap/WarpOverlay.vue': '进入知识星图的过场：全屏恒深空底，和 SplashScreen 一样不参与浅色主题',
   'pet-tutor/PetTutor.vue': '虚拟人桌宠自成一套 UI（3D 舞台 + 气泡），不参与全站主题',
   'pet-tutor/components/VirtualHuman.vue': '同上',
   'views/HomeView.original.vue': '已废弃的旧版首页备份，不在路由里',

@@ -150,3 +150,10 @@
   --hud-skel-line: #7df9ff;
   --hud-skel-joint: #ff9bf0;
 }
+
+/* 知识星图首页卡片：深空星球的高光与暗部（浅底上仍保持星球体积感） */
+:root[data-theme="light"] {
+  --planet-highlight: #ffffff;
+  --planet-deep: #5b21b6;
+  --planet-shadow: #1e1b4b;
+}

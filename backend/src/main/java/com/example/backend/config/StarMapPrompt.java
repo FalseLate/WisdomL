@@ -16,7 +16,8 @@ public class StarMapPrompt {
     public static Map<String, String> buildPointPrompt(String questionText, String optionsText, String userAnswer,
                                                        String correctAnswer, String explanation, String errorTypes,
                                                        String errorNote, List<String> existingTitles) {
-        String system = "你是一位带学生复盘错题的老师。任务只有一个：判断这道题真正考的是哪几个知识点。";
+        String system = "你是一位带学生复盘错题的老师。学生做错了这道题，说明有一块具体知识没掌握清楚。"
+            + "你的任务是根据错题证据，反推出他没掌握的知识，并用一段约100字的连续讲解把这块知识讲清楚，让他看完能补上这个漏洞。";
 
         StringBuilder user = new StringBuilder();
         user.append("题干：").append(cut(questionText, 600)).append('\n');
@@ -42,10 +43,12 @@ public class StarMapPrompt {
         user.append("\n要求：\n");
         user.append("1. 只提炼 2~5 个知识点，宁少勿滥；不要写“认真审题”“多练习”这类不是知识点的话。\n");
         user.append("2. 每个名字不超过 20 个字，用名词短语，不要带“的用法”“知识点”这类后缀。\n");
-        user.append("3. 每个名字都要给一句依据，说明这道题的哪一部分在考古它。\n");
-        user.append("4. 忽略界面、账号、展示、按钮、题目编号等非学科元信息；不要把“展示账号”这类测试数据当成知识点。\n");
-        user.append("5. 只返回纯 JSON，禁止 markdown、禁止多余文字，结构严格为：\n");
-        user.append("{\"points\":[{\"title\":\"知识点名\",\"why\":\"为什么是它\",\"conf\":0.0到1.0}]}\n");
+        user.append("3. 每个知识点配一段约 100 字的连续讲解：它是什么、关键条件或区别、这道题怎么用到它、最容易错在哪。不要分点、不要 markdown，直接写成一段可读的笔记。\n");
+        user.append("4. 讲解要针对“学生没掌握的那块知识”，不是复述题目答案；如果已有清单里有合适的名字就复用。\n");
+        user.append("5. 忽略界面、账号、展示、按钮、题目编号等非学科元信息；不要把“展示账号”这类测试数据当成知识点。\n");
+        user.append("6. 只返回纯 JSON，禁止 markdown、禁止多余文字，结构严格为：\n");
+        user.append("{\"points\":[{\"title\":\"知识点名\",\"note\":\"约100字连续讲解\",\"conf\":0.0到1.0}]}\n");
+        user.append("conf 是你判断“这个知识点确实是这道错题暴露的薄弱点”的把握，0~1；它只是模型自评，不是准确率。\n");
 
         return Map.of("system", system, "user", user.toString());
     }
