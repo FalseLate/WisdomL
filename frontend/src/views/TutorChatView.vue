@@ -6,7 +6,7 @@
          @pointerup="onAvatarUp" @pointercancel="onAvatarUp" @lostpointercapture="onAvatarUp"
          @wheel.prevent="onAvatarWheel">
       <VirtualHuman v-if="avatarMode === '3d'" ref="avatarRef" :model-url="modelUrl" :follow-mouse="false" @ready="onAvatarReady" />
-      <div v-else class="tc-avatar-2d">🖼️ 2D 形象开发中，敬请期待</div>
+      <Live2DAvatar v-else :key="modelUrl2d" ref="avatarRef" :model-url="modelUrl2d" @ready="onAvatarReady" />
     </div>
 
     <!-- 顶栏 -->
@@ -17,6 +17,11 @@
       <button class="tc-toggle" @click="avatarMode = avatarMode === '3d' ? '2d' : '3d'">
         {{ avatarMode === '3d' ? '🧊 3D' : '🖼️ 2D' }}
       </button>
+      <template v-if="avatarMode === '2d'">
+        <span class="tc-mini" @click="fileInput && fileInput.click()">上传模型</span>
+        <span class="tc-mini" @click="resetModel">默认</span>
+        <input ref="fileInput" type="file" accept=".zip" style="display:none" @change="onPickModel" />
+      </template>
       <select v-model="characterId" class="tc-voice" title="音色">
         <option v-for="v in voices" :key="v.id" :value="v.id">{{ v.label }}</option>
         <option v-if="!voices.length" value="jenny">jenny</option>
@@ -92,8 +97,10 @@ import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { AudioSentenceQueue } from '../pet-tutor/utils/AudioSentenceQueue.js'
 import { renderMarkdown } from '../utils/markdown'
+import { modelZipToObjectUrl, saveModelZip, loadModelZip, clearModelZip } from '../utils/live2dModel'
 import { createWLipSyncNode } from 'wlipsync'
 import VirtualHuman from '../pet-tutor/components/VirtualHuman.vue'
+import Live2DAvatar from '../pet-tutor/components/Live2DAvatar.vue'
 import lipSyncProfile from '../pet-tutor/assets/lip-sync-profile.json'
 import { DEFAULT_MODEL_URL } from '../pet-tutor/config'
 
@@ -173,6 +180,30 @@ const player = new AudioSentenceQueue()
 const avatarMode = ref('3d')          // 3d | 2d
 const avatarRef = ref(null)
 const modelUrl = DEFAULT_MODEL_URL    // 与悬浮 PetTutor 同款人物
+const DEFAULT_2D = '/models2d/hiyori/hiyori_pro_t11.model3.json'   // 2D 默认模型（AIRI 同款 Hiyori）
+const modelUrl2d = ref(DEFAULT_2D)
+let uploadedDispose = null
+const fileInput = ref(null)
+async function useUploaded(buf) {
+  const { url, dispose } = await modelZipToObjectUrl(buf)
+  if (uploadedDispose) uploadedDispose()
+  uploadedDispose = dispose
+  modelUrl2d.value = url
+}
+async function onPickModel(e) {
+  const f = e.target.files && e.target.files[0]; if (!f) return
+  try {
+    const buf = await f.arrayBuffer()
+    await useUploaded(buf)
+    await saveModelZip(buf)
+  } catch (err) { alert('模型加载失败：' + err.message) }
+  e.target.value = ''
+}
+async function resetModel() {
+  if (uploadedDispose) { uploadedDispose(); uploadedDispose = null }
+  modelUrl2d.value = DEFAULT_2D
+  await clearModelZip()
+}
 let lipNode = null
 
 // 人物位置/缩放：默认左下角，可拖动 + 滚轮/双指捏合缩放，记忆到 localStorage
@@ -232,6 +263,7 @@ onMounted(() => {
   newSession()
   loadAvatarLayout()
   loadVoices()
+  loadModelZip().then(buf => { if (buf) useUploaded(buf).catch(() => {}) }).catch(() => {})   // 恢复上次上传的模型
   // 音频管线：建 AudioContext → 创建 wlipsync 分析节点 → 注入播放器与虚拟人（口型）
   ;(async () => {
     try {
@@ -396,6 +428,7 @@ async function sendChat() {
 .tc-toggle { font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--accent-border); background: var(--bg-elevated); color: var(--text-primary); cursor: pointer; }
 
 .tc-menu { font-size: 20px; color: var(--text-primary); cursor: pointer; padding: 0 4px; }
+.tc-mini { font-size: 12px; color: var(--accent); cursor: pointer; padding: 4px 8px; border: 1px solid var(--accent-border); border-radius: 8px; white-space: nowrap; }
 .tc-mask { position: fixed; inset: 0; background: rgba(0, 0, 0, .5); z-index: 40; }
 .tc-drawer {
   position: fixed; top: 0; left: 0; bottom: 0; width: 78%; max-width: 320px; z-index: 41;

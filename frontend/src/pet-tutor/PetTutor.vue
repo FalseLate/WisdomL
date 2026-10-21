@@ -261,9 +261,6 @@ async function uploadSpeech(blob) {
 
 // ========== 点击角色 → 迷你功能栏（吸附人物左手边，深色玻璃圆钮，悬停出文字） ==========
 const RAIL_ITEMS = [
-  { key: 'mic',              icon: '🎤', label: '按住说话' },
-  { key: 'translate',        icon: '🔤', label: '帮我翻译' },
-  { key: 'story',            icon: '📖', label: '讲个短故事' },
   { key: 'lookup-word',      icon: '🔍', label: '查单词' },
   { key: 'analyze-sentence', icon: '🧩', label: '解句子' },
   { key: 'chat-full',        icon: '💬', label: '全屏聊天' },
