@@ -39,7 +39,7 @@
       </div>
 
       <!-- 客观题列表 -->
-      <div v-if="!hasBoth || qTab === 0" class="q-scroll">
+      <div v-if="hasObj && (!hasSub || qTab === 0)" class="q-scroll">
         <template v-if="chapterGroups.length > 0">
           <template v-for="g in chapterGroups" :key="g.name">
             <div v-if="g.questions.some(q=>q.type!=='subjective')" class="chapter-header">{{ g.name }}</div>
@@ -85,7 +85,7 @@
       </div>
 
       <!-- 主观题列表 -->
-      <div v-if="hasBoth && qTab === 1" class="q-scroll">
+      <div v-if="hasSub && (!hasObj || qTab === 1)" class="q-scroll">
         <template v-if="chapterGroups.length > 0">
           <template v-for="g in chapterGroups" :key="g.name">
             <div v-if="g.questions.some(q=>q.type==='subjective')" class="chapter-header">{{ g.name }}</div>
@@ -228,7 +228,9 @@ function findQIndex(qid) {
 const allQuestions = computed(() => qStore.questions || [])
 const objQ = computed(() => allQuestions.value.filter(q => q.type !== 'subjective'))
 const subQ = computed(() => allQuestions.value.filter(q => q.type === 'subjective'))
-const hasBoth = computed(() => objQ.value.length > 0 && subQ.value.length > 0)
+const hasObj = computed(() => objQ.value.length > 0)
+const hasSub = computed(() => subQ.value.length > 0)
+const hasBoth = computed(() => hasObj.value && hasSub.value)
 
 // 章节分组：按 chapterName 分组题目
 const chapterGroups = computed(() => {

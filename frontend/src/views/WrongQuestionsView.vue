@@ -134,6 +134,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { showSuccessToast, showFailToast } from 'vant'
 import request from '../utils/request.js'
+import { normalizeWrongQuestion } from '../utils/questionShape.js'
 import ErrorTypeTagger from '../components/ErrorTypeTagger.vue'
 import { CyberNavbar, CyberTag } from '../components/cyber'
 
@@ -163,7 +164,7 @@ async function loadList() {
     const res = await request.get('/wrong-questions')
     list.value = (res || []).map(item => {
       let q = null
-      try { q = JSON.parse(item.questionContent) } catch (e) { /* 忽略坏数据 */ }
+      try { q = normalizeWrongQuestion(JSON.parse(item.questionContent)) } catch (e) { /* 忽略坏数据 */ }
       return { ...item, question: q }
     })
     list.value.forEach(it => { modeMap[it.id] = 'overview' })

@@ -1,6 +1,6 @@
 <template>
   <span class="cyber-tag" :class="type" :style="customStyle">
-    {{ text }}
+    <slot>{{ text }}</slot>
   </span>
 </template>
 

@@ -359,36 +359,6 @@
       </div>
     </div>
 
-    <!-- ===== 出题完成弹窗 ===== -->
-    <div v-if="showGenDialog" class="dialog-overlay" @click.self="showGenDialog=false">
-      <div class="dialog-box">
-        <div class="dialog-accent-line"></div>
-        <div class="dialog-icon">📎</div>
-        <div class="dialog-title">出题完成</div>
-        <div class="dialog-stats">
-          <div class="ds-item">
-            <span class="ds-num">{{ genTotal }}</span>
-            <span class="ds-label">总题数</span>
-          </div>
-          <div class="ds-item">
-            <span class="ds-num cyan">{{ genObj }}</span>
-            <span class="ds-label">客观题</span>
-          </div>
-          <div class="ds-item">
-            <span class="ds-num magenta">{{ genSub }}</span>
-            <span class="ds-label">主观题</span>
-          </div>
-        </div>
-        <p v-if="genMissingCount > 0" class="dialog-warning">
-          ⚠️ {{ genMissingCount }} 道题答案/解析缺失，可进入刷题后手动重试生成
-        </p>
-        <div class="dialog-actions">
-          <CyberButton variant="primary" block @click="goPractice">📝 立即刷题</CyberButton>
-          <CyberButton variant="ghost" block @click="showGenDialog=false">留在首页</CyberButton>
-        </div>
-      </div>
-    </div>
-
     <!-- ===== 出题失败弹窗：原因写清楚，不再只丢一条 toast ===== -->
     <div v-if="genFailMsg" class="dialog-overlay" @click.self="genFailMsg=''">
       <div class="dialog-box">
@@ -406,7 +376,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { showFailToast, showSuccessToast } from 'vant'
 import { useRouter } from 'vue-router'
 import { isLoggedIn } from '../utils/auth.js'
@@ -466,14 +436,9 @@ const loading = ref(false)
 const genLoading = ref(false)
 const fLoading = ref(false)
 const pLoading = ref(false)
-const showGenDialog = ref(false)
 // 失败必须"看得见"：2 秒的底部 toast 用户根本来不及读，之前"什么都不弹"就是这么来的
 const genFailMsg = ref('')
 const showLoginDialog = ref(false)
-const genTotal = ref(0)
-const genObj = ref(0)
-const genSub = ref(0)
-const genMissingCount = ref(0)
 const visImg = ref('')
 const showViz = ref(false)
 const regCount = ref(0)
@@ -514,8 +479,6 @@ onMounted(async () => {
   setTimeout(() => { bottomNavVisible.value = true }, baseDelay + 600)
 })
 
-onUnmounted(clearPollSignals)
-
 function goStarMap() {
   const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
   if (reduce) { router.push('/knowledge-universe'); return }
@@ -552,19 +515,8 @@ function openAiMind() {
   router.push('/study-map')
 }
 
-// 生成中的轮询统一挂在这里：离开页面时全部 abort，避免"人已经走了、还在后台轮询，
-// 回来发现既没弹成功也没弹失败"
-const pollControllers = new Set()
-function newPollSignal() {
-  const c = new AbortController()
-  pollControllers.add(c)
-  return c
-}
-function clearPollSignals() {
-  pollControllers.forEach(c => { try { c.abort() } catch { /* noop */ } })
-  pollControllers.clear()
-}
-
+// 出题轮询跨页面继续：离开首页去刷题/星图时不 abort，
+// 成功写进全局完成事件，失败用全局 toast，回来仍能在题库看到结果。
 // ===== 原来的出题逻辑（完整保留） =====
 async function handleGenerate({ text, questionType }) {
   if (!text?.trim()) { showFailToast('请输入复习资料'); return }
@@ -577,7 +529,7 @@ async function handleGenerate({ text, questionType }) {
     const taskId = res.taskId
     if (!taskId) { genFail('创建任务失败：后端没有返回任务 ID'); return }
     notifyStore.message = 'AI正在出题中...（你可以去刷其他题目）'
-    const result = await pollTask(taskId, { signal: newPollSignal().signal })
+    const result = await pollTask(taskId)
     const cnt = (result.objectiveQuestions || []).length + (result.subjectiveQuestions || []).length
     // 双重校验：状态完成且确实解析出题目才算成功，杜绝空题假成功
     if (result.status !== 'completed' || cnt === 0) {
@@ -601,9 +553,6 @@ async function handlePhotoGenerate({ files, questionType }) {
   pLoading.value = true
   notifyStore.startGenerating('正在OCR识别，生成试题...')
   let ok = false
-  // 必须在发起请求前声明：.then/.catch 回调会在下面 await 挂起期间就跑起来，
-  // 放在 await 之后会踩到「变量未初始化」，结果是每张图都静默失败
-  const pollSignal = newPollSignal().signal
   let ocrErr = ''
   try {
     const tasks = files.map(file => {
@@ -611,7 +560,7 @@ async function handlePhotoGenerate({ files, questionType }) {
       fd.append('file', file)
       fd.append('questionType', questionType)
       return request.post('/photo-and-generate-async', fd, { timeout: 180000 })
-        .then(res => pollTask(res.taskId, { signal: pollSignal }))
+        .then(res => pollTask(res.taskId))
         .catch((err) => { ocrErr = err && err.message ? err.message : '识别失败'; return null })
     })
     const results = await Promise.all(tasks)
@@ -708,6 +657,7 @@ async function genFromSecs() {
   notifyStore.startGenerating('正在生成试题...')
   let ok = false
   let sectionFailed = false
+  let sectionError = ''
   try {
     let allQs = []
     let pureQuestions = []
@@ -725,17 +675,25 @@ async function genFromSecs() {
       const taskId = createRes.taskId
       notifyStore.message = 'AI正在按章节出题...（你可以去刷其他题目）'
       try {
-        const result = await pollTask(taskId, { signal: newPollSignal().signal })
+        const result = await pollTask(taskId)
         const secCnt = (result.objectiveQuestions || []).length + (result.subjectiveQuestions || []).length
         if (result.error || result.status !== 'completed' || secCnt === 0) {
           sectionFailed = true
+          sectionError = result.error
+            || (result.status !== 'completed' ? `出题任务${result.status || '状态异常'}` : '章节任务已完成，但没有解析出有效题目')
         } else {
           allQs.push(...(result.objectiveQuestions || []))
           allQs.push(...(result.subjectiveQuestions || []))
         }
-      } catch (secErr) { sectionFailed = true }
+      } catch (secErr) {
+        sectionFailed = true
+        sectionError = secErr?.message || '章节出题请求失败'
+      }
     }
-    if (allQs.length === 0) { genFail(sectionFailed ? '所选章节都未生成有效题目，请稍后重试' : '未生成有效题目，请稍后重试'); return }
+    if (allQs.length === 0) {
+      genFail(sectionError || (sectionFailed ? '所选章节都未生成有效题目，请稍后重试' : '未生成有效题目，请稍后重试'))
+      return
+    }
     const subQs = allQs.filter(q => q.type === 'subjective')
     const objQs = allQs.filter(q => q.type !== 'subjective')
     if (sectionFailed) showSuccessToast('部分章节生成失败，展示可用题目')
@@ -757,13 +715,15 @@ function genFail(msg) {
 function popDialog(r) {
   const qs = r.objectiveQuestions || []; const ss = r.subjectiveQuestions || []
   const all = [...qs, ...ss]
-  genTotal.value = r.totalCount || qs.length + ss.length
-  genObj.value = qs.length
-  genSub.value = ss.length
-  genMissingCount.value = countMissingAnswers(all)
-  // 只关闭全局“生成中”状态；完成提示统一用本页弹窗，避免与 App.vue 全局完成弹窗叠加成双框
+  // 完成提示统一由 App.vue 的全局主题弹窗负责：用户无论留在首页、
+  // 去了星图还是折返回首页，都能收到同一份结果。
+  notifyStore.completeGeneration({
+    total: r.totalCount || all.length,
+    objective: qs.length,
+    subjective: ss.length,
+    missing: countMissingAnswers(all)
+  })
   notifyStore.finishGenerating()
-  showGenDialog.value = true
 }
 
 function countMissingAnswers(questions) {
@@ -776,7 +736,6 @@ function countMissingAnswers(questions) {
   }).length
 }
 
-function goPractice() { showGenDialog.value = false; if (router.currentRoute.value.path === '/question-bank') { window.location.reload() } else { router.push('/question-bank') } }
 function goProfile() {
   if (!isLoggedIn()) { showLoginDialog.value = true; return }
   router.push("/profile")

@@ -28,6 +28,14 @@
       <span class="glb-sub">你可以去其他页面浏览</span>
     </div>
   </div>
+
+  <!-- 出题完成：全站统一用主题 token 弹窗，首页/星图/设置页都同一套深浅色 -->
+  <GenerationCompleteDialog
+    :open="!!notifyStore.completed"
+    :result="notifyStore.completed || {}"
+    @close="closeCompletion"
+    @practice="goQuestionBank"
+  />
 </template>
 
 <script setup>
@@ -35,6 +43,7 @@ import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useNotificationStore } from './stores/notification'
 import { ParticleBackground, SplashScreen } from './components/cyber'
+import GenerationCompleteDialog from './components/cyber/GenerationCompleteDialog.vue'
 import WarpOverlay from './components/starmap/WarpOverlay.vue'
 import A11ySettingsDrawer from './components/cyber/A11ySettingsDrawer.vue'
 import { a11yPanelOpen } from './a11y/settingsPanel.js'
@@ -43,6 +52,19 @@ import PetTutor from './pet-tutor/PetTutor.vue'
 const route = useRoute()
 const router = useRouter()
 const notifyStore = useNotificationStore()
+
+function closeCompletion() {
+  notifyStore.clearCompletion()
+}
+
+function goQuestionBank() {
+  notifyStore.clearCompletion()
+  if (route.path === '/question-bank') {
+    window.location.reload()
+  } else {
+    router.push('/question-bank')
+  }
+}
 
 // 记单词流程（/word/*）显示虚拟人陪练
 // 虚拟人出现在 记单词 与 分层阅读 两个英语模块（阅读页用它的查词/解句/朗读入口）

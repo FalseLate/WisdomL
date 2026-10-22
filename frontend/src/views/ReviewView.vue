@@ -102,6 +102,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { showFailToast } from 'vant'
 import request from '../utils/request.js'
+import { normalizeWrongQuestion } from '../utils/questionShape.js'
 import { CyberNavbar, CyberTag } from '../components/cyber'
 
 const loading = ref(true)
@@ -124,7 +125,7 @@ onMounted(async () => {
     const res = await request.get('/wrong-questions/review-today')
     queue.value = (res?.list || []).map(it => {
       let q = null
-      try { q = JSON.parse(it.questionContent) } catch (e) { /* 忽略 */ }
+      try { q = normalizeWrongQuestion(JSON.parse(it.questionContent)) } catch (e) { /* 忽略 */ }
       return { ...it, question: q }
     }).filter(it => it.question)
     roundTotal.value = queue.value.length
@@ -151,14 +152,15 @@ function typeLabel(t) { return t === 'single' ? '单选' : t === 'subjective' ? 
 function pick(key) {
   if (feedback.value) return
   const it = current.value
+  const optionKey = String(key)
   if (it.questionType === 'multiple') {
     let arr = picked.value.split('').filter(Boolean)
-    const i = arr.indexOf(key)
-    if (i >= 0) arr.splice(i, 1); else arr.push(key)
+    const i = arr.indexOf(optionKey)
+    if (i >= 0) arr.splice(i, 1); else arr.push(optionKey)
     arr.sort()
     picked.value = arr.join('')
   } else {
-    picked.value = key
+    picked.value = optionKey
   }
 }
 

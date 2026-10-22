@@ -171,6 +171,19 @@ test('游离星尘的钉子不受星球边界限制：右键放多远就留多�
   expect([at.x, at.y, at.z]).toEqual([1000, 180, -420])
 })
 
+test('球内星点拖远后刷新仍按原偏移落位，不按星球半径回弹', () => {
+  const p = seed()
+  const pin = { x: 142.625, y: 132.287, z: -176.918 }
+  p.points[0].pin = pin
+  const L = computeLayout(layoutInput(derive(p)))
+  const topic = L.pos.get('T1')
+  const at = L.pos.get('P11')
+  expect(at.x - topic.x).toBeCloseTo(pin.x, 3)
+  expect(at.y - topic.y).toBeCloseTo(pin.y, 3)
+  expect(at.z - topic.z).toBeCloseTo(pin.z, 3)
+  expect(Math.hypot(pin.x, pin.y, pin.z), '这个偏移要大于旧的 3.2×星球半径钳制').toBeGreaterThan(250)
+})
+
 test('布局可复现：同一份数据两次算出同一个校验和；有钉子时不整体平移', () => {
   const p = seed()
   const first = computeLayout(layoutInput(derive(p))).checksum

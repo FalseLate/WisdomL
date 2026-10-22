@@ -70,30 +70,40 @@ test.describe('出题结果反馈', () => {
     expect(await page.locator('.global-loading-bar').count()).toBe(0);
   });
 
-  test('生成中离开页面：轮询被 abort，不会回来后发现既没成功也没失败', async ({ page }) => {
+  test('生成中离开页面：轮询继续，完成时在任意页面弹全局完成提示', async ({ page }) => {
     await seed(page);
     let polls = 0;
     await page.route('**/api/generate-async', r => r.fulfill({ json: { taskId: 'tk-slow' } }));
     await page.route('**/api/task/tk-slow', r => {
       polls++;
-      return r.fulfill({ json: { status: 'running' } });
+      // 先在 running 停两轮，确保用户有时间离开首页
+      if (polls < 3) return r.fulfill({ json: { status: 'running' } });
+      return r.fulfill({
+        json: { status: 'completed', totalCount: OBJ.length, objectiveQuestions: OBJ, subjectiveQuestions: [] }
+      });
     });
     await openTextGenerate(page);
     await page.locator('.generate-container button').filter({ hasText: /生成题目/ }).click();
     await page.waitForSelector('.global-loading-bar');
     await page.waitForTimeout(2500);
     const before = polls;
-    // 用站内路由离开（不是整页刷新）：刷新会连定时器一起杀掉，验不到 abort 逻辑。
-    // 出题界面没有顶栏设置入口，先返回仪表盘再进设置。
+
+    // 用站内路由离开首页，模拟“边刷题/边看星图边生成”。
     await page.locator('.navbar-left').first().click();
     await page.locator('.icon-btn[aria-label="设置"]').click();
     await page.waitForURL(/settings/, { timeout: 10000 });
-    // 卸载前可能已有一次请求在飞，先给它落地时间；之后再不增长才算真的停了
-    await page.waitForTimeout(2500);
-    const settled = polls;
-    await page.waitForTimeout(4000);
-    console.log('[GEN-ABORT] 离开前 =', before, '| 在飞落地后 =', settled, '| 再等 4 秒 =', polls);
-    expect(before).toBeGreaterThan(0);   // 确实轮询过，否则这条断言是空的
-    expect(polls).toBe(settled);         // 允许离开瞬间补一次，之后必须完全停止
+
+    // 离开后轮询必须继续，而不是像旧版那样 abort
+    await page.waitForTimeout(3000);
+    console.log('[GEN-BG] 离开前 =', before, '| 离开后 =', polls);
+    expect(polls).toBeGreaterThan(before);
+
+    // 任务完成时已经不在首页，App 应弹全局主题完成框
+    await expect(page.locator('.gen-complete-overlay .dialog-title')).toHaveText('出题完成', { timeout: 20000 });
+    await expect(page.locator('.gen-complete-overlay .ds-num').first()).toHaveText('2');
+    await page.screenshot({ path: 'shots/generate-background-done.png' });
+    await page.locator('.dialog-actions button').filter({ hasText: /立即刷题/ }).click();
+    await page.waitForURL(/question-bank/, { timeout: 15000 });
+    await expect(page.locator('.global-loading-bar')).toHaveCount(0);
   });
 });

@@ -135,7 +135,7 @@ public class StarMapAiService {
         return list.stream().map(StarmapPoint::getTitle).toList();
     }
 
-    @Async("generateExecutor")
+    @Async("starmapExecutor")
     public void analyze(String taskId, Long userId, List<UserWrongQuestion> queue) {
         GenerateTask task = taskManager.getTask(taskId);
         if (task == null) return;

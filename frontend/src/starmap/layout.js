@@ -178,11 +178,12 @@ function placeStarsInPlanet(center, radius, members, starPins, starIndex, moved)
     }
   }
 
-  // 钉住的星点：相对父球的偏移原样保留，只限制在“不会把球撑爆”的范围内
+  // 钉住的星点：相对父球的偏移原样保留；只在极端越界时软钳制，
+  // 不能按星球半径回弹，否则用户拖远后刷新会被静默拉回。
   for (const key of members) {
     const place = starPins.get(key)
     if (!place) continue
-    const pin = clampPoint(place, radius * 3.2)
+    const pin = clampPoint(place, UNIVERSE_LIMIT)
     moved.set(key, { x: center.x + pin.x, y: center.y + pin.y, z: center.z + pin.z })
   }
 }
